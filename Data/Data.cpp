@@ -1,10 +1,16 @@
 #include "Data.hpp"
+#include "Maths/linalg.hpp"
 
 /*----------------------------------------Dataframe-----------------------------------*/
 
-double Dataframe::operator()(size_t i, size_t j) const {
-    assert(i < rows && j < cols);
+double Dataframe::at_row_major(size_t i, size_t j) const {
+    //assert(i < rows && j < cols);
     return data[i * cols + j];
+}
+
+double Dataframe::at_col_major(size_t i, size_t j) const {
+    //assert(i < rows && j < cols);
+    return data[j * rows + i];
 }
 
 std::string Dataframe::decode_label(int value) const {
@@ -26,12 +32,14 @@ void Dataframe::display_raw(size_t nb_rows) const {
     }
     std::cout << std::endl;
 
-    for (size_t i = 0; i < nb_rows * cols; i++) {
+    for (size_t i = 0; i < nb_rows; i++) {
+        for (size_t j = 0; j < cols; j++) {
 
-        std::cout << std::to_string(data[i]) << "  ";
+            std::cout << std::to_string((*this)(i,j)) << "  ";
+        }
 
         // If end of row
-        if ( (i+1) % cols == 0 ) std::cout << std::endl;
+        std::cout << std::endl;
     }
 }
 
@@ -45,16 +53,17 @@ void Dataframe::display_decoded(size_t nb_rows) const {
     }
     std::cout << std::endl;
 
-    for (size_t i = 0; i < nb_rows * cols; i++) {
+    for (size_t i = 0; i < nb_rows; i++) {
+        for (size_t j = 0; j < cols; j++) {
 
-        // If current col is encoded then decode value
-        if (encoded_cols.find((i+1) % cols) != encoded_cols.end() ) {
-                std::cout << decode_label(data[i]) << "  ";
-            }
-        else std::cout << std::to_string(data[i]) << "  ";
-        
+            // If current col is encoded then decode value
+            if (encoded_cols.find(j) != encoded_cols.end() ) {
+                    std::cout << decode_label((*this)(i,j)) << "  ";
+                }
+            else std::cout << std::to_string((*this)(i,j)) << "  ";
+        }
         // If end of row
-        if ( (i+1) % cols == 0 ) std::cout << std::endl;
+        std::cout << std::endl;
     }
 }
 
@@ -124,7 +133,7 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep) {
         if (rows == 1) cols = current_cols;
         rows++;
     }
-    
-    return {rows-1, cols, std::move(data), std::move(headers), 
-        std::move(label_encoder), std::move(encoded_cols)};
+
+    // return column-major dataframe
+    return Linalg::transpose_naive({rows-1, cols, std::move(data), std::move(headers)});
 }

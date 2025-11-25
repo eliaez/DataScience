@@ -18,15 +18,15 @@ class Dataframe
     private:
         size_t rows;
         size_t cols;
-        std::vector<double> data;
+        std::vector<double> data; // Column-major
         std::vector<std::string> headers;
         std::unordered_map<std::string, int> label_encoder;
         std::unordered_set<int> encoded_cols;
 
     public: 
 
-        // Get Value
-        double operator()(size_t i, size_t j) const;
+        // Take a column from a Dataframe to create a another Df having this col.
+        Dataframe transfer_col(size_t j);  
 
         // Return corresponding label from a value
         std::string decode_label(int value) const;
@@ -41,8 +41,24 @@ class Dataframe
     // Getters & Constructor
     public:
 
+        // Getting val(i, j) according to our config  
+        double at_row_major(size_t i, size_t j) const;
+        double at_col_major(size_t i, size_t j) const;
+        double operator()(size_t i, size_t j) const { return at_col_major(i,j);}
+        
+        /*std::vector<double>& row(size_t i); // Getting row i
+        std::vector<double>& col(size_t j); // Getting column j
+        std::vector<double>& col(const std::string& header); // Getting column with header*/
+
         size_t get_rows() const { return rows; }
         size_t get_cols() const { return cols; }
+        size_t size() const { return data.size(); }
+        const std::vector<std::string>& get_headers() const { return headers; }
+        const std::unordered_map<std::string, int>& get_encoder() const { return label_encoder; }
+        const std::unordered_set<int>& get_encodedCols() const { return encoded_cols; }
+
+        Dataframe(size_t r, size_t c, std::vector<double> d, std::vector<std::string> h)
+            : rows(r), cols(c), data(std::move(d)), headers(std::move(h)) {}
 
         Dataframe(size_t r, size_t c, std::vector<double> d, std::vector<std::string> h,
             std::unordered_map<std::string, int> l, std::unordered_set<int> e)
@@ -54,7 +70,7 @@ class Dataframe
 class CsvHandler {
     
     public:
-        // Returns Dataframe from Csv path
+        // Returns a column-major Dataframe from Csv path
         static Dataframe loadCsv(const std::string& filepath, char sep = ',');
 
     private:
