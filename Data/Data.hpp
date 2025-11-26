@@ -18,7 +18,8 @@ class Dataframe
     private:
         size_t rows;
         size_t cols;
-        std::vector<double> data; // Column-major
+        bool is_row_major;
+        std::vector<double> data;
         std::vector<std::string> headers;
         std::unordered_map<std::string, int> label_encoder;
         std::unordered_set<int> encoded_cols;
@@ -42,9 +43,7 @@ class Dataframe
     public:
 
         // Getting val(i, j) according to our config  
-        double at_row_major(size_t i, size_t j) const;
-        double at_col_major(size_t i, size_t j) const;
-        double operator()(size_t i, size_t j) const { return at_col_major(i,j);}
+        double operator()(size_t i, size_t j) const;
         
         /*std::vector<double>& row(size_t i); // Getting row i
         std::vector<double>& col(size_t j); // Getting column j
@@ -53,16 +52,17 @@ class Dataframe
         size_t get_rows() const { return rows; }
         size_t get_cols() const { return cols; }
         size_t size() const { return data.size(); }
+        bool get_storage() const {return is_row_major; }
         const std::vector<std::string>& get_headers() const { return headers; }
         const std::unordered_map<std::string, int>& get_encoder() const { return label_encoder; }
         const std::unordered_set<int>& get_encodedCols() const { return encoded_cols; }
 
-        Dataframe(size_t r, size_t c, std::vector<double> d, std::vector<std::string> h)
-            : rows(r), cols(c), data(std::move(d)), headers(std::move(h)) {}
+        Dataframe(size_t r, size_t c, bool i, std::vector<double> d, std::vector<std::string> h)
+            : rows(r), cols(c), is_row_major(i), data(std::move(d)), headers(std::move(h)) {}
 
-        Dataframe(size_t r, size_t c, std::vector<double> d, std::vector<std::string> h,
+        Dataframe(size_t r, size_t c, bool i, std::vector<double> d, std::vector<std::string> h,
             std::unordered_map<std::string, int> l, std::unordered_set<int> e)
-            : rows(r), cols(c), data(std::move(d)), headers(std::move(h)), 
+            : rows(r), cols(c), is_row_major(i), data(std::move(d)), headers(std::move(h)), 
             label_encoder(std::move(l)), encoded_cols(std::move(e)) {}
 
 };

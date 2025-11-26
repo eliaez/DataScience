@@ -1,16 +1,13 @@
 #include "Data.hpp"
-#include "Maths/linalg.hpp"
+#include "Maths/Linalg.hpp"
 
 /*----------------------------------------Dataframe-----------------------------------*/
 
-double Dataframe::at_row_major(size_t i, size_t j) const {
+double Dataframe::operator()(size_t i, size_t j) const {
     //assert(i < rows && j < cols);
-    return data[i * cols + j];
-}
 
-double Dataframe::at_col_major(size_t i, size_t j) const {
-    //assert(i < rows && j < cols);
-    return data[j * rows + i];
+    if (is_row_major) return data[i * cols + j];
+    else return data[j * rows + i];
 }
 
 std::string Dataframe::decode_label(int value) const {
@@ -135,5 +132,5 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep) {
     }
 
     // return column-major dataframe
-    return Linalg::transpose_naive({rows-1, cols, std::move(data), std::move(headers)});
+    return Linalg::transpose_naive({rows-1, cols, true, std::move(data), std::move(headers)});
 }

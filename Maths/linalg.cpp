@@ -1,9 +1,8 @@
-#include "linalg.hpp"
+#include "Linalg.hpp"
 
 
 Dataframe Linalg::transpose_naive(const Dataframe& df) {
 
-    // Class Dataframe variables
     size_t rows = df.get_rows(), cols = df.get_cols();
     std::vector<double> data;
     data.reserve(rows * cols);
@@ -11,9 +10,15 @@ Dataframe Linalg::transpose_naive(const Dataframe& df) {
     for (size_t i = 0; i < cols; i++) {
         for(size_t j = 0; j < rows; j++) {
 
-            data.push_back(df.at_row_major(j,i));
+            data.push_back(df(j,i));
         }
     }
 
-    return {rows, cols, std::move(data), df.get_headers(), df.get_encoder(), df.get_encodedCols()};
+    return {rows, cols, !df.get_storage(), std::move(data), df.get_headers(), 
+        df.get_encoder(), df.get_encodedCols()};
+}
+
+
+Dataframe Linalg::multiply_naive(const Dataframe& df1, const Dataframe& df2) {
+    
 }
