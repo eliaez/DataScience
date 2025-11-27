@@ -57,8 +57,9 @@ class Dataframe
         const std::unordered_map<std::string, int>& get_encoder() const { return label_encoder; }
         const std::unordered_set<int>& get_encodedCols() const { return encoded_cols; }
 
-        Dataframe(size_t r, size_t c, bool i, std::vector<double> d, std::vector<std::string> h)
-            : rows(r), cols(c), is_row_major(i), data(std::move(d)), headers(std::move(h)) {}
+        Dataframe(size_t r = 0, size_t c = 0, bool i = true, std::vector<double> d = {}, 
+            std::vector<std::string> h = {}) : rows(r), cols(c), is_row_major(i), 
+            data(std::move(d)), headers(std::move(h)) {}
 
         Dataframe(size_t r, size_t c, bool i, std::vector<double> d, std::vector<std::string> h,
             std::unordered_map<std::string, int> l, std::unordered_set<int> e)
