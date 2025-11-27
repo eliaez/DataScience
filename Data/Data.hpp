@@ -26,9 +26,6 @@ class Dataframe
 
     public: 
 
-        // Take a column from a Dataframe to create a another Df having this col.
-        Dataframe transfer_col(size_t j);  
-
         // Return corresponding label from a value
         std::string decode_label(int value) const;
 
@@ -39,11 +36,18 @@ class Dataframe
         void display_raw() const {display_raw(rows);}
         void display_decoded() const {display_decoded(rows);}
 
+        // Take a column from a Dataframe to create a another Df having this col.
+        Dataframe transfer_col(size_t j);  
+
+        // Change from row - major to col - major
+        Dataframe change_layout() const;
+
     // Getters & Constructor
     public:
 
         // Getting val(i, j) according to our config  
         double operator()(size_t i, size_t j) const;
+        const double& at(size_t idx) const;
         
         /*std::vector<double>& row(size_t i); // Getting row i
         std::vector<double>& col(size_t j); // Getting column j
@@ -51,8 +55,11 @@ class Dataframe
 
         size_t get_rows() const { return rows; }
         size_t get_cols() const { return cols; }
+
         size_t size() const { return data.size(); }
+        
         bool get_storage() const {return is_row_major; }
+
         const std::vector<std::string>& get_headers() const { return headers; }
         const std::unordered_map<std::string, int>& get_encoder() const { return label_encoder; }
         const std::unordered_set<int>& get_encodedCols() const { return encoded_cols; }
