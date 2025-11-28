@@ -34,7 +34,7 @@ void Dataframe::display_raw(size_t nb_rows) const {
     for (size_t i = 0; i < nb_rows; i++) {
         for (size_t j = 0; j < cols; j++) {
 
-            std::cout << std::to_string((*this)(i,j)) << "  ";
+            std::cout << (*this)(i,j) << "  ";
         }
 
         // If end of row
@@ -59,7 +59,7 @@ void Dataframe::display_decoded(size_t nb_rows) const {
             if (encoded_cols.find(j) != encoded_cols.end() ) {
                     std::cout << decode_label((*this)(i,j)) << "  ";
                 }
-            else std::cout << std::to_string((*this)(i,j)) << "  ";
+            else std::cout << (*this)(i,j) << "  ";
         }
         // If end of row
         std::cout << std::endl;

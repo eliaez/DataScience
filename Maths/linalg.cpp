@@ -32,28 +32,50 @@ Dataframe Linalg::transpose_naive(const Dataframe& df) {
 }
 
 
-Dataframe Linalg::multiply_naive(const Dataframe& df1, const Dataframe& df2) {
+Dataframe Linalg::multiply_naive(const Dataframe& df1, Dataframe& df2) {
 
     size_t m = df1.get_rows();
     size_t n = df1.get_cols();
     size_t o = df2.get_rows();
     size_t p = df2.get_cols();
     
-    if (m != o) {
+    // Verify if we can multiply them
+    assert(n == o);
 
-        // Verify if we can multiply them
-        assert(n == o);
-    }
+    if (df1.get_storage() == df2.get_storage()) {
+        df2 = df2.change_layout();
+    } 
 
     std::vector<double> data(m * p, 0.0);
     
-    for (size_t i = 0; i < m; i++) {
+    // row - col
+    if (df1.get_storage()) {
+        for (size_t i = 0; i < m; i++) {
+            for (size_t j = 0; j < p; j++) {
 
-        for (size_t j = 0; j < p; j++) {
-
-            for (size_t k = 0; k < o; k++) {
-
-                data[i * p + j] += df1(j, k) * df2(k,i);
+                double sum = 0.0;
+                for (size_t k = 0; k < n; k++) {
+                    // df1 row major
+                    // df2 col major
+                    sum += df1.at(i * n + k) * df2.at(j * o + k);
+                }
+                // Write it directly in col major
+                data[j * m + i] = sum;
+            }
+        }
+    }
+    // col - row
+    else {
+        for (size_t i = 0; i < m; i++) {
+            for (size_t k = 0; k < n; k++) {
+                
+                double val1 = df1.at(k*m + i); 
+                for (size_t j = 0; j < p; j++) {
+                    // df1 row major
+                    // df2 col major
+                    // Write it directly in col major
+                    data[j*m + i] += val1 * df2.at(k*p + j); // Sequential read for performances
+                }
             }
         }
     }
