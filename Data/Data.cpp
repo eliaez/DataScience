@@ -1,16 +1,15 @@
 #include "Data.hpp"
-#include "Maths/linalg.hpp"
+#include "Maths/Linalg.hpp"
 
 /*----------------------------------------Dataframe-----------------------------------*/
 
-double Dataframe::at_row_major(size_t i, size_t j) const {
+double Dataframe::operator()(size_t i, size_t j) const {
     //assert(i < rows && j < cols);
-    return data[i * cols + j];
+    return is_row_major ? data[i*cols+j] : data[j*rows+i];
 }
 
-double Dataframe::at_col_major(size_t i, size_t j) const {
-    //assert(i < rows && j < cols);
-    return data[j * rows + i];
+const double& Dataframe::at(size_t idx) const {
+    return data[idx];
 }
 
 std::string Dataframe::decode_label(int value) const {
@@ -35,7 +34,7 @@ void Dataframe::display_raw(size_t nb_rows) const {
     for (size_t i = 0; i < nb_rows; i++) {
         for (size_t j = 0; j < cols; j++) {
 
-            std::cout << std::to_string((*this)(i,j)) << "  ";
+            std::cout << (*this)(i,j) << "  ";
         }
 
         // If end of row
@@ -60,11 +59,31 @@ void Dataframe::display_decoded(size_t nb_rows) const {
             if (encoded_cols.find(j) != encoded_cols.end() ) {
                     std::cout << decode_label((*this)(i,j)) << "  ";
                 }
-            else std::cout << std::to_string((*this)(i,j)) << "  ";
+            else std::cout << (*this)(i,j) << "  ";
         }
         // If end of row
         std::cout << std::endl;
     }
+}
+
+Dataframe Dataframe::change_layout() const {
+    
+    size_t temp_i, temp_j;
+    std::vector<double> new_data;
+    new_data.reserve(rows * cols);
+
+    if (is_row_major) temp_i = cols, temp_j = rows;
+    else temp_i = rows, temp_j = cols;
+
+    for (size_t i = 0; i < temp_i; i++) {
+        for(size_t j = 0; j < temp_j; j++) {
+
+            if (is_row_major) new_data.push_back(data[j*cols+i]);
+            else new_data.push_back(data[j*rows+i]);
+        }
+    }
+    return {rows, cols, !is_row_major, std::move(new_data), headers, 
+        label_encoder, encoded_cols};
 }
 
 /*----------------------------------------CsvHandler-----------------------------------*/
@@ -134,6 +153,8 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep) {
         rows++;
     }
 
+    Dataframe csv = {rows-1, cols, true, std::move(data), std::move(headers)};
+    
     // return column-major dataframe
-    return Linalg::transpose_naive({rows-1, cols, std::move(data), std::move(headers)});
+    return csv.change_layout();
 }
