@@ -66,6 +66,50 @@ void Dataframe::display_decoded(size_t nb_rows) const {
     }
 }
 
+Dataframe Dataframe::transfer_col(size_t j) {
+
+    if (is_row_major) *this = change_layout();  
+
+    // Get Data and erase it
+    std::vector<double> col_y(data.begin() + j*rows, data.begin() + (j+1)*rows);
+    data.erase(data.begin() + j*rows, data.begin() + (j+1)*rows);
+    
+    // Get header and erase it
+    std::vector<std::string> headers_y = {std::move(headers[j])};
+    headers.erase(headers.begin() + j);
+
+    // Get encoded_labels or not
+    std::unordered_set<int> encoded_cols_y;
+    if (encoded_cols.erase(static_cast<int>(j))) {
+        encoded_cols_y.insert(0); 
+    }
+    
+    // Need to fix the indexes of others cols
+    std::unordered_set<int> updated_encoded;
+    for (int idx : encoded_cols) {
+        updated_encoded.insert(idx > static_cast<int>(j) ? idx - 1 : idx);
+    }
+    encoded_cols = std::move(updated_encoded);
+
+    cols--;
+
+    // By precaution since we have not created a direct link, 
+    // we are not sure that certain values belong to our columns
+    return {rows, 1, false, std::move(col_y), std::move(headers_y), 
+        std::move(label_encoder), std::move(encoded_cols_y)};
+}
+
+Dataframe Dataframe::transfer_col(const std::string& col_name) {
+
+    auto idx = std::find(headers.begin(), headers.end(), col_name);
+
+    if (idx != headers.end()) return transfer_col(static_cast<size_t>(idx - headers.begin()));
+    else {
+        std::cout << "Column not found - try again" << std::endl;
+        return {};
+    }
+}
+
 Dataframe Dataframe::change_layout() const {
     
     size_t temp_i, temp_j;
@@ -78,8 +122,7 @@ Dataframe Dataframe::change_layout() const {
     for (size_t i = 0; i < temp_i; i++) {
         for(size_t j = 0; j < temp_j; j++) {
 
-            if (is_row_major) new_data.push_back(data[j*cols+i]);
-            else new_data.push_back(data[j*rows+i]);
+            new_data.push_back(data[j*temp_i+i]);
         }
     }
     return {rows, cols, !is_row_major, std::move(new_data), headers, 

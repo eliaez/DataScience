@@ -38,6 +38,7 @@ class Dataframe
 
         // Take a column from a Dataframe to create a another Df having this col.
         Dataframe transfer_col(size_t j);  
+        Dataframe transfer_col(const std::string& col_name);
 
         // Change from row - major to col - major
         Dataframe change_layout() const;
