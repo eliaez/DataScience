@@ -43,6 +43,9 @@ class Dataframe
         // Change from row - major to col - major
         Dataframe change_layout() const;
 
+        // Change from row - major to col - major 
+        void change_layout_inplace();
+
     // Getters & Constructor
     public:
 
@@ -61,6 +64,7 @@ class Dataframe
         
         bool get_storage() const {return is_row_major; }
 
+        const std::vector<double>& get_data() const { return data; }
         const std::vector<std::string>& get_headers() const { return headers; }
         const std::unordered_map<std::string, int>& get_encoder() const { return label_encoder; }
         const std::unordered_set<int>& get_encodedCols() const { return encoded_cols; }

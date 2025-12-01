@@ -68,7 +68,7 @@ void Dataframe::display_decoded(size_t nb_rows) const {
 
 Dataframe Dataframe::transfer_col(size_t j) {
 
-    if (is_row_major) *this = change_layout();  
+    if (is_row_major) this->change_layout_inplace();  
 
     // Get Data and erase it
     std::vector<double> col_y(data.begin() + j*rows, data.begin() + (j+1)*rows);
@@ -127,6 +127,25 @@ Dataframe Dataframe::change_layout() const {
     }
     return {rows, cols, !is_row_major, std::move(new_data), headers, 
         label_encoder, encoded_cols};
+}
+
+void Dataframe::change_layout_inplace() {
+    
+    size_t temp_i, temp_j;
+    std::vector<double> new_data;
+    new_data.reserve(rows * cols);
+
+    if (is_row_major) temp_i = cols, temp_j = rows;
+    else temp_i = rows, temp_j = cols;
+
+    for (size_t i = 0; i < temp_i; i++) {
+        for(size_t j = 0; j < temp_j; j++) {
+
+            new_data.push_back(data[j*temp_i+i]);
+        }
+    }
+    is_row_major = !is_row_major;
+    data = std::move(new_data);
 }
 
 /*----------------------------------------CsvHandler-----------------------------------*/
