@@ -13,6 +13,8 @@ namespace Linalg {
     std::tuple<double, std::vector<double>, Dataframe> determinant_naive(Dataframe& df);
     
     Dataframe transpose_naive(Dataframe& df);
+
+    Dataframe sum_naive(const Dataframe& df1, const Dataframe& df2, char op = '+');
     
     Dataframe multiply_naive(const Dataframe& df1, Dataframe& df2);
 

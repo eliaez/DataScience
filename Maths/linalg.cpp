@@ -146,6 +146,35 @@ Dataframe Linalg::transpose_naive(Dataframe& df) {
         df.get_encoder(), df.get_encodedCols()};
 }
 
+Dataframe Linalg::sum_naive(const Dataframe& df1, const Dataframe& df2, char op) {
+
+    size_t m = df1.get_rows();
+    size_t n = df1.get_cols();
+    size_t o = df2.get_rows();
+    size_t p = df2.get_cols();
+
+    // Verify if we can sum them
+    assert(m == o && n == p);
+
+    // Condition to have better performances
+    assert((df1.get_storage() && df2.get_storage()) || (!df1.get_storage() && !df2.get_storage()));
+
+    // Data
+    std::vector<double> new_data(m * n);
+
+    if (op == '+') {
+        for (size_t i = 0; i < m*n; i++) {
+            new_data[i] = df1.at(i) + df2.at(i);
+        }
+    }
+    else if (op == '-') {
+        for (size_t i = 0; i < m*n; i++) {
+            new_data[i] = df1.at(i) - df2.at(i);
+        }
+    }
+
+    return {m, n, false, std::move(new_data)};
+}
 
 Dataframe Linalg::multiply_naive(const Dataframe& df1, Dataframe& df2) {
 
