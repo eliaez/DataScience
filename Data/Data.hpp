@@ -38,9 +38,13 @@ class Dataframe
 
         // Take a column from a Dataframe to create a another Df having this col.
         Dataframe transfer_col(size_t j);  
+        Dataframe transfer_col(const std::string& col_name);
 
         // Change from row - major to col - major
         Dataframe change_layout() const;
+
+        // Change from row - major to col - major 
+        void change_layout_inplace();
 
     // Getters & Constructor
     public:
@@ -48,6 +52,7 @@ class Dataframe
         // Getting val(i, j) according to our config  
         double operator()(size_t i, size_t j) const;
         const double& at(size_t idx) const;
+        double& at(size_t idx);
         
         /*std::vector<double>& row(size_t i); // Getting row i
         std::vector<double>& col(size_t j); // Getting column j
@@ -60,6 +65,7 @@ class Dataframe
         
         bool get_storage() const {return is_row_major; }
 
+        const std::vector<double>& get_data() const { return data; }
         const std::vector<std::string>& get_headers() const { return headers; }
         const std::unordered_map<std::string, int>& get_encoder() const { return label_encoder; }
         const std::unordered_set<int>& get_encodedCols() const { return encoded_cols; }
