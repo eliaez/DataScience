@@ -12,6 +12,10 @@ const double& Dataframe::at(size_t idx) const {
     return data[idx];
 }
 
+double& Dataframe::at(size_t idx) {
+    return data[idx];
+}
+
 std::string Dataframe::decode_label(int value) const {
 
     for (const auto& [key, val] : label_encoder) {

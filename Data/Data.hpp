@@ -52,6 +52,7 @@ class Dataframe
         // Getting val(i, j) according to our config  
         double operator()(size_t i, size_t j) const;
         const double& at(size_t idx) const;
+        double& at(size_t idx);
         
         /*std::vector<double>& row(size_t i); // Getting row i
         std::vector<double>& col(size_t j); // Getting column j
