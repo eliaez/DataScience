@@ -1,5 +1,5 @@
-#include "Data.hpp"
-#include "Maths/Linalg.hpp"
+#include "include/Data/Data.hpp"
+#include "include/Linalg/Linalg.hpp"
 
 /*----------------------------------------Dataframe-----------------------------------*/
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Data/Data.hpp"
+#include "include/Data/Data.hpp"
 #include <tuple>
 
 namespace Linalg {
