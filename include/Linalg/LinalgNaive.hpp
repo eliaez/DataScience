@@ -1,20 +1,11 @@
 #pragma once
 
 #include "Data/Data.hpp"
-#include "Linalg/LinalgNaive.hpp"
 #include <tuple>
 
 namespace Linalg {
-
-    enum class Backend {
-        NAIVE, // Still col-major and cache friendly
-        AVX2,
-        AVX2_THREADED,
-        EIGEN,
-        AUTO
-    };
-
-    class Operations {
+    namespace Naive {
+        
         int triangular_matrix(const Dataframe& df);
 
         // LU decomposition, returns nb_swaps, swap - permutation matrix and LU in the same matrix
@@ -31,5 +22,5 @@ namespace Linalg {
         Dataframe solveLU_inplace(const Dataframe& perm, Dataframe& LU);
 
         Dataframe inverse(Dataframe& df);
-    };
-}; 
+    }
+}
