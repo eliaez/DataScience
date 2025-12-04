@@ -16,6 +16,7 @@ include_directories(include)
 # Lib sources
 set(LIB_SOURCES src/Data/Data.cpp
                 src/Linalg/Linalg.cpp
+                src/Linalg/LinalgNaive.cpp
 )
 
 # Main Library

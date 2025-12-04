@@ -15,21 +15,19 @@ namespace Linalg {
     };
 
     class Operations {
-        int triangular_matrix(const Dataframe& df);
 
-        // LU decomposition, returns nb_swaps, swap - permutation matrix and LU in the same matrix
-        std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(const Dataframe& df);
+        private:
+            static Backend current_backend;
 
-        std::tuple<double, std::vector<double>, Dataframe> determinant(Dataframe& df);
-        
-        Dataframe transpose(Dataframe& df);
+        public:
+            
+            static void set_backend(Backend b);
+            static Backend get_backend();
 
-        Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op = '+');
-        
-        Dataframe multiply(const Dataframe& df1, Dataframe& df2);
-
-        Dataframe solveLU_inplace(const Dataframe& perm, Dataframe& LU);
-
-        Dataframe inverse(Dataframe& df);
+            static Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op = '+');
+            static Dataframe multiply(const Dataframe& df1, Dataframe& df2);
+            static Dataframe transpose(Dataframe& df);
+            static Dataframe inverse(Dataframe& df);
+            
     };
 }; 
