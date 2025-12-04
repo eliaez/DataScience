@@ -1,6 +1,10 @@
-#include "Linalg.hpp"
+#include "Linalg/LinalgNaive.hpp"
+#include "Linalg/Linalg.hpp"
 
-std::tuple<int, std::vector<double>, Dataframe> Linalg::LU_decomposition(const Dataframe& df) {
+namespace Linalg {
+namespace Naive {
+
+std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(const Dataframe& df) {
 
     int nb_swaps = 0;
     size_t n = df.get_cols();
@@ -26,7 +30,7 @@ std::tuple<int, std::vector<double>, Dataframe> Linalg::LU_decomposition(const D
         }
 
         // Permutation of rows
-        if (k != idx) {
+        if (k != static_cast<size_t>(idx)) {
             for (size_t j = 0; j < n; j++) {
                 std::swap(LU[j*n + k], LU[j*n + idx]);
                 std::swap(swaps[j*n + k], swaps[j*n + idx]);
@@ -58,7 +62,7 @@ std::tuple<int, std::vector<double>, Dataframe> Linalg::LU_decomposition(const D
     return {nb_swaps, swaps, {n, n, false,  std::move(LU)}};
 }
 
-int Linalg::triangular_matrix(const Dataframe& df) {
+int triangular_matrix(const Dataframe& df) {
 
     size_t n = df.get_rows(); 
     bool is_trig_up = true;
@@ -87,7 +91,7 @@ int Linalg::triangular_matrix(const Dataframe& df) {
     return 0; // No
 }
 
-std::tuple<double, std::vector<double>, Dataframe> Linalg::determinant_naive(Dataframe& df) {
+std::tuple<double, std::vector<double>, Dataframe>determinant(Dataframe& df) {
     
     if (df.get_storage()){
         df.change_layout_inplace();
@@ -123,7 +127,7 @@ std::tuple<double, std::vector<double>, Dataframe> Linalg::determinant_naive(Dat
     }
 }
 
-Dataframe Linalg::transpose_naive(Dataframe& df) {
+Dataframe transpose(Dataframe& df) {
 
     size_t rows = df.get_cols(), cols = df.get_rows();
     size_t temp_row = df.get_rows(), temp_col = df.get_cols();
@@ -146,7 +150,7 @@ Dataframe Linalg::transpose_naive(Dataframe& df) {
         df.get_encoder(), df.get_encodedCols()};
 }
 
-Dataframe Linalg::sum_naive(const Dataframe& df1, const Dataframe& df2, char op) {
+Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
 
     size_t m = df1.get_rows();
     size_t n = df1.get_cols();
@@ -176,7 +180,7 @@ Dataframe Linalg::sum_naive(const Dataframe& df1, const Dataframe& df2, char op)
     return {m, n, false, std::move(new_data)};
 }
 
-Dataframe Linalg::multiply_naive(const Dataframe& df1, Dataframe& df2) {
+Dataframe multiply(const Dataframe& df1, Dataframe& df2) {
 
     size_t m = df1.get_rows();
     size_t n = df1.get_cols();
@@ -230,7 +234,7 @@ Dataframe Linalg::multiply_naive(const Dataframe& df1, Dataframe& df2) {
                      df1.get_headers(), df1.get_encoder(), df1.get_encodedCols());
 }
 
-Dataframe Linalg::solveLU_inplace(const Dataframe& perm, Dataframe& LU) {
+Dataframe solveLU_inplace(const Dataframe& perm, Dataframe& LU) {
 
     size_t n = LU.get_cols();
     std::vector<double> y(n*n);
@@ -270,9 +274,9 @@ Dataframe Linalg::solveLU_inplace(const Dataframe& perm, Dataframe& LU) {
 }
 
 
-Dataframe Linalg::inverse_naive(Dataframe& df) {
+Dataframe inverse(Dataframe& df) {
 
-    auto [det, swaps, LU] = determinant_naive(df);
+    auto [det, swaps, LU] = determinant(df);
     
     // Condition to inverse 
     assert(det != 0);
@@ -338,8 +342,11 @@ Dataframe Linalg::inverse_naive(Dataframe& df) {
         
         // Permutation matrix
         Dataframe df_swaps = {n, n, false, std::move(swaps)};
-        Dataframe perm = multiply_naive(df_swaps, df_id); 
+        Dataframe perm = multiply(df_swaps, df_id); 
 
         return solveLU_inplace(perm, LU);
     }
+}
+
+}
 }
