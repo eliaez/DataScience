@@ -17,6 +17,6 @@ void Tests::run_all() {
             failure++;
         }
     }
-    std::cout << "\n" << "Tests Results: " << success << "/" << success+failure << std::endl;
+    std::cout << "\n" << success << "/" << success+failure << "\n" << std::endl;
 }
 }

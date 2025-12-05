@@ -27,12 +27,13 @@ namespace TestSuite {
 };
 
 #define ASSERT_EQ(actual, expected) \
-    auto _actual = (actual); \
-    auto _expected = (expected); \
-    if (_actual != _expected) { \
-        throw std::runtime_error( \
-            std::string("Ligne ") + std::to_string(__LINE__) + \
-            ": " + #actual + " != " + #expected + \
-            " (" + std::to_string(_actual) + " != " + std::to_string(_expected) + ")" \
-        ); \
-    } \
+    do { \
+        auto _actual = (actual); \
+        auto _expected = (expected); \
+        if (_actual != _expected) { \
+            throw std::runtime_error( \
+                std::string("Ligne ") + std::to_string(__LINE__) \
+            ); \
+        } \
+    } while(0); 
+    
