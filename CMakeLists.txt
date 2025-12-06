@@ -7,7 +7,8 @@ set(CMAKE_CXX_STANDARD 20)
 
 
 # Options
-
+option(BUILD_TEST "Build tests" ON)
+option(BUILD_MAIN "Build main" ON)
 
 # Inclusions
 include_directories(include)
@@ -17,12 +18,25 @@ include_directories(include)
 set(LIB_SOURCES src/Data/Data.cpp
                 src/Linalg/Linalg.cpp
                 src/Linalg/LinalgNaive.cpp
+                src/Utils/TestSuite.cpp
 )
 
 # Main Library
 add_library(linalg STATIC ${LIB_SOURCES})
 target_compile_options(linalg PRIVATE -Wall -Wextra -O3 -march=native)
 
+if(BUILD_TEST)
+    enable_testing()
+    add_executable(test_all 
+                tests/tests_main.cpp
+                tests/tests_data.cpp
+                tests/tests_naive.cpp)
+                
+    target_link_libraries(test_all linalg)
+    add_test(NAME AllTests COMMAND test_all)
+endif()
 
-add_executable(Main src/main.cpp)
-target_link_libraries(Main linalg)
+if(BUILD_MAIN)
+    add_executable(Main src/main.cpp)
+    target_link_libraries(Main linalg)
+endif()

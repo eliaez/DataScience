@@ -42,7 +42,7 @@ std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(const Dataframe
         double p = LU[k*n + k];
         if (std::abs(p) < 1e-14) {
             // det = 0
-            throw std::runtime_error("Singular Matrix");
+            throw std::runtime_error("Singular Matrix <=> Det = 0");
         }
 
         // Then classical LU decomposition algorithm
@@ -99,8 +99,8 @@ std::tuple<double, std::vector<double>, Dataframe>determinant(Dataframe& df) {
 
     size_t rows = df.get_rows(), cols = df.get_cols();
 
-    // First condition, block matrix
-    assert(rows == cols);
+    // First condition, Matrix(n,n)
+    if (rows != cols) throw std::runtime_error("Need Matrix(n,n)");
     size_t n = rows;
 
     // Let's see if the matrix is diagonal or triangular 
@@ -158,10 +158,12 @@ Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
     size_t p = df2.get_cols();
 
     // Verify if we can sum them
-    assert(m == o && n == p);
+    if (m != o || n != p) throw std::runtime_error("Need two Matrix of equal dimensions");
 
     // Condition to have better performances
-    assert((df1.get_storage() && df2.get_storage()) || (!df1.get_storage() && !df2.get_storage()));
+    if (df1.get_storage() != df2.get_storage()) {
+        throw std::runtime_error("Need two Matrix with the same storage Col-major or Row-major for performances purpose");
+    }
 
     // Data
     std::vector<double> new_data(m * n);
@@ -188,7 +190,7 @@ Dataframe multiply(const Dataframe& df1, Dataframe& df2) {
     size_t p = df2.get_cols();
     
     // Verify if we can multiply them
-    assert(n == o);
+    if (n != o) throw std::runtime_error("Need df1 cols == df2 rows");
 
     // If row - row or col - col, we want to optimize
     if (df1.get_storage() == df2.get_storage()) {
@@ -277,9 +279,6 @@ Dataframe solveLU_inplace(const Dataframe& perm, Dataframe& LU) {
 Dataframe inverse(Dataframe& df) {
 
     auto [det, swaps, LU] = determinant(df);
-    
-    // Condition to inverse 
-    assert(det != 0);
 
     size_t n = df.get_cols();
     
