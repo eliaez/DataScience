@@ -29,7 +29,8 @@ if(BUILD_TEST)
     enable_testing()
     add_executable(test_all 
                 tests/tests_main.cpp
-                tests/tests_data.cpp)
+                tests/tests_data.cpp
+                tests/tests_naive.cpp)
                 
     target_link_libraries(test_all linalg)
     add_test(NAME AllTests COMMAND test_all)
