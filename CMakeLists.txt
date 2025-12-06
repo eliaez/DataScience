@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 
 # Options
-option(BUILD_TEST "Build tests" ON)
+option(BUILD_TEST "Build tests" OFF)
 option(BUILD_MAIN "Build main" ON)
 
 # Inclusions

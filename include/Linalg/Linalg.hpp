@@ -19,7 +19,10 @@ namespace Linalg {
 
         public:
             
+            // Setter 
             static void set_backend(Backend b);
+            
+            // Will select the best one if AUTO
             static Backend get_backend();
 
             static Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op = '+');

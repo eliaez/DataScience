@@ -16,8 +16,6 @@ namespace TestSuite {
         public:
             Tests() = default;
 
-            int get_success() const { return success; }
-            int get_failure() const { return failure; }
             const std::vector<std::pair<std::function<void()>,std::string_view>>& get_testlist() const { return to_test; }
 
             void add_test(std::function<void()> f, std::string_view s) { to_test.emplace_back(std::move(f), std::move(s)); }
@@ -26,6 +24,7 @@ namespace TestSuite {
     };
 };
 
+// Macro Assert equal function
 #define ASSERT_EQ(actual, expected) \
     do { \
         auto _actual = (actual); \

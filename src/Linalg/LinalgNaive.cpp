@@ -88,11 +88,12 @@ int triangular_matrix(const Dataframe& df) {
     else if (is_trig_up) return 2; // Up
     else if (is_trig_down) return 1; // Down
 
-    return 0; // No
+    return 0; // Not triangular
 }
 
 std::tuple<double, std::vector<double>, Dataframe>determinant(Dataframe& df) {
     
+    // Changing layout for better performances
     if (df.get_storage()){
         df.change_layout_inplace();
     }
@@ -135,6 +136,7 @@ Dataframe transpose(Dataframe& df) {
     std::vector<double> data;
     data.reserve(rows * cols);
 
+    // Changing layout for better performances
     if (df.get_storage()){
         df.change_layout_inplace();
     }
@@ -143,7 +145,6 @@ Dataframe transpose(Dataframe& df) {
         for(size_t j = 0; j < temp_col; j++) {
 
             data.push_back(df.at(j*temp_row + i));
-
         }
     }   
     return {rows, cols, false, std::move(data), df.get_headers(), 
@@ -165,7 +166,7 @@ Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
         throw std::runtime_error("Need two Matrix with the same storage Col-major or Row-major for performances purpose");
     }
 
-    // Data
+    // New data
     std::vector<double> new_data(m * n);
 
     if (op == '+') {
@@ -289,6 +290,7 @@ Dataframe inverse(Dataframe& df) {
     }
     Dataframe df_id = {n, n, false, std::move(id)};
 
+    // If no LU matrix was returned, then the matrix is triangular
     if (LU.get_data().empty()) {
         std::vector<double> y(n*n, 0.0);
 
@@ -321,7 +323,7 @@ Dataframe inverse(Dataframe& df) {
         // Down
         else {
 
-            // Solving Ly = Id (No division because diag = 1)
+            // Solving Ly = Id
             // Forward substitution
             for (size_t k = 0; k < n; k++) {
                 for (size_t i = 0; i < n; i++) {

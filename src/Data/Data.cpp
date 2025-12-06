@@ -1,5 +1,6 @@
 #include "Data/Data.hpp"
 #include "Linalg/Linalg.hpp"
+#include <iomanip>
 
 /*----------------------------------------Dataframe-----------------------------------*/
 
@@ -21,26 +22,25 @@ std::string Dataframe::decode_label(int value) const {
     for (const auto& [key, val] : label_encoder) {
         if (val == value) return key;
     }
-
     return "NaN - Issue";
 }
 
 void Dataframe::display_raw(size_t nb_rows) const {
 
-    std::cout << "Displaying Raw Matrix:" << std::endl;
+    std::cout << std::left <<  "Displaying Raw Matrix:" << std::endl;
 
     // Displaying headers
     for (const auto& s : headers) {
-        std::cout << s << " ";
+        std::cout << std::setw(20) << s;
     }
     std::cout << std::endl;
+    std::cout << std::string(20*headers.size(), '-') << std::endl;
 
     for (size_t i = 0; i < nb_rows; i++) {
         for (size_t j = 0; j < cols; j++) {
 
-            std::cout << (*this)(i,j) << "  ";
+            std::cout << std::setw(20) << (*this)(i,j) ;
         }
-
         // If end of row
         std::cout << std::endl;
     }
@@ -52,18 +52,19 @@ void Dataframe::display_decoded(size_t nb_rows) const {
     
     // Displaying headers
     for (const auto& s : headers) {
-        std::cout << s << " ";
+        std::cout << std::setw(20) << s;
     }
     std::cout << std::endl;
+    std::cout << std::string(20*headers.size(), '-') << std::endl;
 
     for (size_t i = 0; i < nb_rows; i++) {
         for (size_t j = 0; j < cols; j++) {
 
             // If current col is encoded then decode value
             if (encoded_cols.find(j) != encoded_cols.end() ) {
-                    std::cout << decode_label((*this)(i,j)) << "  ";
+                    std::cout << std::setw(20) << decode_label((*this)(i,j));
                 }
-            else std::cout << (*this)(i,j) << "  ";
+            else std::cout << std::setw(20) << (*this)(i,j);
         }
         // If end of row
         std::cout << std::endl;
@@ -98,13 +99,14 @@ Dataframe Dataframe::transfer_col(size_t j) {
     cols--;
 
     // By precaution since we have not created a direct link, 
-    // we are not sure that certain values belong to our columns
+    // we are not sure that certain values belong to our columns so getting whole label_encoder
     return {rows, 1, false, std::move(col_y), std::move(headers_y), 
-        std::move(label_encoder), std::move(encoded_cols_y)};
+        label_encoder, std::move(encoded_cols_y)};
 }
 
 Dataframe Dataframe::transfer_col(const std::string& col_name) {
 
+    // Find col
     auto idx = std::find(headers.begin(), headers.end(), col_name);
 
     if (idx != headers.end()) return transfer_col(static_cast<size_t>(idx - headers.begin()));
@@ -156,7 +158,7 @@ void Dataframe::change_layout_inplace() {
 
 int CsvHandler::encode_label(std::string& label, std::unordered_map<std::string, int>& label_encoder) {
 
-    // Return pointer to the value or end()
+    // Find if label in vector
     auto it = label_encoder.find(label);
 
     if (it == label_encoder.end()) {
@@ -219,7 +221,8 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep) {
         rows++;
     }
 
-    Dataframe csv = {rows-1, cols, true, std::move(data), std::move(headers)};
+    Dataframe csv = {rows-1, cols, true, std::move(data), std::move(headers), 
+        std::move(label_encoder), std::move(encoded_cols)};
     
     // return column-major dataframe
     return csv.change_layout();
