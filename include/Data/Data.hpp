@@ -29,28 +29,31 @@ class Dataframe
         // Return corresponding label from a value
         std::string decode_label(int value) const;
 
-        // Displaying our datas either with encoded values or decoded values
+        // Displaying our datas with encoded values
         void display_raw(size_t nb_rows) const;
-        void display_decoded(size_t nb_rows) const;
-
         void display_raw() const {display_raw(rows);}
+
+        // Displaying our datas with decoded values
+        void display_decoded(size_t nb_rows) const;
         void display_decoded() const {display_decoded(rows);}
 
-        // Take a column from a Dataframe to create a another Df having this col.
+        // Transfer a column from a Dataframe to a new one 
         Dataframe transfer_col(size_t j);  
         Dataframe transfer_col(const std::string& col_name);
 
         // Change from row - major to col - major
         Dataframe change_layout() const;
 
-        // Change from row - major to col - major 
+        // Change from row - major to col - major inplace
         void change_layout_inplace();
 
     // Getters & Constructor
     public:
 
-        // Getting val(i, j) according to our config  
+        // Getting val(i, j) according to our storage config  
         double operator()(size_t i, size_t j) const;
+
+        // Getting value from Dataframe according to index
         const double& at(size_t idx) const;
         double& at(size_t idx);
         
@@ -88,7 +91,7 @@ class CsvHandler {
         static Dataframe loadCsv(const std::string& filepath, char sep = ',');
 
     private:
-        // Used to encode potential columns using string for categories
+        // Function to encode potential columns using string for categories
         static int encode_label(std::string& label, std::unordered_map<std::string, int>& label_encoder);
 };
 

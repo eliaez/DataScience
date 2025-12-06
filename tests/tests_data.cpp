@@ -3,40 +3,38 @@
 
 using namespace std;
 
-
+// Testing data in col-major with loadingCsv
 void loadCsv_t(const string& filepath, const vector<double>& iris_colmajor) {
 
     Dataframe iris = CsvHandler::loadCsv(filepath);
 
-    // Testing data in col-major and loadingCsv
     ASSERT_EQ(iris.get_data(), iris_colmajor)
 }
 
-
+// Testing data after change_layout
 void changelayout_t(Dataframe iris, const vector<double>& iris_rowmajor) {
     
     iris.change_layout_inplace();
 
-    // Testing data after change_layout
     ASSERT_EQ(iris.get_data(), iris_rowmajor)
 }
 
-
+// Testing the transfer of a column from a Df to another new one
 void transfercol_t(Dataframe& iris, const string& col,
     const Dataframe& iris_bis, const vector<double>& res_y) {
 
     Dataframe y = iris.transfer_col(col);
     
-    // 
+    // Data new df
     ASSERT_EQ(y.get_data(), res_y)
 
-    //
+    // Headers new df
     ASSERT_EQ(y.get_headers()[0], col)
 
-    //
+    // Data former df
     ASSERT_EQ(iris.get_data(), iris_bis.get_data())
 
-    //
+    // Headers former df
     ASSERT_EQ(iris.get_headers(), iris_bis.get_headers())
 }
 
