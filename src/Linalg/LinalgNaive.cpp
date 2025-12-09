@@ -62,35 +62,6 @@ std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(const Dataframe
     return {nb_swaps, swaps, {n, n, false,  std::move(LU)}};
 }
 
-int triangular_matrix(const Dataframe& df) {
-
-    size_t n = df.get_rows(); 
-    bool is_trig_up = true;
-    bool is_trig_down = true;
-
-    // Triangular sup
-    for (size_t i = 0; i < n && is_trig_up; i++) {
-        for(size_t j = 0; j < i && is_trig_up; j++) {
-            
-            if (df.at(j*n + i) != 0) is_trig_up = false;
-        }
-    }
-
-    // Triangular inf 
-    for (size_t i = 0; i < n && is_trig_down; i++) {
-        for(size_t j = i+1; j < n && is_trig_down; j++) {
-            
-            if (df.at(j*n + i) != 0) is_trig_down = false;
-        }
-    }
-
-    if (is_trig_up && (is_trig_up && is_trig_down)) return 3; // Diag
-    else if (is_trig_up) return 2; // Up
-    else if (is_trig_down) return 1; // Down
-
-    return 0; // Not triangular
-}
-
 std::tuple<double, std::vector<double>, Dataframe>determinant(Dataframe& df) {
     
     // Changing layout for better performances
@@ -151,7 +122,7 @@ Dataframe transpose(Dataframe& df) {
         df.get_encoder(), df.get_encodedCols()};
 }
 
-Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
+Dataframe sum(Dataframe& df1, Dataframe& df2, char op) {
 
     size_t m = df1.get_rows();
     size_t n = df1.get_cols();
@@ -183,7 +154,7 @@ Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
     return {m, n, false, std::move(new_data)};
 }
 
-Dataframe multiply(const Dataframe& df1, Dataframe& df2) {
+Dataframe multiply(Dataframe& df1, Dataframe& df2) {
 
     size_t m = df1.get_rows();
     size_t n = df1.get_cols();

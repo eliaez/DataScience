@@ -5,7 +5,7 @@ using namespace std;
 using namespace Linalg;
 
 /*// Testing AVX2 Transpose col-major
-void transpose_t(Dataframe& iris, const vector<double>& res) {
+void transpose_avx(Dataframe& iris, const vector<double>& res) {
 
     Dataframe iris_t = Operations::transpose(iris);
 
@@ -13,7 +13,7 @@ void transpose_t(Dataframe& iris, const vector<double>& res) {
 }*/
 
 // Testing AVX2 Sum
-void sum_t(Dataframe& df1, Dataframe& df2, char op, const vector<double>& res) {
+void sum_avx(Dataframe& df1, Dataframe& df2, char op, const vector<double>& res) {
 
     Dataframe df = Operations::sum(df1, df2, op);
 
@@ -21,7 +21,7 @@ void sum_t(Dataframe& df1, Dataframe& df2, char op, const vector<double>& res) {
 }
 
 /*// Testing AVX2 Multiply
-void multiply_t(const Dataframe& df1, Dataframe& df2, const vector<double>& res) {
+void multiply_avx(const Dataframe& df1, Dataframe& df2, const vector<double>& res) {
     
     Dataframe df = Operations::multiply(df1, df2);
 
@@ -29,12 +29,12 @@ void multiply_t(const Dataframe& df1, Dataframe& df2, const vector<double>& res)
 }
 
 // Testing AVX2 Inverse - Error det = 0
-void inverse_v1(Dataframe& df1) {
+void inverse_avx_v1(Dataframe& df1) {
     Dataframe df = Operations::inverse(df1);
 }
 
 // Testing AVX2 Inverse Triangular
-void inverse_v2(Dataframe& df1, const vector<double>& res) {
+void inverse_avx_v2(Dataframe& df1, const vector<double>& res) {
     
     Dataframe df = Operations::inverse(df1);
 
@@ -42,7 +42,7 @@ void inverse_v2(Dataframe& df1, const vector<double>& res) {
 }
 
 // Testing AVX2 Inverse LU
-void inverse_v3(Dataframe& df1, const vector<double>& res) {
+void inverse_avx_v3(Dataframe& df1, const vector<double>& res) {
     
     Dataframe df = Operations::inverse(df1);
 
@@ -86,7 +86,7 @@ void tests_AVX2() {
     );*/
 
     tests_AVX2.add_test(
-        bind(sum_t, df1, df2, '-', sum), 
+        bind(sum_avx, df1, df2, '-', sum), 
         "Testing AVX2 Sum"
     );
 

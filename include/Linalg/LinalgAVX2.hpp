@@ -1,17 +1,14 @@
 #pragma once
 
 #include "Data/Data.hpp"
+#include <immintrin.h>
 #include <tuple>
 
 namespace Linalg {
     namespace AVX2 {
 
         constexpr size_t NB_DB = 4; // AVX2 (256 bits) so 4 doubles
-        constexpr size_t PREFETCH_DIST = 64; // Pre-fetch 64*8 bytes ahead 
-        
-        // Function to test if the data from df is a triangular matrix, 
-        // 3 for diagonal, 2 for Up, 1 for Down and 0 if not.
-        int triangular_matrix(Dataframe& df);
+        constexpr size_t PREFETCH_DIST = 64; // Pre-fetch 64*8 bytes ahead
 
         Dataframe sum(Dataframe& df1, Dataframe& df2, char op = '+');
         Dataframe multiply(Dataframe& df1, Dataframe& df2);
@@ -30,5 +27,8 @@ namespace Linalg {
 
         // Function to inverse matrix by using LU decomposition 
         Dataframe inverse(Dataframe& df);
+
+        // Horizontal Reduction
+        double horizontal_red(__m256d& vec);
     }
 }

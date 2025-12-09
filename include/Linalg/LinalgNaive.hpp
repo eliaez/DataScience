@@ -6,12 +6,8 @@
 namespace Linalg {
     namespace Naive {
 
-        // Function to test if the data from df is a triangular matrix, 
-        // 3 for diagonal, 2 for Up, 1 for Down and 0 if not.
-        int triangular_matrix(const Dataframe& df);
-
-        Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op = '+');
-        Dataframe multiply(const Dataframe& df1, Dataframe& df2);
+        Dataframe sum(Dataframe& df1, Dataframe& df2, char op = '+');
+        Dataframe multiply(Dataframe& df1, Dataframe& df2);
         Dataframe transpose(Dataframe& df);
 
         // Function to calculate determinant of Matrix from Df data, through either the product of 

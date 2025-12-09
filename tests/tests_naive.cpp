@@ -12,8 +12,8 @@ void transpose_t(Dataframe& iris, const vector<double>& res) {
     ASSERT_EQ(iris_t.get_data(), res)
 }
 
-// Testing Naive Sum
-void sum_t(const Dataframe& df1, const Dataframe& df2, char op, const vector<double>& res) {
+// Testing Sum
+void sum_t(Dataframe& df1, Dataframe& df2, char op, const vector<double>& res) {
 
     Dataframe df = Operations::sum(df1, df2, op);
 
@@ -21,7 +21,7 @@ void sum_t(const Dataframe& df1, const Dataframe& df2, char op, const vector<dou
 }
 
 // Testing Naive Multiply
-void multiply_t(const Dataframe& df1, Dataframe& df2, const vector<double>& res) {
+void multiply_t(Dataframe& df1, Dataframe& df2, const vector<double>& res) {
     
     Dataframe df = Operations::multiply(df1, df2);
 
