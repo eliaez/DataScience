@@ -23,7 +23,8 @@ void sum_t(Dataframe& df1, Dataframe& df2, char op, const vector<double>& res) {
 // Testing Naive Multiply
 void multiply_t(Dataframe& df1, Dataframe& df2, const vector<double>& res) {
     
-    Dataframe df = Operations::multiply(df1, df2);
+    Dataframe df1_temp = df1.change_layout(); 
+    Dataframe df = Operations::multiply(df1_temp, df2);
 
     ASSERT_EQ(df.get_data(), res)
 }

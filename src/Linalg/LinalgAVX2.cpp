@@ -38,22 +38,14 @@ Dataframe sum(Dataframe& df1, Dataframe& df2, char op) {
     size_t vec_size = m*n - ((m*n) % NB_DB);
 
     if (op == '+') {
-        // With Prefetch
-        for (; i + PREFETCH_DIST < m*n && i < vec_size ; i+=NB_DB)  {
-
-            // Pre-charged PREFETCH_DIST*8 bytes ahead
-            _mm_prefetch((const char*)&df1.at(i+PREFETCH_DIST), _MM_HINT_T0);
-            _mm_prefetch((const char*)&df2.at(i+PREFETCH_DIST), _MM_HINT_T0);
-
-            __m256d vec1 = _mm256_loadu_pd(&df1.at(i));
-            __m256d vec2 = _mm256_loadu_pd(&df2.at(i));
-
-            __m256d res = _mm256_add_pd(vec1, vec2);
-
-            _mm256_storeu_pd(&new_data[i], res);
-        }
-        // Without Prefetch
         for (;i < vec_size ; i+=NB_DB)  {
+
+            if (i + PREFETCH_DIST < vec_size) {
+                // Pre-charged PREFETCH_DIST*8 bytes ahead
+                _mm_prefetch((const char*)&df1.at(i+PREFETCH_DIST), _MM_HINT_T0);
+                _mm_prefetch((const char*)&df2.at(i+PREFETCH_DIST), _MM_HINT_T0);
+            }
+
             __m256d vec1 = _mm256_loadu_pd(&df1.at(i));
             __m256d vec2 = _mm256_loadu_pd(&df2.at(i));
 
@@ -68,22 +60,14 @@ Dataframe sum(Dataframe& df1, Dataframe& df2, char op) {
         }
     }
     else if (op == '-') {
-        // With Prefetch
-        for (; i + PREFETCH_DIST < m*n && i < vec_size ; i+=NB_DB)  {
-
-            // Pre-charged PREFETCH_DIST*8 bytes ahead
-            _mm_prefetch((const char*)&df1.at(i+PREFETCH_DIST), _MM_HINT_T0);
-            _mm_prefetch((const char*)&df2.at(i+PREFETCH_DIST), _MM_HINT_T0);
-
-            __m256d vec1 = _mm256_loadu_pd(&df1.at(i));
-            __m256d vec2 = _mm256_loadu_pd(&df2.at(i));
-
-            __m256d res = _mm256_sub_pd(vec1, vec2);
-
-            _mm256_storeu_pd(&new_data[i], res);
-        }
-        // Without Prefetch
         for (;i < vec_size ; i+=NB_DB)  {
+
+            if (i + PREFETCH_DIST < vec_size) {
+                // Pre-charged PREFETCH_DIST*8 bytes ahead
+                _mm_prefetch((const char*)&df1.at(i+PREFETCH_DIST), _MM_HINT_T0);
+                _mm_prefetch((const char*)&df2.at(i+PREFETCH_DIST), _MM_HINT_T0);
+            }
+
             __m256d vec1 = _mm256_loadu_pd(&df1.at(i));
             __m256d vec2 = _mm256_loadu_pd(&df2.at(i));
 
@@ -111,23 +95,8 @@ Dataframe multiply(Dataframe& df1, Dataframe& df2) {
     // Verify if we can multiply them
     if (n != o) throw std::runtime_error("Need df1 cols == df2 rows");
 
-    // To optimize to avoid col - row config (see explication at end of function)
-    // row - row or col - col
-    if (df1.get_storage() == df2.get_storage()) {
-
-        // row - row 
-        if (df1.get_storage()) df2.change_layout_inplace();
-        
-        // col - col
-        else df1 = df1.change_layout();
-    } 
-    else {
-        // col - row
-        if (!df1.get_storage() && df2.get_storage()) {
-            df1 = df1.change_layout();
-            df2.change_layout_inplace();
-        } 
-    }
+    // To optimize we want only row - col config (see explication at end of function)
+    if (!(df1.get_storage() && !df2.get_storage())) throw std::runtime_error("Need df1 row major and df2 col major");
 
     std::vector<double> data(m * p, 0.0);
     
@@ -140,25 +109,16 @@ Dataframe multiply(Dataframe& df1, Dataframe& df2) {
             size_t vec_size = n - (n % NB_DB);
             __m256d sum_vec = _mm256_setzero_pd();
 
-            // With Prefetch
-            for (; k + PREFETCH_DIST < n && k < vec_size; k+=NB_DB) {
+            for (;k < vec_size; k+=NB_DB) {
                 
-                // Pre-charged PREFETCH_DIST*8 bytes ahead
-                _mm_prefetch((const char*)&df1.at(k+PREFETCH_DIST), _MM_HINT_T0);
-                _mm_prefetch((const char*)&df2.at(k+PREFETCH_DIST), _MM_HINT_T0);
+                if (k + PREFETCH_DIST < vec_size) {
+                    // Pre-charged PREFETCH_DIST*8 bytes ahead
+                    _mm_prefetch((const char*)&df1.at(k+PREFETCH_DIST), _MM_HINT_T0);
+                    _mm_prefetch((const char*)&df2.at(k+PREFETCH_DIST), _MM_HINT_T0);
+                }
 
                 // df1 row major
                 // df2 col major
-                __m256d vec1 = _mm256_loadu_pd(&df1.at(i * n + k));
-                __m256d vec2 = _mm256_loadu_pd(&df2.at(j * o + k)); 
-                
-                __m256d res = _mm256_mul_pd(vec1, vec2);
-
-                sum_vec = _mm256_add_pd(sum_vec, res);
-            }
-
-            // Without prefetch 
-            for (;k < vec_size; k+=NB_DB) {
                 __m256d vec1 = _mm256_loadu_pd(&df1.at(i * n + k));
                 __m256d vec2 = _mm256_loadu_pd(&df2.at(j * o + k)); 
                 
@@ -189,6 +149,87 @@ Dataframe multiply(Dataframe& df1, Dataframe& df2) {
                      df1.get_headers(), df1.get_encoder(), df1.get_encodedCols());
 }
 
+Dataframe transpose(Dataframe& df) {
+
+    size_t rows = df.get_cols(), cols = df.get_rows();
+    size_t temp_row = df.get_rows(), temp_col = df.get_cols();
+
+    std::vector<double> data(rows*cols);
+
+    // Changing layout for better performances later
+    if (df.get_storage()){
+        df.change_layout_inplace();
+    }
+
+    // Variables
+    size_t i = 0, j = 0;
+    size_t vec_sizei = temp_row - (temp_row % NB_DB);
+    size_t vec_sizej = temp_col - (temp_col % NB_DB);
+
+    for (; i < vec_sizei; i += NB_DB) {
+        for (; j < vec_sizej; j += NB_DB) {
+
+            if (j + PREFETCH_DIST1 < vec_sizej) {
+                _mm_prefetch(&df.at((j+PREFETCH_DIST1+0) * temp_row + i), _MM_HINT_T0);
+                _mm_prefetch(&df.at((j+PREFETCH_DIST1+1) * temp_row + i), _MM_HINT_T0);
+                _mm_prefetch(&df.at((j+PREFETCH_DIST1+2) * temp_row + i), _MM_HINT_T0);
+                _mm_prefetch(&df.at((j+PREFETCH_DIST1+3) * temp_row + i), _MM_HINT_T0);
+            }
+            
+            // Load 4 cols
+            __m256d col0 = _mm256_loadu_pd(&df.at((j+0)*temp_row + i));
+            __m256d col1 = _mm256_loadu_pd(&df.at((j+1)*temp_row + i));
+            __m256d col2 = _mm256_loadu_pd(&df.at((j+2)*temp_row + i));
+            __m256d col3 = _mm256_loadu_pd(&df.at((j+3)*temp_row + i));
+            
+            // Get pair elements of each
+            __m256d t0 = _mm256_unpacklo_pd(col0, col1);
+
+            // Get odd elements of each 
+            __m256d t1 = _mm256_unpackhi_pd(col0, col1);
+
+            __m256d t2 = _mm256_unpacklo_pd(col2, col3);
+            __m256d t3 = _mm256_unpackhi_pd(col2, col3);
+            
+            // Get two first elements of each 
+            __m256d row0 = _mm256_permute2f128_pd(t0, t2, 0x20);
+            __m256d row1 = _mm256_permute2f128_pd(t1, t3, 0x20);
+
+            // Get two last elements of each
+            __m256d row2 = _mm256_permute2f128_pd(t0, t2, 0x31);
+            __m256d row3 = _mm256_permute2f128_pd(t1, t3, 0x31);
+            
+            _mm256_storeu_pd(&data[(i+0)*temp_col + j], row0);
+            _mm256_storeu_pd(&data[(i+1)*temp_col + j], row1);
+            _mm256_storeu_pd(&data[(i+2)*temp_col + j], row2);
+            _mm256_storeu_pd(&data[(i+3)*temp_col + j], row3);
+        }
+
+        // Scalar residual
+        for(; j < temp_col; j++) {
+                data[(i+0)*temp_col + j] = df.at(j*temp_row + (i+0));
+                data[(i+1)*temp_col + j] = df.at(j*temp_row + (i+1));
+                data[(i+2)*temp_col + j] = df.at(j*temp_row + (i+2));
+                data[(i+3)*temp_col + j] = df.at(j*temp_row + (i+3));
+        }
+        j = 0;
+    }
+
+    // Scalar residual 
+    for (; i < temp_row; i++) {
+        for(size_t j = 0; j < temp_col; j++) {
+            data[i*temp_col + j] = df.at(j*temp_row + i);
+        }
+    }   
+
+    return {rows, cols, false, std::move(data), df.get_headers(), 
+        df.get_encoder(), df.get_encodedCols()};
+}
+
+Dataframe inverse(Dataframe& df) {
+
+    return {};
+}
 
 }
 }

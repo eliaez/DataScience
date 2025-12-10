@@ -9,9 +9,14 @@ namespace Linalg {
 
         constexpr size_t NB_DB = 4; // AVX2 (256 bits) so 4 doubles
         constexpr size_t PREFETCH_DIST = 64; // Pre-fetch 64*8 bytes ahead
+        constexpr size_t PREFETCH_DIST1 = 8; // Pre-fetch 8*8 bytes ahead
 
         Dataframe sum(Dataframe& df1, Dataframe& df2, char op = '+');
+
+        // Mult AVX2 row - col config only
         Dataframe multiply(Dataframe& df1, Dataframe& df2);
+
+        // Transpose by blocks
         Dataframe transpose(Dataframe& df);
 
         // Function to calculate determinant of Matrix from Df data, through either the product of 
