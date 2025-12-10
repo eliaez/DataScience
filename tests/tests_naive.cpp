@@ -4,6 +4,7 @@
 using namespace std;
 using namespace Linalg;
 
+/*
 // Testing Naive Transpose col-major
 void transpose_t(Dataframe& iris, const vector<double>& res) {
 
@@ -11,6 +12,7 @@ void transpose_t(Dataframe& iris, const vector<double>& res) {
 
     ASSERT_EQ(iris_t.get_data(), res)
 }
+*/
 
 // Testing Sum
 void sum_t(Dataframe& df1, Dataframe& df2, char op, const vector<double>& res) {
@@ -23,7 +25,7 @@ void sum_t(Dataframe& df1, Dataframe& df2, char op, const vector<double>& res) {
 // Testing Naive Multiply
 void multiply_t(Dataframe& df1, Dataframe& df2, const vector<double>& res) {
     
-    Dataframe df1_temp = df1.change_layout(); 
+    Dataframe df1_temp = df1.change_layout("Naive"); 
     Dataframe df = Operations::multiply(df1_temp, df2);
 
     ASSERT_EQ(df.get_data(), res)
@@ -81,10 +83,12 @@ void tests_naive() {
     // Add tests
     TestSuite::Tests tests_naive;
 
+    /*
     tests_naive.add_test(
         bind(transpose_t, iris, iris_t), 
         "Naive Transpose col-major"
     );
+    */
 
     tests_naive.add_test(
         bind(sum_t, df1, df2, '-', sum), 

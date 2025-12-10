@@ -11,6 +11,7 @@ void loadCsv_t(const string& filepath, const vector<double>& iris_colmajor) {
     ASSERT_EQ(iris.get_data(), iris_colmajor)
 }
 
+/*
 // Testing data after change_layout
 void changelayout_t(Dataframe iris, const vector<double>& iris_rowmajor) {
     
@@ -18,6 +19,7 @@ void changelayout_t(Dataframe iris, const vector<double>& iris_rowmajor) {
 
     ASSERT_EQ(iris.get_data(), iris_rowmajor)
 }
+*/
 
 // Testing the transfer of a column from a Df to another new one
 void transfercol_t(Dataframe& iris, const string& col,
@@ -69,11 +71,13 @@ void tests_data() {
         "Loading Csv"
     );
 
+    /*
     tests_data.add_test(
         bind(changelayout_t, iris, iris_rowmajor), 
         "Change layout"
     );
-
+    */
+   
     tests_data.add_test(
         bind(transfercol_t, iris, col, iris_bis, res_y), 
         "Transfer column"

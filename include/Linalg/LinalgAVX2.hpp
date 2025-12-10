@@ -1,15 +1,14 @@
 #pragma once
 
 #include "Data/Data.hpp"
-#include <immintrin.h>
 #include <tuple>
 
 namespace Linalg {
     namespace AVX2 {
-
+        
+        #ifdef __AVX2__
         constexpr size_t NB_DB = 4; // AVX2 (256 bits) so 4 doubles
         constexpr size_t PREFETCH_DIST = 64; // Pre-fetch 64*8 bytes ahead
-        constexpr size_t PREFETCH_DIST1 = 8; // Pre-fetch 8*8 bytes ahead
 
         Dataframe sum(Dataframe& df1, Dataframe& df2, char op = '+');
 
@@ -35,5 +34,6 @@ namespace Linalg {
 
         // Horizontal Reduction
         double horizontal_red(__m256d& vec);
+        #endif
     }
 }

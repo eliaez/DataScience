@@ -5,12 +5,21 @@
         case Linalg::Backend::EIGEN: return Linalg::Eigen::func(__VA_ARGS__); \ 
 */
 
-#define DISPATCH_BACKEND(func, ...) \
-    switch(current_backend) { \
-        case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
-        case Linalg::Backend::AVX2: return Linalg::AVX2::func(__VA_ARGS__); \
-        default: return Linalg::Naive::func(__VA_ARGS__); \
-    }
+#ifdef __AVX2__
+    #define DISPATCH_BACKEND(func, ...) \
+        switch(current_backend) { \
+            case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
+            case Linalg::Backend::AVX2: return Linalg::AVX2::func(__VA_ARGS__); \
+            default: return Linalg::AVX2::func(__VA_ARGS__); \
+        }
+#else
+    #define DISPATCH_BACKEND(func, ...) \
+        switch(current_backend) { \
+            case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
+            case Linalg::Backend::EIGEN: return Linalg::Eigen::func(__VA_ARGS__); \ 
+            default: return Linalg::NAIVE::func(__VA_ARGS__); \
+        }
+#endif
 
 namespace Linalg {
 
@@ -26,7 +35,11 @@ Backend Operations::get_backend() {
     if (current_backend == Backend::AUTO) {
 
         // AVX2 for now
-        return Backend::AVX2;
+        #ifdef __AVX2__
+            return Backend::AVX2;
+        #else
+            return Backend::NAIVE;
+        #endif
 
         // return Backend::AVX2_THREADED;
     } 

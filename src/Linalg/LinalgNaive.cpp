@@ -66,7 +66,7 @@ std::tuple<double, std::vector<double>, Dataframe>determinant(Dataframe& df) {
     
     // Changing layout for better performances
     if (df.get_storage()){
-        df.change_layout_inplace();
+        df.change_layout_inplace("Naive");
     }
 
     size_t rows = df.get_rows(), cols = df.get_cols();
@@ -104,20 +104,13 @@ Dataframe transpose(Dataframe& df) {
     size_t rows = df.get_cols(), cols = df.get_rows();
     size_t temp_row = df.get_rows(), temp_col = df.get_cols();
 
-    std::vector<double> data;
-    data.reserve(rows * cols);
-
     // Changing layout for better performances later
     if (df.get_storage()){
-        df.change_layout_inplace();
+        df.change_layout_inplace("Naive");
     }
 
-    for (size_t i = 0; i < temp_row; i++) {
-        for(size_t j = 0; j < temp_col; j++) {
+    std::vector<double> data = Dataframe::transpose_naive(temp_row, temp_col, df.get_data());
 
-            data.push_back(df.at(j*temp_row + i));
-        }
-    }   
     return {rows, cols, false, std::move(data), df.get_headers(), 
         df.get_encoder(), df.get_encodedCols()};
 }
@@ -259,7 +252,7 @@ Dataframe inverse(Dataframe& df) {
     for (size_t i = 0; i < n; i++) {
         id[i*n + i] = 1;
     }
-    Dataframe df_id = {n, n, false, std::move(id)};
+    Dataframe df_id = {n, n, true, std::move(id)};
 
     // If no LU matrix was returned, then the matrix is triangular
     if (LU.get_data().empty()) {

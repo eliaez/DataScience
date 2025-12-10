@@ -5,13 +5,21 @@
 
 namespace Linalg {
 
-    enum class Backend {
-        NAIVE, // Still col-major and cache friendly
-        AVX2,
-        AVX2_THREADED,
-        EIGEN,
-        AUTO
-    };
+    #ifdef __AVX2__
+        enum class Backend {
+            NAIVE, // Still col-major and cache friendly
+            AVX2,
+            AVX2_THREADED,
+            EIGEN,
+            AUTO
+        };
+    #else
+        enum class Backend {
+            NAIVE, // Still col-major and cache friendly
+            EIGEN,
+            AUTO
+        };
+    #endif
 
     class Operations {
 

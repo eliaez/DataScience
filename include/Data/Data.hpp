@@ -10,6 +10,10 @@
 #include <cassert>
 #include <iostream>
 
+#ifdef __AVX2__
+#include <immintrin.h>
+#endif
+
 #pragma once
 
 
@@ -23,6 +27,11 @@ class Dataframe
         std::vector<std::string> headers;
         std::unordered_map<std::string, int> label_encoder;
         std::unordered_set<int> encoded_cols;
+
+    public:
+        #ifdef __AVX2__
+        static constexpr size_t PREFETCH_DIST1 = 8; // Pre-fetch 8*8 bytes ahead
+        #endif
 
     public: 
 
@@ -41,11 +50,19 @@ class Dataframe
         Dataframe transfer_col(size_t j);  
         Dataframe transfer_col(const std::string& col_name);
 
-        // Change from row - major to col - major
-        Dataframe change_layout() const;
+        // Change from row - major to col - major inplace, choose between Naive, AVX2...
+        Dataframe change_layout(const std::string& choice = "AVX2") const;
 
-        // Change from row - major to col - major inplace
-        void change_layout_inplace();
+        // Change from row - major to col - major inplace, choose between Naive, AVX2...
+        void change_layout_inplace(const std::string& choice = "AVX2");
+
+        // Tranpose Naive
+        static std::vector<double> transpose_naive(size_t rows_, size_t cols_, const std::vector<double>& df);
+
+        #ifdef __AVX2__
+        // Tranpose AVX2 by blocks (see LinalgAVX2.hpp for NB_DB)
+        static std::vector<double> transpose_blocks_avx2(size_t rows_, size_t cols_, const std::vector<double>& df, size_t NB_DB);
+        #endif
 
     // Getters & Constructor
     public:
@@ -88,7 +105,7 @@ class CsvHandler {
     
     public:
         // Returns a column-major Dataframe from Csv path
-        static Dataframe loadCsv(const std::string& filepath, char sep = ',');
+        static Dataframe loadCsv(const std::string& filepath, char sep = ',', bool is_header = true);
 
     private:
         // Function to encode potential columns using string for categories

@@ -4,6 +4,8 @@
 using namespace std;
 using namespace Linalg;
 
+#ifdef __AVX2__
+
 /*// Testing AVX2 Transpose col-major
 void transpose_avx(Dataframe& iris, const vector<double>& res) {
 
@@ -53,6 +55,7 @@ void inverse_avx_v3(Dataframe& df1, const vector<double>& res) {
 void tests_AVX2() {
 
     Operations::set_backend(Backend::AVX2);
+
 
     // Initialization of our data 
     size_t m = 3, n = 4;
@@ -113,3 +116,4 @@ void tests_AVX2() {
     cout << "Testing AVX2 functions:" << endl;
     tests_AVX2.run_all();
 }
+#endif

@@ -10,6 +10,7 @@ set(CMAKE_CXX_STANDARD 20)
 option(BUILD_TEST "Build tests" ON)
 option(BUILD_MAIN "Build main" ON)
 
+
 # Inclusions
 include_directories(include)
 
@@ -18,27 +19,14 @@ include_directories(include)
 set(LIB_SOURCES src/Data/Data.cpp
                 src/Linalg/Linalg.cpp
                 src/Linalg/LinalgNaive.cpp
+                src/Linalg/LinalgAVX2.cpp
                 src/Utils/TestSuite.cpp
 )
 
 
-# Lib AVX2
-set(LIB_AVX2_SOURCES src/Linalg/LinalgAVX2.cpp)
-
-
 # Main Library
-add_library(linalg STATIC ${LIB_SOURCES})
-target_compile_options(linalg PRIVATE -Wall -Wextra -O3 -march=native)
-
-
-# AVX2 Library
-add_library(linalg_avx2 STATIC ${LIB_AVX2_SOURCES})
-target_compile_options(linalg_avx2 PRIVATE -Wall -Wextra -O3 -mavx2 -mfma)
-
-
-# Combine them 
-add_library(linalg_full INTERFACE)
-target_link_libraries(linalg_full INTERFACE linalg linalg_avx2)
+add_library(linalg_full STATIC ${LIB_SOURCES})
+target_compile_options(linalg_full PRIVATE -Wall -Wextra -O3 -march=native)
 
 
 if(BUILD_TEST)
