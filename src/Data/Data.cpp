@@ -202,10 +202,10 @@ std::vector<double> Dataframe::transpose_blocks_avx2(size_t rows_, size_t cols_,
         for (; j < vec_sizej; j += NB_DB) {
 
             if (j + PREFETCH_DIST1 < vec_sizej) {
-                _mm_prefetch(&df[(j+PREFETCH_DIST1+0) * rows_ + i], _MM_HINT_T0);
-                _mm_prefetch(&df[(j+PREFETCH_DIST1+1) * rows_ + i], _MM_HINT_T0);
-                _mm_prefetch(&df[(j+PREFETCH_DIST1+2) * rows_ + i], _MM_HINT_T0);
-                _mm_prefetch(&df[(j+PREFETCH_DIST1+3) * rows_ + i], _MM_HINT_T0);
+                _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+0) * rows_ + i], _MM_HINT_T0);
+                _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+1) * rows_ + i], _MM_HINT_T0);
+                _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+2) * rows_ + i], _MM_HINT_T0);
+                _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+3) * rows_ + i], _MM_HINT_T0);
             }
             
             // Load 4 cols

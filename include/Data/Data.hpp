@@ -30,7 +30,7 @@ class Dataframe
 
     public:
         #ifdef __AVX2__
-        static constexpr size_t PREFETCH_DIST1 = 8; // Pre-fetch 8*8 bytes ahead
+        static constexpr size_t PREFETCH_DIST1 = 16; // Pre-fetch 16*8 bytes ahead for Blocks algo
         #endif
 
     public: 

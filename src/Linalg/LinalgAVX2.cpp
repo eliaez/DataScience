@@ -5,6 +5,134 @@ namespace Linalg {
 namespace AVX2 {
 #ifdef __AVX2__
 
+std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(Dataframe& df) {
+
+    int nb_swaps = 0;
+    size_t n = df.get_cols();
+    std::vector<double> LU = df.get_data();
+
+    // Permutation matrix is Id at first
+    std::vector<double> swaps(n*n, 0.0);
+    for (size_t i = 0; i < n; i++) {
+        swaps[i*n + i] = 1;
+    }
+
+    for (size_t k = 0; k < n-1; k++) {
+
+        // Partial pivot (get most important pivot and permutate lines)
+        auto [max, idx] = std::tuple{-1, 0};
+        for (size_t i = k; i < n; i++) {
+
+            double val = std::abs(LU[k*n + i]);
+            if (max < val) {
+                max =  val;
+                idx = i;
+            }
+        }
+
+        // Permutation of rows
+        if (k != static_cast<size_t>(idx)) {
+            for (size_t j = 0; j < n; j++) {
+                std::swap(LU[j*n + k], LU[j*n + idx]);
+                std::swap(swaps[j*n + k], swaps[j*n + idx]);
+            }
+            nb_swaps++;
+        }
+
+        // Pivot
+        double p = LU[k*n + k];
+        if (std::abs(p) < 1e-14) {
+            // det = 0
+            throw std::runtime_error("Singular Matrix <=> Det = 0");
+        }
+
+        // LU decomposition algorithm by blocks AVX2
+        size_t i = k+1, j = k+1;
+        size_t vec_size = n - (n % NB_DB);
+
+        alignas(32) double mult[4];
+        
+        for (; i < vec_size; i+=NB_DB) {
+
+            // Prefectch if possible
+            if (i + PREFETCH_DIST < vec_size) {
+                _mm_prefetch((const char*)&LU[k*n + i + PREFETCH_DIST], _MM_HINT_T0);
+            }
+
+            __m256d vec_LU = _mm256_loadu_pd(&LU[k*n + i]);
+            
+            // Broadcast our pivot in vector
+            __m256d pivot = _mm256_set1_pd(p);
+
+            // L value 
+            __m256d vec_Lvalue = _mm256_div_pd(vec_LU, pivot); 
+            _mm256_storeu_pd(&LU[k*n + i], vec_Lvalue);
+            
+            // Update value in other cols 
+            // Block version
+            // Same method as Transpose_blocks_avx2
+            for (; j < vec_size; j+=NB_DB) {
+                
+                if (j + df.PREFETCH_DIST1 < vec_size) {
+                    for (size_t l = 0; l < NB_DB; l++) {
+                        _mm_prefetch((const char*)&LU[(j + l + df.PREFETCH_DIST1)*n + i], _MM_HINT_T0);
+                    }
+                }
+
+                __m256d val0 = _mm256_set1_pd(LU[j*n + k]);
+                __m256d val1 = _mm256_set1_pd(LU[(j+1)*n + k]);
+                __m256d val2 = _mm256_set1_pd(LU[(j+2)*n + k]);
+                __m256d val3 = _mm256_set1_pd(LU[(j+3)*n + k]);
+
+                __m256d vec_LU0 = _mm256_loadu_pd(&LU[j*n + i]);
+                __m256d vec_LU1 = _mm256_loadu_pd(&LU[(j+1)*n + i]);
+                __m256d vec_LU2 = _mm256_loadu_pd(&LU[(j+2)*n + i]);
+                __m256d vec_LU3 = _mm256_loadu_pd(&LU[(j+3)*n + i]);
+
+                // (a*b) - c
+                vec_LU0 = _mm256_fnmadd_pd(val0, vec_Lvalue, vec_LU0); 
+                vec_LU1 = _mm256_fnmadd_pd(val1, vec_Lvalue, vec_LU1); 
+                vec_LU2 = _mm256_fnmadd_pd(val2, vec_Lvalue, vec_LU2); 
+                vec_LU3 = _mm256_fnmadd_pd(val3, vec_Lvalue, vec_LU3); 
+
+                _mm256_storeu_pd(&LU[j*n + i], vec_LU0);
+                _mm256_storeu_pd(&LU[(j+1)*n + i], vec_LU1);
+                _mm256_storeu_pd(&LU[(j+2)*n + i], vec_LU2);
+                _mm256_storeu_pd(&LU[(j+3)*n + i], vec_LU3);
+            }
+
+
+            // Scalar residual
+            if (j < n) {
+                _mm256_storeu_pd(mult, vec_Lvalue);
+            }
+            for (; j < n; j++) {
+                double pivot_val = LU[j*n + k];
+                LU[j*n + i] -= mult[0] * pivot_val;
+                LU[j*n + i+1] -= mult[1] * pivot_val;
+                LU[j*n + i+2] -= mult[2] * pivot_val;
+                LU[j*n + i+3] -= mult[3] * pivot_val;
+            }
+            j = k+1;
+        }
+
+        // Scalar residual
+        for (; i < n; i++) {
+
+            // L value 
+            double mult = LU[k*n + i] / p;
+            LU[k*n + i] = mult;
+
+            // Update value in other cols 
+            for (size_t j = k+1; j < n; j++) {
+                LU[j*n + i] -= mult * LU[j*n + k];
+            }
+        }
+    }
+    
+    return {nb_swaps, swaps, {n, n, false,  std::move(LU)}};
+}
+
 double horizontal_red(__m256d& vec) {
     // hadd1 = [a+b, a+b, c+d, c+d] 
     __m256d hadd1 = _mm256_hadd_pd(vec, vec); 
