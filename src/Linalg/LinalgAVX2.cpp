@@ -139,7 +139,6 @@ Dataframe multiply(Dataframe& df1, Dataframe& df2) {
             data[j * m + i] = sum;
         }
     }
-
     // col - row
     // Non-optimized for AVX2 
     // ie need to access data[j*m + i], data[(j+1)*m + i], ...

@@ -10,11 +10,6 @@ namespace Linalg {
         Dataframe multiply(Dataframe& df1, Dataframe& df2);
         Dataframe transpose(Dataframe& df);
 
-        // Function to calculate determinant of Matrix from Df data, through either the product of 
-        // the diagonal if the matrix is triangular or with LU decomposition. 
-        // Returns determinant, LU matrix 
-        std::tuple<double, std::vector<double>, Dataframe> determinant(Dataframe& df);
-
         // LU decomposition, returns nb_swaps, swap - permutation matrix and LU in the same matrix
         std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(const Dataframe& df);
 

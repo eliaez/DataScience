@@ -62,43 +62,6 @@ std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(const Dataframe
     return {nb_swaps, swaps, {n, n, false,  std::move(LU)}};
 }
 
-std::tuple<double, std::vector<double>, Dataframe>determinant(Dataframe& df) {
-    
-    // Changing layout for better performances
-    if (df.get_storage()){
-        df.change_layout_inplace("Naive");
-    }
-
-    size_t rows = df.get_rows(), cols = df.get_cols();
-
-    // First condition, Matrix(n,n)
-    if (rows != cols) throw std::runtime_error("Need Matrix(n,n)");
-    size_t n = rows;
-
-    // Let's see if the matrix is diagonal or triangular 
-    int test_v = triangular_matrix(df);
-    if (test_v != 0) {
-        
-        double det = 1;
-        for (size_t j = 0; j < n; j++) {
-            
-            det *= df.at(j*n + j); // Product of the diagonal
-        }
-        return {det, {static_cast<double>(test_v)}, {}};
-    }
-    else {
-
-        auto [nb_swaps, swaps, LU] = LU_decomposition(df);
-
-        double det = (nb_swaps % 2) ? -1.0 : 1.0;
-        for (size_t j = 0; j < n; j++) {
-            
-            det *= LU.at(j*n + j); // Product of the diagonal
-        }
-        return {det, swaps, LU};
-    }
-}
-
 Dataframe transpose(Dataframe& df) {
 
     size_t rows = df.get_cols(), cols = df.get_rows();
