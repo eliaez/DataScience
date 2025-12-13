@@ -240,10 +240,11 @@ Dataframe inverse(Dataframe& df) {
             for (size_t k = 0; k < n; k++) {
                 for (int i = static_cast<int>(n)-1; i >= 0; i--) {
 
-                    y[k*n + i] = df_id.at(k*n + i);
+                    double sum = df_id.at(k*n + i);
                     for (size_t j = i+1; j < n; j++) {
-                        y[k*n + i] -= df.at(j*n + i) * y[k*n + j];
+                        sum -= df.at(j*n + i) * y[k*n + j];
                     }
+                    y[k*n + i] = sum;
                     if (std::abs(y[k*n + i]) < 1e-14) y[k*n + i] = 0;
                     else y[k*n + i] /= df.at(i*n+i);
                 }

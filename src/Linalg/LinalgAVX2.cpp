@@ -432,7 +432,172 @@ Dataframe transpose(Dataframe& df) {
 
 Dataframe inverse(Dataframe& df) {
 
-    return {};
+    auto [det, swaps, LU] = determinant(df);
+
+    size_t n = df.get_cols();
+    
+    // Id matrix
+    std::vector<double> id(n*n, 0.0);
+    for (size_t i = 0; i < n; i++) {
+        id[i*n + i] = 1;
+    }
+    Dataframe df_id = {n, n, false, std::move(id)};
+
+    // If no LU matrix was returned, then the matrix is triangular
+    if (LU.get_data().empty()) {
+        std::vector<double> y(n*n, 0.0);
+
+        // Diag
+        if (swaps[0] == 3) {
+            std::vector<double> y(n*n, 0.0);
+            for (size_t i = 0; i < n; i++) {
+               y[i*n + i] = 1 / df.at(i*n+i);
+            }
+            return {n, n, false, std::move(y)};
+        }
+        // Up
+        else if (swaps[0] == 2) {
+
+            // Solving Uy = Id 
+            // Backward substitution by blocks
+            size_t k = 0;
+            size_t vec_size = n - (n % NB_DB);
+            for (; k < vec_size; k+=NB_DB) {
+                for (int i = static_cast<int>(n)-1; i >= 0; i--) {
+
+                    double sum0 = df_id.at(k*n + i);
+                    double sum1 = df_id.at((k+1)*n + i);
+                    double sum2 = df_id.at((k+2)*n + i);
+                    double sum3 = df_id.at((k+3)*n + i);
+
+                    for (size_t j = i+1; j < n; j++) {
+                        sum0 -= df.at(j*n + i) * y[k*n + j];
+                        sum1 -= df.at(j*n + i) * y[(k+1)*n + j];
+                        sum2 -= df.at(j*n + i) * y[(k+2)*n + j];
+                        sum3 -= df.at(j*n + i) * y[(k+3)*n + j];
+                    }
+
+                    y[k*n + i] = sum0;
+                    y[(k+1)*n + i] = sum1;
+                    y[(k+2)*n + i] = sum2;
+                    y[(k+3)*n + i] = sum3;
+
+                    for(size_t p = 0; p < NB_DB; p++) {
+                        if (std::abs(y[(k+p)*n + i]) < 1e-14) y[(k+p)*n + i] = 0;
+                        else y[(k+p)*n + i] /= df.at(i*n+i);
+                    }
+                }
+            }
+
+            // Scalar Residual for k 
+            for (; k < n; k++) {
+                for (int i = static_cast<int>(n)-1; i >= 0; i--) {
+
+                    y[k*n + i] = df_id.at(k*n + i);
+                    for (size_t j = i+1; j < n; j++) {
+                        y[k*n + i] -= df.at(j*n + i) * y[k*n + j];
+                    }
+                    if (std::abs(y[k*n + i]) < 1e-14) y[k*n + i] = 0;
+                    else y[k*n + i] /= df.at(i*n+i);
+                }
+            }
+            return {n, n, false, std::move(y)};
+        }
+        // Down
+        else {
+
+            // Solving Ly = Id
+            // Forward substitution by blocks with AVX2
+            size_t k = 0, i = 0;
+            size_t vec_size = n - (n % NB_DB);
+
+            for (; i < vec_size; i+=NB_DB) {
+            
+                if (k + df.PREFETCH_DIST1 < vec_size) {
+                    for (size_t p = 0; p < NB_DB; p++) {
+                        _mm_prefetch((const char*)&df_id.at((k+p+df.PREFETCH_DIST1)*n + i), _MM_HINT_T0);
+                    }        
+                }
+
+                __m256d sum0 = _mm256_loadu_pd(&df_id.at((k+0)*n + i));
+                __m256d sum1 = _mm256_loadu_pd(&df_id.at((k+1)*n + i));
+                __m256d sum2 = _mm256_loadu_pd(&df_id.at((k+2)*n + i));
+                __m256d sum3 = _mm256_loadu_pd(&df_id.at((k+3)*n + i));
+
+                for (size_t j = 0; j < i; j++) {
+
+                    if (j + LU.PREFETCH_DIST1 < i) {
+                        _mm_prefetch((const char*)&df.at((j+df.PREFETCH_DIST1)*n + i), _MM_HINT_T0);
+                    }
+
+                    __m256d df_vec = _mm256_loadu_pd(&df.at(j*n + i));
+
+                    __m256d y0 = _mm256_set1_pd(y[(k+0)*n + j]);
+                    __m256d y1 = _mm256_set1_pd(y[(k+1)*n + j]);
+                    __m256d y2 = _mm256_set1_pd(y[(k+2)*n + j]);
+                    __m256d y3 = _mm256_set1_pd(y[(k+3)*n + j]);
+
+                    sum0 = _mm256_fnmadd_pd(df_vec, y0, sum0);
+                    sum1 = _mm256_fnmadd_pd(df_vec, y1, sum1);
+                    sum2 = _mm256_fnmadd_pd(df_vec, y2, sum2);
+                    sum3 = _mm256_fnmadd_pd(df_vec, y3, sum3);
+                }
+
+                __m256d df_diag = _mm256_set_pd(df.at((i+3)*n + i+3), df.at((i+2)*n + i+2), 
+                                                df.at((i+1)*n + i+1), df.at(i*n + i));
+
+                _mm256_storeu_pd(&y[k*n + i], _mm256_div_pd(sum0, df_diag));
+                _mm256_storeu_pd(&y[(k+1)*n + i], _mm256_div_pd(sum1, df_diag));
+                _mm256_storeu_pd(&y[(k+2)*n + i], _mm256_div_pd(sum2, df_diag));
+                _mm256_storeu_pd(&y[(k+3)*n + i], _mm256_div_pd(sum3, df_diag));
+            }
+
+            // Scalar residual for i 
+            for (; i < n; i++) {
+
+                double sum0 = df_id.at(k*n + i);
+                double sum1 = df_id.at((k+1)*n + i);
+                double sum2 = df_id.at((k+2)*n + i);
+                double sum3 = df_id.at((k+3)*n + i);
+
+                for (size_t j = 0; j < i; j++) {
+                    sum0 -= df.at(j*n + i) * y[k*n + j];
+                    sum1 -= df.at(j*n + i) * y[(k+1)*n + j];
+                    sum2 -= df.at(j*n + i) * y[(k+2)*n + j];
+                    sum3 -= df.at(j*n + i) * y[(k+3)*n + j];
+                }
+                y[k*n + i] = sum0 / df.at(i*n + i);
+                y[(k+1)*n + i] = sum1 / df.at(i*n + i);
+                y[(k+2)*n + i] = sum2 / df.at(i*n + i);
+                y[(k+3)*n + i] = sum3 / df.at(i*n + i);
+            }
+
+            // Scalar Residual for k
+            for (; k < n; k++) {
+                for (size_t i = 0; i < n; i++) {
+
+                    double sum = 0.0;
+                    sum = df_id.at(k*n + i);
+                    for (size_t j = 0; j < i; j++) {
+                        sum -= df.at(j*n + i) * y[k*n + j];
+                    }
+                    y[k*n + i] = sum / df.at(i*n + i);
+                }
+            }
+            return {n, n, false, std::move(y)};
+        }
+    }
+    else {
+        
+        // Permutation matrix
+        Dataframe df_swaps = {n, n, false, std::move(swaps)};
+        df_swaps.change_layout_inplace();
+
+        // Row - Col to use multiply from AVX2
+        Dataframe perm = multiply(df_swaps, df_id); 
+
+        return solveLU_inplace(perm, LU);
+    }
 }
 
 #endif
