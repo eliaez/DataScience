@@ -192,9 +192,12 @@ Dataframe solveLU_inplace(const Dataframe& perm, Dataframe& LU) {
         // Solving Ux = y 
         // Backward substitution
         for (int i = static_cast<int>(n)-1; i >= 0; i--) {
+
+            double sum = y[k*n + i];
             for (size_t j = i+1; j < n; j++) {
-                y[k*n + i] -= LU.at(j*n + i) * y[k*n + j];
+                sum -= LU.at(j*n + i) * y[k*n + j];
             }
+            y[k*n + i] = sum;
             if (std::abs(y[k*n + i]) < 1e-14) y[k*n + i] = 0;
             else y[k*n + i] /= diag_U[i];
             

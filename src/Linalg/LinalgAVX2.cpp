@@ -133,6 +133,143 @@ std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(Dataframe& df) 
     return {nb_swaps, swaps, {n, n, false,  std::move(LU)}};
 }
 
+Dataframe solveLU_inplace(const Dataframe& perm, Dataframe& LU) {
+
+    size_t n = LU.get_cols();
+    std::vector<double> y(n*n);
+
+    // Store the Diag
+    std::vector<double> diag_U(n);
+    for (size_t i = 0; i < n; i++) {
+        diag_U[i] = LU.at(i * n + i);
+    }
+
+    size_t k = 0, i = 0;
+    size_t vec_size = n - (n % NB_DB);
+
+    // By Blocks with AVX2
+    for (; k < vec_size; k+=NB_DB) {
+
+        // Solving Ly = perm (No division because diag = 1)
+        // Forward substitution 
+        for (; i < vec_size; i+=NB_DB) {
+            
+            if (k + LU.PREFETCH_DIST1 < vec_size) {
+                for (size_t p = 0; p < NB_DB; p++) {
+                    _mm_prefetch((const char*)&perm.at((k+p+LU.PREFETCH_DIST1)*n + i), _MM_HINT_T0);
+                }        
+            }
+
+            __m256d sum0 = _mm256_loadu_pd(&perm.at((k+0)*n + i));
+            __m256d sum1 = _mm256_loadu_pd(&perm.at((k+1)*n + i));
+            __m256d sum2 = _mm256_loadu_pd(&perm.at((k+2)*n + i));
+            __m256d sum3 = _mm256_loadu_pd(&perm.at((k+3)*n + i));
+
+            for (size_t j = 0; j < i; j++) {
+
+                if (j + LU.PREFETCH_DIST1 < i) {
+                    _mm_prefetch((const char*)&LU.at((j+LU.PREFETCH_DIST1)*n + i), _MM_HINT_T0);
+                }
+
+                __m256d LU_vec = _mm256_loadu_pd(&LU.at(j*n + i));
+
+                __m256d y0 = _mm256_set1_pd(y[(k+0)*n + j]);
+                __m256d y1 = _mm256_set1_pd(y[(k+1)*n + j]);
+                __m256d y2 = _mm256_set1_pd(y[(k+2)*n + j]);
+                __m256d y3 = _mm256_set1_pd(y[(k+3)*n + j]);
+
+                sum0 = _mm256_fnmadd_pd(LU_vec, y0, sum0);
+                sum1 = _mm256_fnmadd_pd(LU_vec, y1, sum1);
+                sum2 = _mm256_fnmadd_pd(LU_vec, y2, sum2);
+                sum3 = _mm256_fnmadd_pd(LU_vec, y3, sum3);
+            }
+
+            _mm256_storeu_pd(&y[k*n + i], sum0);
+            _mm256_storeu_pd(&y[(k+1)*n + i], sum1);
+            _mm256_storeu_pd(&y[(k+2)*n + i], sum2);
+            _mm256_storeu_pd(&y[(k+3)*n + i], sum3);
+        }
+
+        // Scalar residual for i 
+        for (; i < n; i++) {
+
+            double sum0 = perm.at(k*n + i);
+            double sum1 = perm.at((k+1)*n + i);
+            double sum2 = perm.at((k+2)*n + i);
+            double sum3 = perm.at((k+3)*n + i);
+
+            for (size_t j = 0; j < i; j++) {
+                sum0 -= LU.at(j*n + i) * y[k*n + j];
+                sum1 -= LU.at(j*n + i) * y[(k+1)*n + j];
+                sum2 -= LU.at(j*n + i) * y[(k+2)*n + j];
+                sum3 -= LU.at(j*n + i) * y[(k+3)*n + j];
+            }
+            y[k*n + i] = sum0;
+            y[(k+1)*n + i] = sum1;
+            y[(k+2)*n + i] = sum2;
+            y[(k+3)*n + i] = sum3;
+        }
+
+        // Solving Ux = y 
+        // Backward substitution (Not worth in AVX2 due to i decreasing loop)
+        for (int i = static_cast<int>(n)-1; i >= 0; i--) {
+
+            double sum0 = y[k*n + i];
+            double sum1 = y[(k+1)*n + i];
+            double sum2 = y[(k+2)*n + i];
+            double sum3 = y[(k+3)*n + i];
+
+            for (size_t j = i+1; j < n; j++) {
+                sum0 -= LU.at(j*n + i) * y[k*n + j];
+                sum1 -= LU.at(j*n + i) * y[(k+1)*n + j];
+                sum2 -= LU.at(j*n + i) * y[(k+2)*n + j];
+                sum3 -= LU.at(j*n + i) * y[(k+3)*n + j];
+            }
+
+            y[k*n + i] = sum0;
+            y[(k+1)*n + i] = sum1;
+            y[(k+2)*n + i] = sum2;
+            y[(k+3)*n + i] = sum3;
+
+            for(size_t p = 0; p < NB_DB; p++) {
+                if (std::abs(y[(k+p)*n + i]) < 1e-14) y[(k+p)*n + i] = 0;
+                else y[(k+p)*n + i] /= diag_U[i];
+            }
+        }
+    }
+
+    // Scalar Residual for k 
+    for (; k < n; k++) {
+
+        // Solving Ly = perm (No division because diag = 1)
+        // Forward substitution
+        for (size_t i = 0; i < n; i++) {
+            
+            double sum = 0.0;
+            sum = perm.at(k*n + i);
+            for (size_t j = 0; j < i; j++) {
+                sum -= LU.at(j*n + i) * y[k*n + j];
+            }
+            y[k*n + i] = sum;
+        }
+
+        // Solving Ux = y 
+        // Backward substitution
+        for (int i = static_cast<int>(n)-1; i >= 0; i--) {
+
+            double sum = y[k*n + i];
+            for (size_t j = i+1; j < n; j++) {
+                sum -= LU.at(j*n + i) * y[k*n + j];
+            }
+            y[k*n + i] = sum;
+            if (std::abs(y[k*n + i]) < 1e-14) y[k*n + i] = 0;
+            else y[k*n + i] /= diag_U[i];
+            
+        }
+    }
+    return {n, n, false, std::move(y)};
+}
+
 double horizontal_red(__m256d& vec) {
     // hadd1 = [a+b, a+b, c+d, c+d] 
     __m256d hadd1 = _mm256_hadd_pd(vec, vec); 
