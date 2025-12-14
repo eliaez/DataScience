@@ -3,83 +3,80 @@
 
 using namespace std;
 
-// Testing data in col-major with loadingCsv
-void loadCsv_t(const string& filepath, const vector<double>& iris_colmajor) {
-
-    Dataframe iris = CsvHandler::loadCsv(filepath);
-
-    ASSERT_EQ(iris.get_data(), iris_colmajor)
-}
-
-/*
-// Testing data after change_layout
-void changelayout_t(Dataframe iris, const vector<double>& iris_rowmajor) {
+// Testing data after change_layout Naive
+void changelayout_naive(Dataframe iris, const Dataframe& iris_t) {
     
-    iris.change_layout_inplace();
+    Dataframe iris_bis_t = iris.change_layout("Naive");
 
-    ASSERT_EQ(iris.get_data(), iris_rowmajor)
+    ASSERT_EQ(iris_bis_t.get_data(), iris_t.get_data())
 }
-*/
+
+// Testing data after change_layout AVX2
+void changelayout_avx2_v1(Dataframe iris, const Dataframe& iris_t) {
+    
+    Dataframe iris_bis_t = iris.change_layout("AVX2");
+
+    ASSERT_EQ(iris_bis_t.get_data(), iris_t.get_data())
+}
+
+// Testing data after change_layout AVX2 (different data size)
+void changelayout_avx2_v2(Dataframe mat, const Dataframe& mat_t) {
+    
+    Dataframe mat_bis_t = mat.change_layout("AVX2");
+
+    ASSERT_EQ(mat_bis_t.get_data(), mat_t.get_data())
+}
 
 // Testing the transfer of a column from a Df to another new one
 void transfercol_t(Dataframe& iris, const string& col,
-    const Dataframe& iris_bis, const vector<double>& res_y) {
+    const Dataframe& iris_x, const Dataframe& iris_y) {
 
     Dataframe y = iris.transfer_col(col);
     
     // Data new df
-    ASSERT_EQ(y.get_data(), res_y)
+    ASSERT_EQ(y.get_data(), iris_y.get_data())
 
     // Headers new df
     ASSERT_EQ(y.get_headers()[0], col)
 
     // Data former df
-    ASSERT_EQ(iris.get_data(), iris_bis.get_data())
+    ASSERT_EQ(iris.get_data(), iris_x.get_data())
 
     // Headers former df
-    ASSERT_EQ(iris.get_headers(), iris_bis.get_headers())
+    ASSERT_EQ(iris.get_headers(), iris_x.get_headers())
 }
 
 void tests_data() {
 
     // Initialization of our data 
-    size_t m = 3, n = 4;
+    Dataframe iris = CsvHandler::loadCsv("../tests/datasets/iris.csv");
+    Dataframe iris_t = CsvHandler::loadCsv("../tests/datasets/iris_t.csv");
+    Dataframe iris_x = CsvHandler::loadCsv("../tests/datasets/iris_x.csv");
+    Dataframe iris_y = CsvHandler::loadCsv("../tests/datasets/iris_y.csv");
 
-    string col = "sepal width (cm)";
-
-    vector<string> iris_headers = {"sepal length (cm)", "sepal width (cm)",
-        "petal length (cm)", "petal width (cm)", "target"};
-
-    vector<string> iris_headers_bis = {"sepal length (cm)", "petal length (cm)", 
-        "petal width (cm)", "target"};
-
-    vector<double> res_y = {3.5,3.0,3.2};
-
-    vector<double> iris_colmajor = {5.1,4.9,4.7,3.5,3.0,3.2,1.4,1.4,1.3,0.2,0.2,0.2};
-    vector<double> iris_colmajor_bis = {5.1,4.9,4.7,1.4,1.4,1.3,0.2,0.2,0.2};
-
-    vector<double> iris_rowmajor = {5.1,3.5,1.4,0.2,4.9,3.0,1.4,0.2,4.7,3.2,1.3,0.2};
-
-    Dataframe iris = {m, n, false, iris_colmajor, iris_headers};
-    Dataframe iris_bis = {m, n-1, false, iris_colmajor_bis, iris_headers_bis};
+    Dataframe mat = CsvHandler::loadCsv("../tests/datasets/mat.csv", ',', false);
+    Dataframe mat_t = CsvHandler::loadCsv("../tests/datasets/mat_t.csv", ',', false);
 
     // Add tests
     TestSuite::Tests tests_data;
 
     tests_data.add_test(
-        bind(loadCsv_t, "../tests/iris.csv", iris_colmajor), 
-        "Loading Csv"
+        bind(changelayout_naive, iris, iris_t), 
+        "Change layout Naive"
     );
 
-    /*
     tests_data.add_test(
-        bind(changelayout_t, iris, iris_rowmajor), 
-        "Change layout"
+        bind(changelayout_avx2_v1, iris, iris_t), 
+        "Change layout AVX2 v1"
     );
-    */
+
+    tests_data.add_test(
+        bind(changelayout_avx2_v2, mat, mat_t), 
+        "Change layout AVX2 v2"
+    );
    
     tests_data.add_test(
-        bind(transfercol_t, iris, col, iris_bis, res_y), 
+        bind(transfercol_t, iris, "target", iris_x, iris_y), 
         "Transfer column"
     );
 
