@@ -6,121 +6,92 @@ using namespace Linalg;
 
 #ifdef __AVX2__
 
-// Testing Sum
-void sum_t(Dataframe& df1, Dataframe& df2, char op, const vector<double>& res) {
+// Testing Sum AVX2
+void sum_avx2(Dataframe& df1, Dataframe& df2, char op, const std::vector<double>& res) {
 
     Dataframe df = Operations::sum(df1, df2, op);
 
     ASSERT_EQ(df.get_data(), res)
 }
 
-// Testing Naive Multiply v1
-void multiply_v1(Dataframe& df1, Dataframe& df2, const vector<double>& res) {
+// Testing AVX2 Multiply v1
+void multiply_avx2(Dataframe& df, Dataframe& df_t, const vector<double>& res) {
     
-    Dataframe df1_temp = df1.change_layout("Naive"); 
-    
-    // Row - col
-    Dataframe df = Operations::multiply(df1_temp, df2);
-
-    ASSERT_EQ(df.get_data(), res)
-}
-
-// Testing Naive Multiply v2
-void multiply_v2(Dataframe& mat, Dataframe& mat_t, const Dataframe& mat_mult) {
-    
-    Dataframe mat_bis_t = mat_t.change_layout("Naive"); 
+    Dataframe df_bis_t = df_t.change_layout("AVX2"); 
     
     // Row - col
-    Dataframe df = Operations::multiply(mat_bis_t, mat);
+    Dataframe df_mult = Operations::multiply(df_bis_t, df);
 
     // Simplified result for practical reasons
-    ASSERT_EQ_VEC_INT(df.get_data(), mat_mult.get_data())
+    ASSERT_EQ_VEC_SCI3(df_mult.get_data(), res)
 }
 
-// Testing Naive Inverse - Error det = 0
-void inverse_v1(Dataframe& df1) {
-    Dataframe df = Operations::inverse(df1);
-}
-
-// Testing Naive Inverse Triangular
-void inverse_v2(Dataframe& df1, const vector<double>& res) {
+// Testing AVX2 Inverse LU
+void inverse_avx2(Dataframe& df, Dataframe& df_t, const std::vector<double>& res) {
     
-    Dataframe df = Operations::inverse(df1);
-
-    ASSERT_EQ(df.get_data(), res)
-}
-
-// Testing Naive Inverse LU
-void inverse_v3(Dataframe& mat, Dataframe& mat_t, const Dataframe& mat_inv) {
-    
-    Dataframe mat_bis_t = mat_t.change_layout("Naive"); 
+    Dataframe df_bis_t = df_t.change_layout("AVX2"); 
 
     // Row - col
-    Dataframe df = Operations::multiply(mat_bis_t, mat);
+    Dataframe df_mult = Operations::multiply(df_bis_t, df);
+
+    // Inv
+    Dataframe df_inv = Operations::inverse(df_mult);
 
     // Simplified result for practical reasons 
-    ASSERT_EQ_VEC_SCI3(df.get_data(), mat_inv.get_data())
+    ASSERT_EQ_VEC_SCI3(df_inv.get_data(), res)
 }
 
 
-void tests_naive() {
+void tests_avx2() {
 
-    Operations::set_backend(Backend::NAIVE);
+    Operations::set_backend(Backend::AVX2);
 
-    // Initialization of our data 
-    size_t n = 4;
-
-    vector<double> v1 = {1,5,9,13,2,6,10,14,3,7,11,15,4,8,12,16};
-    vector<double> v2 = {2,4,1,0,0,5,3,2,1,0,6,4,3,2,0,1};
-    vector<double> v3 = {1,0,0,0,2,1,0,0,3,2,1,0,4,3,2,1};
-
-    Dataframe df1 = {n, n, false, v1};
-    Dataframe df2 = {n, n, false, v2};
-    Dataframe df3 = {n, n, false, v3};
-
-    vector<double> sum = {-1,1,8,13,2,1,7,12,2,7,5,11,1,6,12,15};
-    vector<double> mult = {13,41,69,97,27,67,107,147,35,79,123,167,11,35,59,83};
-    vector<double> inv3 = {1,0,0,0,-2,1,0,0,1,-2,1,0,0,1,-2,1};
+    Dataframe iris = CsvHandler::loadCsv("../tests/datasets/iris.csv");
+    Dataframe iris_t = CsvHandler::loadCsv("../tests/datasets/iris_t.csv", ',', false);
+    Dataframe iris_sum = CsvHandler::loadCsv("../tests/datasets/iris_sum.csv", ',', false);
+    Dataframe iris_mult = CsvHandler::loadCsv("../tests/datasets/iris_mult.csv", ',', false);
+    Dataframe iris_inv = CsvHandler::loadCsv("../tests/datasets/iris_inv.csv", ',', false);
 
     Dataframe mat = CsvHandler::loadCsv("../tests/datasets/mat.csv", ',', false);
     Dataframe mat_t = CsvHandler::loadCsv("../tests/datasets/mat_t.csv", ',', false);
+    Dataframe mat_sum = CsvHandler::loadCsv("../tests/datasets/mat_sum.csv", ',', false);
     Dataframe mat_mult = CsvHandler::loadCsv("../tests/datasets/mat_mult.csv", ',', false);
     Dataframe mat_inv = CsvHandler::loadCsv("../tests/datasets/mat_inv.csv", ',', false);
 
     // Add tests
-    TestSuite::Tests tests_naive;
+    TestSuite::Tests tests_avx2;
 
-    tests_naive.add_test(
-        bind(sum_t, df1, df2, '-', sum), 
-        "Testing Naive Sum"
+    tests_avx2.add_test(
+        bind(sum_avx2, iris, iris, '+', iris_sum.get_data()), 
+        "Testing AVX2 Sum v1"
     );
 
-    tests_naive.add_test(
-        bind(multiply_v1, df1, df2, mult), 
-        "Testing Naive Multiply v1"
+    tests_avx2.add_test(
+        bind(sum_avx2, mat, mat, '+', mat_sum.get_data()), 
+        "Testing AVX2 Sum v2"
     );
 
-    tests_naive.add_test(
-        bind(multiply_v2, mat, mat_t, mat_mult), 
-        "Testing Naive Multiply v2"
+    tests_avx2.add_test(
+        bind(multiply_avx2, iris, iris_t, iris_mult.get_data()), 
+        "Testing AVX2 Multiply v1"
     );
 
-    tests_naive.add_test(
-        bind(inverse_v1, df1), 
-        "Testing Naive Inverse v1 - Error"
+    tests_avx2.add_test(
+        bind(multiply_avx2, mat, mat_t, mat_mult.get_data()), 
+        "Testing AVX2 Multiply v2"
     );
 
-    tests_naive.add_test(
-        bind(inverse_v2, df3, inv3), 
-        "Testing Naive Inverse v2 - Triangular"
+    tests_avx2.add_test(
+        bind(inverse_avx2, iris, iris_t, iris_inv.get_data()), 
+        "Testing AVX2 Inverse v1"
     );
 
-    tests_naive.add_test(
-        bind(inverse_v3, mat, mat_t, mat_inv), 
-        "Testing Naive Inverse v3 - LU"
+    tests_avx2.add_test(
+        bind(inverse_avx2, mat, mat_t, mat_inv.get_data()), 
+        "Testing AVX2 Inverse v2"
     );
 
-    cout << "Testing Naive functions:" << endl;
-    tests_naive.run_all();
+    cout << "Testing AVX2 functions:" << endl;
+    tests_avx2.run_all();
 }
 #endif

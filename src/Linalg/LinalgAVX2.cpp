@@ -133,7 +133,7 @@ std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(Dataframe& df) 
     return {nb_swaps, swaps, {n, n, false,  std::move(LU)}};
 }
 
-Dataframe solveLU_inplace(const Dataframe& perm, Dataframe& LU) {
+Dataframe solveLU_inplace(Dataframe& perm, Dataframe& LU) {
 
     size_t n = LU.get_cols();
     std::vector<double> y(n*n);

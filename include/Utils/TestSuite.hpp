@@ -38,21 +38,6 @@ namespace TestSuite {
         } \
     } while(0); 
 
-#define ASSERT_EQ_VEC_INT(actual, expected) \
-    do { \
-        auto to_int = [](const std::vector<double>& v) { \
-            std::vector<int> r(v.size()); \
-            std::transform(v.begin(), v.end(), r.begin(), \
-                [](double d) { return static_cast<int>(d); }); \
-            return r; \
-        }; \
-    if (to_int(actual) != to_int(expected)) { \
-            throw std::runtime_error( \
-                std::string("Ligne ") + std::to_string(__LINE__) \
-            ); \
-        } \
-    } while(0);
-
 #define ASSERT_EQ_VEC_SCI3(actual, expected) \
     do { \
         auto to_scistr = [](const std::vector<double>& v) { \

@@ -5,7 +5,7 @@ using namespace std;
 using namespace Linalg;
 
 // Testing Sum
-void sum_t(Dataframe& df1, Dataframe& df2, char op, const vector<double>& res) {
+void sum_naive(Dataframe& df1, Dataframe& df2, char op, const vector<double>& res) {
 
     Dataframe df = Operations::sum(df1, df2, op);
 
@@ -13,7 +13,7 @@ void sum_t(Dataframe& df1, Dataframe& df2, char op, const vector<double>& res) {
 }
 
 // Testing Naive Multiply v1
-void multiply_v1(Dataframe& df1, Dataframe& df2, const vector<double>& res) {
+void multiply_naive_v1(Dataframe& df1, Dataframe& df2, const vector<double>& res) {
     
     Dataframe df1_temp = df1.change_layout("Naive"); 
     
@@ -24,7 +24,7 @@ void multiply_v1(Dataframe& df1, Dataframe& df2, const vector<double>& res) {
 }
 
 // Testing Naive Multiply v2
-void multiply_v2(Dataframe& mat, Dataframe& mat_t, const Dataframe& mat_mult) {
+void multiply_naive_v2(Dataframe& mat, Dataframe& mat_t, const std::vector<double>& mat_mult) {
     
     Dataframe mat_bis_t = mat_t.change_layout("Naive"); 
     
@@ -32,16 +32,16 @@ void multiply_v2(Dataframe& mat, Dataframe& mat_t, const Dataframe& mat_mult) {
     Dataframe df = Operations::multiply(mat_bis_t, mat);
 
     // Simplified result for practical reasons
-    ASSERT_EQ_VEC_INT(df.get_data(), mat_mult.get_data())
+    ASSERT_EQ_VEC_SCI3(df.get_data(), mat_mult)
 }
 
 // Testing Naive Inverse - Error det = 0
-void inverse_v1(Dataframe& df1) {
+void inverse_naive_v1(Dataframe& df1) {
     Dataframe df = Operations::inverse(df1);
 }
 
 // Testing Naive Inverse Triangular
-void inverse_v2(Dataframe& df1, const vector<double>& res) {
+void inverse_naive_v2(Dataframe& df1, const vector<double>& res) {
     
     Dataframe df = Operations::inverse(df1);
 
@@ -49,15 +49,18 @@ void inverse_v2(Dataframe& df1, const vector<double>& res) {
 }
 
 // Testing Naive Inverse LU
-void inverse_v3(Dataframe& mat, Dataframe& mat_t, const Dataframe& mat_inv) {
+void inverse_naive_v3(Dataframe& mat, Dataframe& mat_t, const std::vector<double>& mat_inv) {
     
     Dataframe mat_bis_t = mat_t.change_layout("Naive"); 
 
     // Row - col
     Dataframe df = Operations::multiply(mat_bis_t, mat);
 
+    // Inv
+    Dataframe df_inv = Operations::inverse(df);
+
     // Simplified result for practical reasons 
-    ASSERT_EQ_VEC_SCI3(df.get_data(), mat_inv.get_data())
+    ASSERT_EQ_VEC_SCI3(df_inv.get_data(), mat_inv)
 }
 
 
@@ -89,32 +92,32 @@ void tests_naive() {
     TestSuite::Tests tests_naive;
 
     tests_naive.add_test(
-        bind(sum_t, df1, df2, '-', sum), 
+        bind(sum_naive, df1, df2, '-', sum), 
         "Testing Naive Sum"
     );
 
     tests_naive.add_test(
-        bind(multiply_v1, df1, df2, mult), 
+        bind(multiply_naive_v1, df1, df2, mult), 
         "Testing Naive Multiply v1"
     );
 
     tests_naive.add_test(
-        bind(multiply_v2, mat, mat_t, mat_mult), 
+        bind(multiply_naive_v2, mat, mat_t, mat_mult.get_data()), 
         "Testing Naive Multiply v2"
     );
 
     tests_naive.add_test(
-        bind(inverse_v1, df1), 
+        bind(inverse_naive_v1, df1), 
         "Testing Naive Inverse v1 - Error"
     );
 
     tests_naive.add_test(
-        bind(inverse_v2, df3, inv3), 
+        bind(inverse_naive_v2, df3, inv3), 
         "Testing Naive Inverse v2 - Triangular"
     );
 
     tests_naive.add_test(
-        bind(inverse_v3, mat, mat_t, mat_inv), 
+        bind(inverse_naive_v3, mat, mat_t, mat_inv.get_data()), 
         "Testing Naive Inverse v3 - LU"
     );
 

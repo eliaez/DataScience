@@ -4,37 +4,29 @@
 using namespace std;
 
 // Testing data after change_layout Naive
-void changelayout_naive(Dataframe iris, const Dataframe& iris_t) {
+void changelayout_naive(Dataframe iris, const std::vector<double>& iris_t) {
     
     Dataframe iris_bis_t = iris.change_layout("Naive");
 
-    ASSERT_EQ(iris_bis_t.get_data(), iris_t.get_data())
+    ASSERT_EQ(iris_bis_t.get_data(), iris_t)
 }
 
 // Testing data after change_layout AVX2
-void changelayout_avx2_v1(Dataframe iris, const Dataframe& iris_t) {
+void changelayout_avx2(Dataframe df1, const std::vector<double>& res) {
     
-    Dataframe iris_bis_t = iris.change_layout("AVX2");
+    Dataframe df1_t = df1.change_layout("AVX2");
 
-    ASSERT_EQ(iris_bis_t.get_data(), iris_t.get_data())
-}
-
-// Testing data after change_layout AVX2 (different data size)
-void changelayout_avx2_v2(Dataframe mat, const Dataframe& mat_t) {
-    
-    Dataframe mat_bis_t = mat.change_layout("AVX2");
-
-    ASSERT_EQ(mat_bis_t.get_data(), mat_t.get_data())
+    ASSERT_EQ(df1_t.get_data(), res)
 }
 
 // Testing the transfer of a column from a Df to another new one
 void transfercol_t(Dataframe& iris, const string& col,
-    const Dataframe& iris_x, const Dataframe& iris_y) {
+    const Dataframe& iris_x, const std::vector<double>& iris_y) {
 
     Dataframe y = iris.transfer_col(col);
     
     // Data new df
-    ASSERT_EQ(y.get_data(), iris_y.get_data())
+    ASSERT_EQ(y.get_data(), iris_y)
 
     // Headers new df
     ASSERT_EQ(y.get_headers()[0], col)
@@ -61,22 +53,22 @@ void tests_data() {
     TestSuite::Tests tests_data;
 
     tests_data.add_test(
-        bind(changelayout_naive, iris, iris_t), 
+        bind(changelayout_naive, iris, iris_t.get_data()), 
         "Change layout Naive"
     );
 
     tests_data.add_test(
-        bind(changelayout_avx2_v1, iris, iris_t), 
+        bind(changelayout_avx2, iris, iris_t.get_data()), 
         "Change layout AVX2 v1"
     );
 
     tests_data.add_test(
-        bind(changelayout_avx2_v2, mat, mat_t), 
+        bind(changelayout_avx2, mat, mat_t.get_data()), 
         "Change layout AVX2 v2"
     );
    
     tests_data.add_test(
-        bind(transfercol_t, iris, "target", iris_x, iris_y), 
+        bind(transfercol_t, iris, "target", iris_x, iris_y.get_data()), 
         "Transfer column"
     );
 
