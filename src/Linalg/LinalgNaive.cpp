@@ -62,91 +62,18 @@ std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(const Dataframe
     return {nb_swaps, swaps, {n, n, false,  std::move(LU)}};
 }
 
-int triangular_matrix(const Dataframe& df) {
-
-    size_t n = df.get_rows(); 
-    bool is_trig_up = true;
-    bool is_trig_down = true;
-
-    // Triangular sup
-    for (size_t i = 0; i < n && is_trig_up; i++) {
-        for(size_t j = 0; j < i && is_trig_up; j++) {
-            
-            if (df.at(j*n + i) != 0) is_trig_up = false;
-        }
-    }
-
-    // Triangular inf 
-    for (size_t i = 0; i < n && is_trig_down; i++) {
-        for(size_t j = i+1; j < n && is_trig_down; j++) {
-            
-            if (df.at(j*n + i) != 0) is_trig_down = false;
-        }
-    }
-
-    if (is_trig_up && (is_trig_up && is_trig_down)) return 3; // Diag
-    else if (is_trig_up) return 2; // Up
-    else if (is_trig_down) return 1; // Down
-
-    return 0; // Not triangular
-}
-
-std::tuple<double, std::vector<double>, Dataframe>determinant(Dataframe& df) {
-    
-    // Changing layout for better performances
-    if (df.get_storage()){
-        df.change_layout_inplace();
-    }
-
-    size_t rows = df.get_rows(), cols = df.get_cols();
-
-    // First condition, Matrix(n,n)
-    if (rows != cols) throw std::runtime_error("Need Matrix(n,n)");
-    size_t n = rows;
-
-    // Let's see if the matrix is diagonal or triangular 
-    int test_v = triangular_matrix(df);
-    if (test_v != 0) {
-        
-        double det = 1;
-        for (size_t j = 0; j < n; j++) {
-            
-            det *= df.at(j*n + j); // Product of the diagonal
-        }
-        return {det, {static_cast<double>(test_v)}, {}};
-    }
-    else {
-
-        auto [nb_swaps, swaps, LU] = LU_decomposition(df);
-
-        double det = (nb_swaps % 2) ? -1.0 : 1.0;
-        for (size_t j = 0; j < n; j++) {
-            
-            det *= LU.at(j*n + j); // Product of the diagonal
-        }
-        return {det, swaps, LU};
-    }
-}
-
 Dataframe transpose(Dataframe& df) {
 
     size_t rows = df.get_cols(), cols = df.get_rows();
     size_t temp_row = df.get_rows(), temp_col = df.get_cols();
 
-    std::vector<double> data;
-    data.reserve(rows * cols);
-
-    // Changing layout for better performances
+    // Changing layout for better performances later
     if (df.get_storage()){
-        df.change_layout_inplace();
+        df.change_layout_inplace("Naive");
     }
 
-    for (size_t i = 0; i < temp_row; i++) {
-        for(size_t j = 0; j < temp_col; j++) {
+    std::vector<double> data = Dataframe::transpose_naive(temp_row, temp_col, df.get_data());
 
-            data.push_back(df.at(j*temp_row + i));
-        }
-    }   
     return {rows, cols, false, std::move(data), df.get_headers(), 
         df.get_encoder(), df.get_encodedCols()};
 }
@@ -183,7 +110,7 @@ Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
     return {m, n, false, std::move(new_data)};
 }
 
-Dataframe multiply(const Dataframe& df1, Dataframe& df2) {
+Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
 
     size_t m = df1.get_rows();
     size_t n = df1.get_cols();
@@ -193,12 +120,12 @@ Dataframe multiply(const Dataframe& df1, Dataframe& df2) {
     // Verify if we can multiply them
     if (n != o) throw std::runtime_error("Need df1 cols == df2 rows");
 
-    // If row - row or col - col, we want to optimize
+    // To optimize we want only row - col or col - row config
     if (df1.get_storage() == df2.get_storage()) {
-        df2 = df2.change_layout();
-    } 
+        throw std::runtime_error("Need df1 row major and df2 col major or df1 col major and df2 row major");
+    }
 
-    std::vector<double> data(m * p, 0.0);
+    std::vector<double> data(m * p);
     
     // row - col
     if (df1.get_storage()) {
@@ -237,7 +164,7 @@ Dataframe multiply(const Dataframe& df1, Dataframe& df2) {
                      df1.get_headers(), df1.get_encoder(), df1.get_encodedCols());
 }
 
-Dataframe solveLU_inplace(const Dataframe& perm, Dataframe& LU) {
+Dataframe solveLU_inplace(const Dataframe& perm, const Dataframe& LU) {
 
     size_t n = LU.get_cols();
     std::vector<double> y(n*n);
@@ -265,9 +192,12 @@ Dataframe solveLU_inplace(const Dataframe& perm, Dataframe& LU) {
         // Solving Ux = y 
         // Backward substitution
         for (int i = static_cast<int>(n)-1; i >= 0; i--) {
+
+            double sum = y[k*n + i];
             for (size_t j = i+1; j < n; j++) {
-                y[k*n + i] -= LU.at(j*n + i) * y[k*n + j];
+                sum -= LU.at(j*n + i) * y[k*n + j];
             }
+            y[k*n + i] = sum;
             if (std::abs(y[k*n + i]) < 1e-14) y[k*n + i] = 0;
             else y[k*n + i] /= diag_U[i];
             
@@ -288,7 +218,7 @@ Dataframe inverse(Dataframe& df) {
     for (size_t i = 0; i < n; i++) {
         id[i*n + i] = 1;
     }
-    Dataframe df_id = {n, n, false, std::move(id)};
+    Dataframe df_id = {n, n, true, std::move(id)};
 
     // If no LU matrix was returned, then the matrix is triangular
     if (LU.get_data().empty()) {
@@ -310,10 +240,11 @@ Dataframe inverse(Dataframe& df) {
             for (size_t k = 0; k < n; k++) {
                 for (int i = static_cast<int>(n)-1; i >= 0; i--) {
 
-                    y[k*n + i] = df_id.at(k*n + i);
+                    double sum = df_id.at(k*n + i);
                     for (size_t j = i+1; j < n; j++) {
-                        y[k*n + i] -= df.at(j*n + i) * y[k*n + j];
+                        sum -= df.at(j*n + i) * y[k*n + j];
                     }
+                    y[k*n + i] = sum;
                     if (std::abs(y[k*n + i]) < 1e-14) y[k*n + i] = 0;
                     else y[k*n + i] /= df.at(i*n+i);
                 }

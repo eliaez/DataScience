@@ -116,43 +116,146 @@ Dataframe Dataframe::transfer_col(const std::string& col_name) {
     }
 }
 
-Dataframe Dataframe::change_layout() const {
+Dataframe Dataframe::change_layout(const std::string& choice) const {
     
     size_t temp_i, temp_j;
     std::vector<double> new_data;
-    new_data.reserve(rows * cols);
 
     if (is_row_major) temp_i = cols, temp_j = rows;
     else temp_i = rows, temp_j = cols;
-
-    for (size_t i = 0; i < temp_i; i++) {
-        for(size_t j = 0; j < temp_j; j++) {
-
-            new_data.push_back(data[j*temp_i+i]);
-        }
+    
+    if (choice == "Naive") {
+        new_data = transpose_naive(temp_i, temp_j, data);
     }
+    #ifdef __AVX2__
+        else if (choice == "AVX2") {
+            new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+        }
+        else {
+            new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+        }
+    #else
+        else {
+            new_data = transpose_naive(temp_i, temp_j, data);
+        }
+    #endif
+
     return {rows, cols, !is_row_major, std::move(new_data), headers, 
         label_encoder, encoded_cols};
 }
 
-void Dataframe::change_layout_inplace() {
+void Dataframe::change_layout_inplace(const std::string& choice) {
     
     size_t temp_i, temp_j;
     std::vector<double> new_data;
-    new_data.reserve(rows * cols);
 
     if (is_row_major) temp_i = cols, temp_j = rows;
     else temp_i = rows, temp_j = cols;
 
-    for (size_t i = 0; i < temp_i; i++) {
-        for(size_t j = 0; j < temp_j; j++) {
-
-            new_data.push_back(data[j*temp_i+i]);
-        }
+    if (choice == "Naive") {
+        new_data = transpose_naive(temp_i, temp_j, data);
     }
+    #ifdef __AVX2__
+        else if (choice == "AVX2") {
+            new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+        }
+        else {
+            new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+        }
+    #else
+        else {
+            new_data = transpose_naive(temp_i, temp_j, data);
+        }
+    #endif
+    
     is_row_major = !is_row_major;
     data = std::move(new_data);
 }
+
+std::vector<double> Dataframe::transpose_naive(size_t rows_, size_t cols_, 
+    const std::vector<double>& df) {
+    
+    std::vector<double> new_data(rows_*cols_);
+
+    for (size_t i = 0; i < rows_; i++) {
+        for(size_t j = 0; j < cols_; j++) {
+
+            new_data[i*cols_ + j] = df[j*rows_ + i];
+        }
+    }   
+    return new_data;
+}
+
+#ifdef __AVX2__
+std::vector<double> Dataframe::transpose_blocks_avx2(size_t rows_, size_t cols_, 
+    const std::vector<double>& df) {
+    
+    std::vector<double> new_data(rows_*cols_);
+    
+    // Variables
+    size_t i = 0, j = 0;
+    size_t vec_sizei = rows_ - (rows_ % NB_DB);
+    size_t vec_sizej = cols_ - (cols_ % NB_DB);
+
+    for (; i < vec_sizei; i += NB_DB) {
+        for (; j < vec_sizej; j += NB_DB) {
+
+            if (j + PREFETCH_DIST1 < vec_sizej) {
+                _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+0) * rows_ + i], _MM_HINT_T0);
+                _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+1) * rows_ + i], _MM_HINT_T0);
+                _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+2) * rows_ + i], _MM_HINT_T0);
+                _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+3) * rows_ + i], _MM_HINT_T0);
+            }
+            
+            // Load 4 cols
+            __m256d col0 = _mm256_loadu_pd(&df[(j+0)*rows_ + i]);
+            __m256d col1 = _mm256_loadu_pd(&df[(j+1)*rows_ + i]);
+            __m256d col2 = _mm256_loadu_pd(&df[(j+2)*rows_ + i]);
+            __m256d col3 = _mm256_loadu_pd(&df[(j+3)*rows_ + i]);
+            
+            // Get pair elements of each
+            __m256d t0 = _mm256_unpacklo_pd(col0, col1);
+
+            // Get odd elements of each 
+            __m256d t1 = _mm256_unpackhi_pd(col0, col1);
+
+            __m256d t2 = _mm256_unpacklo_pd(col2, col3);
+            __m256d t3 = _mm256_unpackhi_pd(col2, col3);
+            
+            // Get two first elements of each 
+            __m256d row0 = _mm256_permute2f128_pd(t0, t2, 0x20);
+            __m256d row1 = _mm256_permute2f128_pd(t1, t3, 0x20);
+
+            // Get two last elements of each
+            __m256d row2 = _mm256_permute2f128_pd(t0, t2, 0x31);
+            __m256d row3 = _mm256_permute2f128_pd(t1, t3, 0x31);
+            
+            _mm256_storeu_pd(&new_data[(i+0)*cols_ + j], row0);
+            _mm256_storeu_pd(&new_data[(i+1)*cols_ + j], row1);
+            _mm256_storeu_pd(&new_data[(i+2)*cols_ + j], row2);
+            _mm256_storeu_pd(&new_data[(i+3)*cols_ + j], row3);
+        }
+
+        // Scalar residual
+        for(; j < cols_; j++) {
+                new_data[(i+0)*cols_ + j] = df[j*rows_ + (i+0)];
+                new_data[(i+1)*cols_ + j] = df[j*rows_ + (i+1)];
+                new_data[(i+2)*cols_ + j] = df[j*rows_ + (i+2)];
+                new_data[(i+3)*cols_ + j] = df[j*rows_ + (i+3)];
+        }
+        j = 0;
+    }
+
+    // Scalar residual 
+    for (; i < rows_; i++) {
+        for(size_t j = 0; j < cols_; j++) {
+            new_data[i*cols_ + j] = df[j*rows_ + i];
+        }
+    }   
+
+    return new_data;
+}
+#endif
 
 /*----------------------------------------CsvHandler-----------------------------------*/
 
@@ -169,7 +272,7 @@ int CsvHandler::encode_label(std::string& label, std::unordered_map<std::string,
     return it->second;
 }
 
-Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep) {
+Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep, bool is_header, const std::string& method) {
 
     // Class Dataframe variables
     size_t rows = 0, cols = 0;
@@ -197,7 +300,7 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep) {
         while (std::getline(ss, cell, sep)) {
 
             // For the header
-            if (rows == 0) {
+            if (rows == 0 && is_header) {
                 headers.push_back(cell);
             }
             else {
@@ -211,19 +314,21 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep) {
                     data.push_back(val);
 
                     // Get indexes of encoded_cols
-                    if (rows == 1) encoded_cols.insert(current_cols); 
+                    if (rows == 1 || (rows == 0 && !is_header)) encoded_cols.insert(current_cols); 
                 }
             }
-            if (rows == 1) current_cols++;
+            if (rows == 1 || (rows == 0 && !is_header)) current_cols++;
 
         }
-        if (rows == 1) cols = current_cols;
+        if (rows == 1 || (rows == 0 && !is_header)) cols = current_cols;
         rows++;
     }
 
-    Dataframe csv = {rows-1, cols, true, std::move(data), std::move(headers), 
+    if (is_header) rows--;
+
+    Dataframe csv = {rows, cols, true, std::move(data), std::move(headers), 
         std::move(label_encoder), std::move(encoded_cols)};
     
     // return column-major dataframe
-    return csv.change_layout();
+    return csv.change_layout(method);
 }

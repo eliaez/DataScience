@@ -1,16 +1,19 @@
 #pragma once
 
 #include <vector>
+#include <cmath>
 #include <functional>
 #include <string>
 #include <stdexcept>
+#include <iomanip>
+#include <sstream>
 
 namespace TestSuite {
 
     class Tests {
         private:
-            int success;
-            int failure;
+            int success = 0;
+            int failure = 0;
             std::vector<std::pair<std::function<void()>,std::string_view>> to_test;
 
         public:
@@ -33,6 +36,21 @@ namespace TestSuite {
             throw std::runtime_error( \
                 std::string("Ligne ") + std::to_string(__LINE__) \
             ); \
+        } \
+    } while(0); 
+
+// Macro to compare two vectors of the same type with espilon = 1e-9 as lower threshold
+#define ASSERT_EQ_VEC_EPS(actual, expected) \
+    do { \
+        const double EPSILON = 1e-9; \
+        auto _actual = (actual); \
+        auto _expected = (expected); \
+        for (size_t i = 0; i < _actual.size(); i++) { \
+            if (std::abs(_actual[i] - _expected[i]) > EPSILON) { \
+                throw std::runtime_error( \
+                    std::string("Ligne ") + std::to_string(__LINE__) \
+                ); \
+            } \
         } \
     } while(0); 
     
