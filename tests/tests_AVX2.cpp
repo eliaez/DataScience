@@ -23,7 +23,7 @@ void multiply_avx2(Dataframe& df, Dataframe& df_t, const vector<double>& res) {
     Dataframe df_mult = Operations::multiply(df_bis_t, df);
 
     // Simplified result for practical reasons
-    ASSERT_EQ_VEC_SCI3(df_mult.get_data(), res)
+    ASSERT_EQ_VEC_EPS(df_mult.get_data(), res)
 }
 
 // Testing AVX2 Inverse LU
@@ -38,7 +38,7 @@ void inverse_avx2(Dataframe& df, Dataframe& df_t, const std::vector<double>& res
     Dataframe df_inv = Operations::inverse(df_mult);
 
     // Simplified result for practical reasons 
-    ASSERT_EQ_VEC_SCI3(df_inv.get_data(), res)
+    ASSERT_EQ_VEC_EPS(df_inv.get_data(), res)
 }
 
 

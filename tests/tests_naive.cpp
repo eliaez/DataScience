@@ -32,7 +32,7 @@ void multiply_naive_v2(Dataframe& mat, Dataframe& mat_t, const std::vector<doubl
     Dataframe df = Operations::multiply(mat_bis_t, mat);
 
     // Simplified result for practical reasons
-    ASSERT_EQ_VEC_SCI3(df.get_data(), mat_mult)
+    ASSERT_EQ_VEC_EPS(df.get_data(), mat_mult)
 }
 
 // Testing Naive Inverse - Error det = 0
@@ -60,7 +60,7 @@ void inverse_naive_v3(Dataframe& mat, Dataframe& mat_t, const std::vector<double
     Dataframe df_inv = Operations::inverse(df);
 
     // Simplified result for practical reasons 
-    ASSERT_EQ_VEC_SCI3(df_inv.get_data(), mat_inv)
+    ASSERT_EQ_VEC_EPS(df_inv.get_data(), mat_inv)
 }
 
 

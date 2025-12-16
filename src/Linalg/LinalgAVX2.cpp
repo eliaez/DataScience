@@ -362,9 +362,9 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
     if (n != o) throw std::runtime_error("Need df1 cols == df2 rows");
 
     // To optimize we want only row - col config (see explication at end of function)
-    if (!(df1.get_storage() && !df2.get_storage())) throw std::runtime_error("Need df1 row major and df2 col major");
+    if (!df1.get_storage() == df2.get_storage()) throw std::runtime_error("Need df1 row major and df2 col major");
 
-    std::vector<double> data(m * p, 0.0);
+    std::vector<double> data(m * p);
     
     // row - col
     for (size_t i = 0; i < m; i++) {

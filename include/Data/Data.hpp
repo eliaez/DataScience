@@ -31,7 +31,7 @@ class Dataframe
     public:
         #ifdef __AVX2__
         static constexpr size_t NB_DB = 4; // AVX2 (256 bits) so 4 doubles
-        static constexpr size_t PREFETCH_DIST1 = 16; // Pre-fetch 16*8 bytes ahead for Blocks algo
+        static constexpr size_t PREFETCH_DIST1 = 4; // Pre-fetch 4*64 bytes ahead for Blocks algo
         #endif
 
     public: 

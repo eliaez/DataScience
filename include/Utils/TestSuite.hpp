@@ -12,8 +12,8 @@ namespace TestSuite {
 
     class Tests {
         private:
-            int success;
-            int failure;
+            int success = 0;
+            int failure = 0;
             std::vector<std::pair<std::function<void()>,std::string_view>> to_test;
 
         public:
@@ -39,12 +39,13 @@ namespace TestSuite {
         } \
     } while(0); 
 
+// Macro to compare two vectors of the same type with espilon = 1e-9 as lower threshold
 #define ASSERT_EQ_VEC_EPS(actual, expected) \
     do { \
         const double EPSILON = 1e-9; \
         auto _actual = (actual); \
         auto _expected = (expected); \
-         for (size_t i = 0; i < _actual.size(); i++) { \
+        for (size_t i = 0; i < _actual.size(); i++) { \
             if (std::abs(_actual[i] - _expected[i]) > EPSILON) { \
                 throw std::runtime_error( \
                     std::string("Ligne ") + std::to_string(__LINE__) \
@@ -52,22 +53,4 @@ namespace TestSuite {
             } \
         } \
     } while(0); 
-
-#define ASSERT_EQ_VEC_SCI3(actual, expected) \
-    do { \
-        auto to_scistr = [](const std::vector<double>& v) { \
-            std::vector<std::string> r(v.size()); \
-            std::transform(v.begin(), v.end(), r.begin(), \
-                [](double d) { \
-                            std::ostringstream oss; \
-                            oss << std::scientific << std::setprecision(3) << d; \
-                            return oss.str(); }); \
-            return r; \
-        }; \
-        if (to_scistr(actual) != to_scistr(expected)) { \
-            throw std::runtime_error( \
-                std::string("Ligne ") + std::to_string(__LINE__) \
-            ); \
-        } \
-    } while(0);
     
