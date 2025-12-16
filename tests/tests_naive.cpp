@@ -86,7 +86,7 @@ void tests_naive() {
     Dataframe mat = CsvHandler::loadCsv("../tests/datasets/mat.csv", ',', false);
     Dataframe mat_t = CsvHandler::loadCsv("../tests/datasets/mat_t.csv", ',', false);
     Dataframe mat_mult = CsvHandler::loadCsv("../tests/datasets/mat_mult.csv", ',', false);
-    Dataframe mat_inv = CsvHandler::loadCsv("../tests/datasets/mat_inv.csv", ',', false);
+    Dataframe mat_inv = CsvHandler::loadCsv("../tests/datasets/mat_multinv.csv", ',', false);
 
     // Add tests
     TestSuite::Tests tests_naive;

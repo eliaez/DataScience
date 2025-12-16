@@ -42,7 +42,7 @@ void tests_data() {
 
     // Initialization of our data 
     Dataframe iris = CsvHandler::loadCsv("../tests/datasets/iris.csv");
-    Dataframe iris_t = CsvHandler::loadCsv("../tests/datasets/iris_t.csv");
+    Dataframe iris_t = CsvHandler::loadCsv("../tests/datasets/iris_t.csv", ',', false);
     Dataframe iris_x = CsvHandler::loadCsv("../tests/datasets/iris_x.csv");
     Dataframe iris_y = CsvHandler::loadCsv("../tests/datasets/iris_y.csv");
 

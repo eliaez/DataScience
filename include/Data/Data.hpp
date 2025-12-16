@@ -30,6 +30,7 @@ class Dataframe
 
     public:
         #ifdef __AVX2__
+        static constexpr size_t NB_DB = 4; // AVX2 (256 bits) so 4 doubles
         static constexpr size_t PREFETCH_DIST1 = 16; // Pre-fetch 16*8 bytes ahead for Blocks algo
         #endif
 
@@ -61,7 +62,7 @@ class Dataframe
 
         #ifdef __AVX2__
         // Tranpose AVX2 by blocks (see LinalgAVX2.hpp for NB_DB)
-        static std::vector<double> transpose_blocks_avx2(size_t rows_, size_t cols_, const std::vector<double>& df, size_t NB_DB);
+        static std::vector<double> transpose_blocks_avx2(size_t rows_, size_t cols_, const std::vector<double>& df);
         #endif
 
     // Getters & Constructor
@@ -105,7 +106,13 @@ class CsvHandler {
     
     public:
         // Returns a column-major Dataframe from Csv path
-        static Dataframe loadCsv(const std::string& filepath, char sep = ',', bool is_header = true);
+        #ifdef __AVX2__
+            static Dataframe loadCsv(const std::string& filepath, 
+                char sep = ',', bool is_header = true, const std::string& method = "AVX2");
+        #else 
+            static Dataframe loadCsv(const std::string& filepath, 
+                char sep = ',', bool is_header = true, const std::string& method = "Naive");
+        #endif
 
     private:
         // Function to encode potential columns using string for categories

@@ -129,10 +129,10 @@ Dataframe Dataframe::change_layout(const std::string& choice) const {
     }
     #ifdef __AVX2__
         else if (choice == "AVX2") {
-            new_data = transpose_blocks_avx2(temp_i, temp_j, data, PREFETCH_DIST1);
+            new_data = transpose_blocks_avx2(temp_i, temp_j, data);
         }
         else {
-            new_data = transpose_blocks_avx2(temp_i, temp_j, data, PREFETCH_DIST1);
+            new_data = transpose_blocks_avx2(temp_i, temp_j, data);
         }
     #else
         else {
@@ -157,10 +157,10 @@ void Dataframe::change_layout_inplace(const std::string& choice) {
     }
     #ifdef __AVX2__
         else if (choice == "AVX2") {
-            new_data = transpose_blocks_avx2(temp_i, temp_j, data, PREFETCH_DIST1);
+            new_data = transpose_blocks_avx2(temp_i, temp_j, data);
         }
         else {
-            new_data = transpose_blocks_avx2(temp_i, temp_j, data, PREFETCH_DIST1);
+            new_data = transpose_blocks_avx2(temp_i, temp_j, data);
         }
     #else
         else {
@@ -175,13 +175,12 @@ void Dataframe::change_layout_inplace(const std::string& choice) {
 std::vector<double> Dataframe::transpose_naive(size_t rows_, size_t cols_, 
     const std::vector<double>& df) {
     
-    std::vector<double> new_data;
-    new_data.reserve(rows_ * cols_);
+    std::vector<double> new_data(rows_*cols_);
 
     for (size_t i = 0; i < rows_; i++) {
         for(size_t j = 0; j < cols_; j++) {
 
-            new_data.push_back(df[j*rows_ + i]);
+            new_data[i*cols_ + j] = df[j*rows_ + i];
         }
     }   
     return new_data;
@@ -189,7 +188,7 @@ std::vector<double> Dataframe::transpose_naive(size_t rows_, size_t cols_,
 
 #ifdef __AVX2__
 std::vector<double> Dataframe::transpose_blocks_avx2(size_t rows_, size_t cols_, 
-    const std::vector<double>& df, size_t NB_DB) {
+    const std::vector<double>& df) {
     
     std::vector<double> new_data(rows_*cols_);
     
@@ -273,7 +272,7 @@ int CsvHandler::encode_label(std::string& label, std::unordered_map<std::string,
     return it->second;
 }
 
-Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep, bool is_header) {
+Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep, bool is_header, const std::string& method) {
 
     // Class Dataframe variables
     size_t rows = 0, cols = 0;
@@ -325,11 +324,11 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep, bool is_hea
         rows++;
     }
 
-    if (!is_header) rows--;
+    if (is_header) rows--;
 
     Dataframe csv = {rows, cols, true, std::move(data), std::move(headers), 
         std::move(label_encoder), std::move(encoded_cols)};
     
     // return column-major dataframe
-    return csv.change_layout();
+    return csv.change_layout(method);
 }

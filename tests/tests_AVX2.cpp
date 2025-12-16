@@ -50,13 +50,13 @@ void tests_avx2() {
     Dataframe iris_t = CsvHandler::loadCsv("../tests/datasets/iris_t.csv", ',', false);
     Dataframe iris_sum = CsvHandler::loadCsv("../tests/datasets/iris_sum.csv", ',', false);
     Dataframe iris_mult = CsvHandler::loadCsv("../tests/datasets/iris_mult.csv", ',', false);
-    Dataframe iris_inv = CsvHandler::loadCsv("../tests/datasets/iris_inv.csv", ',', false);
+    Dataframe iris_inv = CsvHandler::loadCsv("../tests/datasets/iris_multinv.csv", ',', false);
 
     Dataframe mat = CsvHandler::loadCsv("../tests/datasets/mat.csv", ',', false);
     Dataframe mat_t = CsvHandler::loadCsv("../tests/datasets/mat_t.csv", ',', false);
     Dataframe mat_sum = CsvHandler::loadCsv("../tests/datasets/mat_sum.csv", ',', false);
     Dataframe mat_mult = CsvHandler::loadCsv("../tests/datasets/mat_mult.csv", ',', false);
-    Dataframe mat_inv = CsvHandler::loadCsv("../tests/datasets/mat_inv.csv", ',', false);
+    Dataframe mat_inv = CsvHandler::loadCsv("../tests/datasets/mat_multinv.csv", ',', false);
 
     // Add tests
     TestSuite::Tests tests_avx2;

@@ -78,7 +78,7 @@ Dataframe transpose(Dataframe& df) {
         df.get_encoder(), df.get_encodedCols()};
 }
 
-Dataframe sum(Dataframe& df1, Dataframe& df2, char op) {
+Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
 
     size_t m = df1.get_rows();
     size_t n = df1.get_cols();
@@ -110,7 +110,7 @@ Dataframe sum(Dataframe& df1, Dataframe& df2, char op) {
     return {m, n, false, std::move(new_data)};
 }
 
-Dataframe multiply(Dataframe& df1, Dataframe& df2) {
+Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
 
     size_t m = df1.get_rows();
     size_t n = df1.get_cols();
@@ -164,7 +164,7 @@ Dataframe multiply(Dataframe& df1, Dataframe& df2) {
                      df1.get_headers(), df1.get_encoder(), df1.get_encodedCols());
 }
 
-Dataframe solveLU_inplace(const Dataframe& perm, Dataframe& LU) {
+Dataframe solveLU_inplace(const Dataframe& perm, const Dataframe& LU) {
 
     size_t n = LU.get_cols();
     std::vector<double> y(n*n);

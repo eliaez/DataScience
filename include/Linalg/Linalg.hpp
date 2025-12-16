@@ -35,8 +35,8 @@ namespace Linalg {
             // Will select the best one if AUTO
             static Backend get_backend();
 
-            static Dataframe sum(Dataframe& df1, Dataframe& df2, char op = '+');
-            static Dataframe multiply(Dataframe& df1, Dataframe& df2);
+            static Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op = '+');
+            static Dataframe multiply(const Dataframe& df1, const Dataframe& df2);
             static Dataframe transpose(Dataframe& df);
             static Dataframe inverse(Dataframe& df);
             

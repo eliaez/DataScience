@@ -5,7 +5,7 @@ namespace Linalg {
 namespace AVX2 {
 #ifdef __AVX2__
 
-std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(Dataframe& df) {
+std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(const Dataframe& df) {
 
     int nb_swaps = 0;
     size_t n = df.get_cols();
@@ -133,7 +133,7 @@ std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(Dataframe& df) 
     return {nb_swaps, swaps, {n, n, false,  std::move(LU)}};
 }
 
-Dataframe solveLU_inplace(Dataframe& perm, Dataframe& LU) {
+Dataframe solveLU_inplace(const Dataframe& perm, const Dataframe& LU) {
 
     size_t n = LU.get_cols();
     std::vector<double> y(n*n);
@@ -282,7 +282,7 @@ double horizontal_red(__m256d& vec) {
     return _mm_cvtsd_f64(sum128);
 }
 
-Dataframe sum(Dataframe& df1, Dataframe& df2, char op) {
+Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
 
     size_t m = df1.get_rows();
     size_t n = df1.get_cols();
@@ -351,7 +351,7 @@ Dataframe sum(Dataframe& df1, Dataframe& df2, char op) {
     return {m, n, false, std::move(new_data)};
 }
 
-Dataframe multiply(Dataframe& df1, Dataframe& df2) {
+Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
 
     size_t m = df1.get_rows();
     size_t n = df1.get_cols();
@@ -424,7 +424,7 @@ Dataframe transpose(Dataframe& df) {
         df.change_layout_inplace("AVX2");
     }
 
-    std::vector<double> data = Dataframe::transpose_blocks_avx2(temp_row, temp_col, df.get_data(), NB_DB);
+    std::vector<double> data = Dataframe::transpose_blocks_avx2(temp_row, temp_col, df.get_data());
 
     return {rows, cols, false, std::move(data), df.get_headers(), 
         df.get_encoder(), df.get_encodedCols()};

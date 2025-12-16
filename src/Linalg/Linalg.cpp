@@ -32,7 +32,7 @@
     #define DISPATCH_BACKEND(func, ...) \
         switch(current_backend) { \
             case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
-            case Linalg::Backend::EIGEN: return Linalg::Eigen::func(__VA_ARGS__); \ 
+            case Linalg::Backend::EIGEN: return Linalg::Eigen::func(__VA_ARGS__); \
             default: return Linalg::NAIVE::func(__VA_ARGS__); \
         }
 
@@ -78,11 +78,11 @@ Backend Operations::get_backend() {
     return current_backend;
 }
 
-Dataframe Operations::sum(Dataframe& df1, Dataframe& df2, char op) {
+Dataframe Operations::sum(const Dataframe& df1, const Dataframe& df2, char op) {
     DISPATCH_BACKEND(sum, df1, df2, op)
 }
 
-Dataframe Operations::multiply(Dataframe& df1, Dataframe& df2) {
+Dataframe Operations::multiply(const Dataframe& df1, const Dataframe& df2) {
     DISPATCH_BACKEND(multiply, df1, df2)
 }
 
