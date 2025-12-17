@@ -38,7 +38,7 @@ set(LIB_SOURCES src/Data/Data.cpp
 
 # Main Library
 add_library(linalg_full STATIC ${LIB_SOURCES})
-target_compile_options(linalg_full PRIVATE -Wall -Wextra -O0 -march=native ${AVX2_FLAGS})
+target_compile_options(linalg_full PRIVATE -Wall -Wextra -O3 -march=native ${AVX2_FLAGS})
 
 
 if(BUILD_TEST)

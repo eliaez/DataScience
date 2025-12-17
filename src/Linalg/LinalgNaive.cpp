@@ -165,7 +165,7 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
 
 Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n) {
 
-    std::vector<double> y(n*n);
+    std::vector<double> y(n*n, 0.0);
 
     // Store the Diag
     std::vector<double> diag_U(n);
