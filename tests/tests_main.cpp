@@ -4,7 +4,7 @@ void tests_data();
 void tests_naive();
 
 #ifdef __AVX2__
-void tests_AVX2();
+void tests_avx2();
 #endif
 
 int main() {
@@ -12,6 +12,6 @@ int main() {
     tests_naive();
 
     #ifdef __AVX2__
-    tests_AVX2();
+    tests_avx2();
     #endif
 }

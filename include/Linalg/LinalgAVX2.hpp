@@ -19,10 +19,10 @@ namespace Linalg {
         Dataframe transpose(Dataframe& df);
 
         // LU decomposition, returns nb_swaps, swap - permutation matrix and LU in the same matrix
-        std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(const Dataframe& df);
+        std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const Dataframe& df);
 
         // Function to solve LU system with Forward substitution and Backward substitution
-        Dataframe solveLU_inplace(const Dataframe& perm, const Dataframe& LU);
+        Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n);
 
         // Function to inverse matrix by using LU decomposition 
         Dataframe inverse(Dataframe& df);

@@ -4,7 +4,7 @@
 namespace Linalg {
 namespace Naive {
 
-std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(const Dataframe& df) {
+std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const Dataframe& df) {
 
     int nb_swaps = 0;
     size_t n = df.get_cols();
@@ -19,8 +19,8 @@ std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(const Dataframe
     for (size_t k = 0; k < n-1; k++) {
 
         // Partial pivot (get most important pivot and permutate lines)
-        auto [max, idx] = std::tuple{-1, 0};
-        for (size_t i = k; i < n; i++) {
+        auto [max, idx] = std::tuple{LU[k*n + k], k};
+        for (size_t i = k+1; i < n; i++) {
 
             double val = std::abs(LU[k*n + i]);
             if (max < val) {
@@ -49,17 +49,16 @@ std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(const Dataframe
         for (size_t i = k+1; i < n; i++) {
 
             // L value 
-            double mult = LU[k*n + i] / p;
-            LU[k*n + i] = mult;
+            double Lvalue = LU[k*n + i] / p;
+            LU[k*n + i] = Lvalue;
 
             // Update value in other cols 
             for (size_t j = k+1; j < n; j++) {
-                LU[j*n + i] -= mult * LU[j*n + k];
+                LU[j*n + i] -= Lvalue * LU[j*n + k];
             }
         }
     }
-    
-    return {nb_swaps, swaps, {n, n, false,  std::move(LU)}};
+    return std::make_tuple(nb_swaps, std::move(swaps), std::move(LU));
 }
 
 Dataframe transpose(Dataframe& df) {
@@ -164,15 +163,14 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
                      df1.get_headers(), df1.get_encoder(), df1.get_encodedCols());
 }
 
-Dataframe solveLU_inplace(const Dataframe& perm, const Dataframe& LU) {
+Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n) {
 
-    size_t n = LU.get_cols();
     std::vector<double> y(n*n);
 
     // Store the Diag
     std::vector<double> diag_U(n);
     for (size_t i = 0; i < n; i++) {
-        diag_U[i] = LU.at(i * n + i);
+        diag_U[i] = LU[i * n + i];
     }
 
     for (size_t k = 0; k < n; k++) {
@@ -182,9 +180,9 @@ Dataframe solveLU_inplace(const Dataframe& perm, const Dataframe& LU) {
         for (size_t i = 0; i < n; i++) {
 
             double sum = 0.0;
-            sum = perm.at(k*n + i);
+            sum = perm[k*n + i];
             for (size_t j = 0; j < i; j++) {
-                sum -= LU.at(j*n + i) * y[k*n + j];
+                sum -= LU[j*n + i] * y[k*n + j];
             }
             y[k*n + i] = sum;
         }
@@ -195,7 +193,7 @@ Dataframe solveLU_inplace(const Dataframe& perm, const Dataframe& LU) {
 
             double sum = y[k*n + i];
             for (size_t j = i+1; j < n; j++) {
-                sum -= LU.at(j*n + i) * y[k*n + j];
+                sum -= LU[j*n + i] * y[k*n + j];
             }
             y[k*n + i] = sum;
             if (std::abs(y[k*n + i]) < 1e-14) y[k*n + i] = 0;
@@ -221,7 +219,7 @@ Dataframe inverse(Dataframe& df) {
     Dataframe df_id = {n, n, true, std::move(id)};
 
     // If no LU matrix was returned, then the matrix is triangular
-    if (LU.get_data().empty()) {
+    if (LU.empty()) {
         std::vector<double> y(n*n, 0.0);
 
         // Diag
@@ -276,7 +274,7 @@ Dataframe inverse(Dataframe& df) {
         Dataframe df_swaps = {n, n, false, std::move(swaps)};
         Dataframe perm = multiply(df_swaps, df_id); 
 
-        return solveLU_inplace(perm, LU);
+        return solveLU_inplace(perm.get_data(), LU, n);
     }
 }
 

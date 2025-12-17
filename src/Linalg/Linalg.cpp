@@ -143,7 +143,7 @@ int triangular_matrix(const Dataframe& df) {
     return 0; // Not triangular
 }
 
-std::tuple<double, std::vector<double>, Dataframe>determinant(Dataframe& df) {
+std::tuple<double, std::vector<double>, std::vector<double>> determinant(Dataframe& df) {
     
     // Changing layout for better performances
     if (df.get_storage()){
@@ -155,6 +155,7 @@ std::tuple<double, std::vector<double>, Dataframe>determinant(Dataframe& df) {
     // First condition, Matrix(n,n)
     if (rows != cols) throw std::runtime_error("Need Matrix(n,n)");
     size_t n = rows;
+    std::vector<double> LU;
 
     // Let's see if the matrix is diagonal or triangular 
     int test_v = triangular_matrix(df);
@@ -165,21 +166,23 @@ std::tuple<double, std::vector<double>, Dataframe>determinant(Dataframe& df) {
             
             det *= df.at(j*n + j); // Product of the diagonal
         }
-        return {det, {static_cast<double>(test_v)}, {}};
+
+        std::vector<double> vec_v = {static_cast<double>(test_v)};
+        
+        return std::make_tuple(det, std::move(vec_v), std::move(LU));
     }
     else {
         int nb_swaps;
         std::vector<double> swaps;
-        Dataframe LU; 
 
         DISPATCH_BACKEND2(LU_decomposition, df)
 
         double det = (nb_swaps % 2) ? -1.0 : 1.0;
         for (size_t j = 0; j < n; j++) {
             
-            det *= LU.at(j*n + j); // Product of the diagonal
+            det *= LU[j*n + j]; // Product of the diagonal
         }
-        return {det, swaps, LU};
+        return std::make_tuple(det, std::move(swaps), std::move(LU));
     }
 }
 

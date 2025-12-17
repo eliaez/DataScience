@@ -5,7 +5,7 @@ namespace Linalg {
 namespace AVX2 {
 #ifdef __AVX2__
 
-std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(const Dataframe& df) {
+std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const Dataframe& df) {
 
     int nb_swaps = 0;
     size_t n = df.get_cols();
@@ -20,8 +20,8 @@ std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(const Dataframe
     for (size_t k = 0; k < n-1; k++) {
 
         // Partial pivot (get most important pivot and permutate lines)
-        auto [max, idx] = std::tuple{-1, 0};
-        for (size_t i = k; i < n; i++) {
+        auto [max, idx] = std::tuple{LU[k*n + k], k};
+        for (size_t i = k+1; i < n; i++) {
 
             double val = std::abs(LU[k*n + i]);
             if (max < val) {
@@ -47,101 +47,64 @@ std::tuple<int, std::vector<double>, Dataframe> LU_decomposition(const Dataframe
         }
 
         // LU decomposition algorithm by blocks AVX2
-        size_t i = k+1, j = k+1;
-        size_t vec_size = n - (n % NB_DB);
-
-        alignas(32) double mult[4];
+        size_t vec_size = n - ((n - k - 1) % NB_DB);
         
-        for (; i < vec_size; i+=NB_DB) {
+        for (size_t i = k+1; i < n; i++) {
 
-            // Prefectch if possible
-            if (i + PREFETCH_DIST < vec_size) {
-                _mm_prefetch((const char*)&LU[k*n + i + PREFETCH_DIST], _MM_HINT_T0);
-            }
-
-            __m256d vec_LU = _mm256_loadu_pd(&LU[k*n + i]);
+            double Lvalue = LU[k*n + i] / p;
+            LU[k*n + i] = Lvalue;
             
-            // Broadcast our pivot in vector
-            __m256d pivot = _mm256_set1_pd(p);
-
-            // L value 
-            __m256d vec_Lvalue = _mm256_div_pd(vec_LU, pivot); 
-            _mm256_storeu_pd(&LU[k*n + i], vec_Lvalue);
+            // Broadcast our L value in vector
+            __m256d vec_Lvalue = _mm256_set1_pd(Lvalue);
             
             // Update value in other cols 
             // Block version
-            // Same method as Transpose_blocks_avx2
+            size_t j = k+1;
             for (; j < vec_size; j+=NB_DB) {
+                        
+                __m256d vec_pivot = _mm256_set_pd(
+                    LU[(j+3)*n + k],
+                    LU[(j+2)*n + k],
+                    LU[(j+1)*n + k],
+                    LU[j*n + k]
+                );
                 
-                if (j + df.PREFETCH_DIST1 < vec_size) {
-                    for (size_t l = 0; l < NB_DB; l++) {
-                        _mm_prefetch((const char*)&LU[(j + l + df.PREFETCH_DIST1)*n + i], _MM_HINT_T0);
-                    }
-                }
-
-                __m256d val0 = _mm256_set1_pd(LU[j*n + k]);
-                __m256d val1 = _mm256_set1_pd(LU[(j+1)*n + k]);
-                __m256d val2 = _mm256_set1_pd(LU[(j+2)*n + k]);
-                __m256d val3 = _mm256_set1_pd(LU[(j+3)*n + k]);
-
-                __m256d vec_LU0 = _mm256_loadu_pd(&LU[j*n + i]);
-                __m256d vec_LU1 = _mm256_loadu_pd(&LU[(j+1)*n + i]);
-                __m256d vec_LU2 = _mm256_loadu_pd(&LU[(j+2)*n + i]);
-                __m256d vec_LU3 = _mm256_loadu_pd(&LU[(j+3)*n + i]);
-
+                __m256d vec_LU = _mm256_set_pd(
+                    LU[(j+3)*n + i],
+                    LU[(j+2)*n + i],
+                    LU[(j+1)*n + i],
+                    LU[j*n + i]
+                );
+                
                 // (a*b) - c
-                vec_LU0 = _mm256_fnmadd_pd(val0, vec_Lvalue, vec_LU0); 
-                vec_LU1 = _mm256_fnmadd_pd(val1, vec_Lvalue, vec_LU1); 
-                vec_LU2 = _mm256_fnmadd_pd(val2, vec_Lvalue, vec_LU2); 
-                vec_LU3 = _mm256_fnmadd_pd(val3, vec_Lvalue, vec_LU3); 
+                vec_LU = _mm256_fnmadd_pd(vec_Lvalue, vec_pivot, vec_LU);
 
-                _mm256_storeu_pd(&LU[j*n + i], vec_LU0);
-                _mm256_storeu_pd(&LU[(j+1)*n + i], vec_LU1);
-                _mm256_storeu_pd(&LU[(j+2)*n + i], vec_LU2);
-                _mm256_storeu_pd(&LU[(j+3)*n + i], vec_LU3);
+                alignas(32) double temp[4];
+                _mm256_store_pd(temp, vec_LU);
+                LU[j*n + i] = temp[0];
+                LU[(j+1)*n + i] = temp[1];
+                LU[(j+2)*n + i] = temp[2];
+                LU[(j+3)*n + i] = temp[3];
             }
-
 
             // Scalar residual
-            if (j < n) {
-                _mm256_storeu_pd(mult, vec_Lvalue);
-            }
             for (; j < n; j++) {
-                double pivot_val = LU[j*n + k];
-                LU[j*n + i] -= mult[0] * pivot_val;
-                LU[j*n + i+1] -= mult[1] * pivot_val;
-                LU[j*n + i+2] -= mult[2] * pivot_val;
-                LU[j*n + i+3] -= mult[3] * pivot_val;
-            }
-            j = k+1;
-        }
-
-        // Scalar residual
-        for (; i < n; i++) {
-
-            // L value 
-            double mult = LU[k*n + i] / p;
-            LU[k*n + i] = mult;
-
-            // Update value in other cols 
-            for (size_t j = k+1; j < n; j++) {
-                LU[j*n + i] -= mult * LU[j*n + k];
+                LU[j*n + i] -= Lvalue * LU[j*n + k];
             }
         }
     }
-    
-    return {nb_swaps, swaps, {n, n, false,  std::move(LU)}};
+    return std::make_tuple(nb_swaps, std::move(swaps), std::move(LU));
 }
 
-Dataframe solveLU_inplace(const Dataframe& perm, const Dataframe& LU) {
+Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n) {
 
-    size_t n = LU.get_cols();
     std::vector<double> y(n*n);
+    size_t prefetch_dist = NB_DB;
 
     // Store the Diag
     std::vector<double> diag_U(n);
     for (size_t i = 0; i < n; i++) {
-        diag_U[i] = LU.at(i * n + i);
+        diag_U[i] = LU[i * n + i];
     }
 
     size_t k = 0, i = 0;
@@ -154,24 +117,24 @@ Dataframe solveLU_inplace(const Dataframe& perm, const Dataframe& LU) {
         // Forward substitution 
         for (; i < vec_size; i+=NB_DB) {
             
-            if (k + LU.PREFETCH_DIST1 < vec_size) {
+            if (k + prefetch_dist < vec_size) {
                 for (size_t p = 0; p < NB_DB; p++) {
-                    _mm_prefetch((const char*)&perm.at((k+p+LU.PREFETCH_DIST1)*n + i), _MM_HINT_T0);
+                    _mm_prefetch((const char*)&perm[(k+p+prefetch_dist)*n + i], _MM_HINT_T0);
                 }        
             }
 
-            __m256d sum0 = _mm256_loadu_pd(&perm.at((k+0)*n + i));
-            __m256d sum1 = _mm256_loadu_pd(&perm.at((k+1)*n + i));
-            __m256d sum2 = _mm256_loadu_pd(&perm.at((k+2)*n + i));
-            __m256d sum3 = _mm256_loadu_pd(&perm.at((k+3)*n + i));
+            __m256d sum0 = _mm256_loadu_pd(&perm[(k+0)*n + i]);
+            __m256d sum1 = _mm256_loadu_pd(&perm[(k+1)*n + i]);
+            __m256d sum2 = _mm256_loadu_pd(&perm[(k+2)*n + i]);
+            __m256d sum3 = _mm256_loadu_pd(&perm[(k+3)*n + i]);
 
             for (size_t j = 0; j < i; j++) {
 
-                if (j + LU.PREFETCH_DIST1 < i) {
-                    _mm_prefetch((const char*)&LU.at((j+LU.PREFETCH_DIST1)*n + i), _MM_HINT_T0);
+                if (j + prefetch_dist < i) {
+                    _mm_prefetch((const char*)&LU[(j+prefetch_dist*n) + i], _MM_HINT_T0);
                 }
 
-                __m256d LU_vec = _mm256_loadu_pd(&LU.at(j*n + i));
+                __m256d LU_vec = _mm256_loadu_pd(&LU[j*n + i]);
 
                 __m256d y0 = _mm256_set1_pd(y[(k+0)*n + j]);
                 __m256d y1 = _mm256_set1_pd(y[(k+1)*n + j]);
@@ -193,16 +156,16 @@ Dataframe solveLU_inplace(const Dataframe& perm, const Dataframe& LU) {
         // Scalar residual for i 
         for (; i < n; i++) {
 
-            double sum0 = perm.at(k*n + i);
-            double sum1 = perm.at((k+1)*n + i);
-            double sum2 = perm.at((k+2)*n + i);
-            double sum3 = perm.at((k+3)*n + i);
+            double sum0 = perm[k*n + i];
+            double sum1 = perm[(k+1)*n + i];
+            double sum2 = perm[(k+2)*n + i];
+            double sum3 = perm[(k+3)*n + i];
 
             for (size_t j = 0; j < i; j++) {
-                sum0 -= LU.at(j*n + i) * y[k*n + j];
-                sum1 -= LU.at(j*n + i) * y[(k+1)*n + j];
-                sum2 -= LU.at(j*n + i) * y[(k+2)*n + j];
-                sum3 -= LU.at(j*n + i) * y[(k+3)*n + j];
+                sum0 -= LU[j*n + i] * y[k*n + j];
+                sum1 -= LU[j*n + i] * y[(k+1)*n + j];
+                sum2 -= LU[j*n + i] * y[(k+2)*n + j];
+                sum3 -= LU[j*n + i] * y[(k+3)*n + j];
             }
             y[k*n + i] = sum0;
             y[(k+1)*n + i] = sum1;
@@ -220,10 +183,10 @@ Dataframe solveLU_inplace(const Dataframe& perm, const Dataframe& LU) {
             double sum3 = y[(k+3)*n + i];
 
             for (size_t j = i+1; j < n; j++) {
-                sum0 -= LU.at(j*n + i) * y[k*n + j];
-                sum1 -= LU.at(j*n + i) * y[(k+1)*n + j];
-                sum2 -= LU.at(j*n + i) * y[(k+2)*n + j];
-                sum3 -= LU.at(j*n + i) * y[(k+3)*n + j];
+                sum0 -= LU[j*n + i] * y[k*n + j];
+                sum1 -= LU[j*n + i] * y[(k+1)*n + j];
+                sum2 -= LU[j*n + i] * y[(k+2)*n + j];
+                sum3 -= LU[j*n + i] * y[(k+3)*n + j];
             }
 
             y[k*n + i] = sum0;
@@ -246,9 +209,9 @@ Dataframe solveLU_inplace(const Dataframe& perm, const Dataframe& LU) {
         for (size_t i = 0; i < n; i++) {
             
             double sum = 0.0;
-            sum = perm.at(k*n + i);
+            sum = perm[k*n + i];
             for (size_t j = 0; j < i; j++) {
-                sum -= LU.at(j*n + i) * y[k*n + j];
+                sum -= LU[j*n + i] * y[k*n + j];
             }
             y[k*n + i] = sum;
         }
@@ -259,7 +222,7 @@ Dataframe solveLU_inplace(const Dataframe& perm, const Dataframe& LU) {
 
             double sum = y[k*n + i];
             for (size_t j = i+1; j < n; j++) {
-                sum -= LU.at(j*n + i) * y[k*n + j];
+                sum -= LU[j*n + i] * y[k*n + j];
             }
             y[k*n + i] = sum;
             if (std::abs(y[k*n + i]) < 1e-14) y[k*n + i] = 0;
@@ -362,7 +325,7 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
     if (n != o) throw std::runtime_error("Need df1 cols == df2 rows");
 
     // To optimize we want only row - col config (see explication at end of function)
-    if (!df1.get_storage() == df2.get_storage()) throw std::runtime_error("Need df1 row major and df2 col major");
+    if (!(df1.get_storage() && !df2.get_storage())) throw std::runtime_error("Need df1 row major and df2 col major");
 
     std::vector<double> data(m * p);
     
@@ -379,8 +342,8 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
                 
                 if (k + PREFETCH_DIST < vec_size) {
                     // Pre-charged PREFETCH_DIST*8 bytes ahead
-                    _mm_prefetch((const char*)&df1.at(k+PREFETCH_DIST), _MM_HINT_T0);
-                    _mm_prefetch((const char*)&df2.at(k+PREFETCH_DIST), _MM_HINT_T0);
+                    _mm_prefetch((const char*)&df1.at(i * n + k + PREFETCH_DIST), _MM_HINT_T0);
+                    _mm_prefetch((const char*)&df2.at(j * o + k + PREFETCH_DIST), _MM_HINT_T0);
                 }
 
                 // df1 row major
@@ -444,7 +407,7 @@ Dataframe inverse(Dataframe& df) {
     Dataframe df_id = {n, n, false, std::move(id)};
 
     // If no LU matrix was returned, then the matrix is triangular
-    if (LU.get_data().empty()) {
+    if (LU.empty()) {
         std::vector<double> y(n*n, 0.0);
 
         // Diag
@@ -526,7 +489,7 @@ Dataframe inverse(Dataframe& df) {
 
                 for (size_t j = 0; j < i; j++) {
 
-                    if (j + LU.PREFETCH_DIST1 < i) {
+                    if (j + df.PREFETCH_DIST1 < i) {
                         _mm_prefetch((const char*)&df.at((j+df.PREFETCH_DIST1)*n + i), _MM_HINT_T0);
                     }
 
@@ -591,12 +554,14 @@ Dataframe inverse(Dataframe& df) {
         
         // Permutation matrix
         Dataframe df_swaps = {n, n, false, std::move(swaps)};
-        df_swaps.change_layout_inplace();
+        df_swaps.change_layout_inplace("AVX2");
 
         // Row - Col to use multiply from AVX2
         Dataframe perm = multiply(df_swaps, df_id); 
 
-        return solveLU_inplace(perm, LU);
+        std::vector<double> perm_d = perm.get_data();
+        Dataframe res = solveLU_inplace(perm_d, LU, n);
+        return res;
     }
 }
 
