@@ -52,5 +52,5 @@ namespace Linalg {
     // Function to calculate determinant of Matrix from Df data, through either the product of 
     // the diagonal if the matrix is triangular or with LU decomposition. 
     // Returns determinant, LU matrix 
-    std::tuple<double, std::vector<double>, Dataframe> determinant(Dataframe& df);
+    std::tuple<double, std::vector<double>, std::vector<double>> determinant(Dataframe& df);
 }; 
