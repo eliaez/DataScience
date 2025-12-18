@@ -25,7 +25,7 @@ class Dataframe
         bool is_row_major;
         std::vector<double> data;
         std::vector<std::string> headers;
-        std::unordered_map<std::string, int> label_encoder;
+        std::unordered_map<int, std::unordered_map<std::string, int>> label_encoder;
         std::unordered_set<int> encoded_cols;
 
     public:
@@ -37,7 +37,7 @@ class Dataframe
     public: 
 
         // Return corresponding label from a value
-        std::string decode_label(int value) const;
+        std::string decode_label(int value, int col) const;
 
         // Displaying our datas with encoded values
         void display_raw(size_t nb_rows) const;
@@ -88,7 +88,7 @@ class Dataframe
 
         const std::vector<double>& get_data() const { return data; }
         const std::vector<std::string>& get_headers() const { return headers; }
-        const std::unordered_map<std::string, int>& get_encoder() const { return label_encoder; }
+        const std::unordered_map<int, std::unordered_map<std::string, int>>& get_encoder() const { return label_encoder; }
         const std::unordered_set<int>& get_encodedCols() const { return encoded_cols; }
 
         Dataframe(size_t r = 0, size_t c = 0, bool i = true, std::vector<double> d = {}, 
@@ -96,7 +96,7 @@ class Dataframe
             data(std::move(d)), headers(std::move(h)) {}
 
         Dataframe(size_t r, size_t c, bool i, std::vector<double> d, std::vector<std::string> h,
-            std::unordered_map<std::string, int> l, std::unordered_set<int> e)
+            std::unordered_map<int, std::unordered_map<std::string, int>> l, std::unordered_set<int> e)
             : rows(r), cols(c), is_row_major(i), data(std::move(d)), headers(std::move(h)), 
             label_encoder(std::move(l)), encoded_cols(std::move(e)) {}
 
@@ -116,6 +116,7 @@ class CsvHandler {
 
     private:
         // Function to encode potential columns using string for categories
-        static int encode_label(std::string& label, std::unordered_map<std::string, int>& label_encoder);
+        static int encode_label(std::string& label, int col,
+            std::unordered_map<int, std::unordered_map<std::string, int>>& label_encoder);
 };
 

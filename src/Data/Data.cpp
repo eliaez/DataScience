@@ -17,9 +17,9 @@ double& Dataframe::at(size_t idx) {
     return data[idx];
 }
 
-std::string Dataframe::decode_label(int value) const {
+std::string Dataframe::decode_label(int value, int col) const {
 
-    for (const auto& [key, val] : label_encoder) {
+    for (const auto& [key, val] : label_encoder.at(col)) {
         if (val == value) return key;
     }
     return "NaN - Issue";
@@ -62,7 +62,7 @@ void Dataframe::display_decoded(size_t nb_rows) const {
 
             // If current col is encoded then decode value
             if (encoded_cols.find(j) != encoded_cols.end() ) {
-                    std::cout << std::setw(20) << decode_label((*this)(i,j));
+                    std::cout << std::setw(20) << decode_label((*this)(i,j), j);
                 }
             else std::cout << std::setw(20) << (*this)(i,j);
         }
@@ -96,12 +96,25 @@ Dataframe Dataframe::transfer_col(size_t j) {
     }
     encoded_cols = std::move(updated_encoded);
 
+    // Get label_encoder of the col
+    std::unordered_map<int, std::unordered_map<std::string, int>> label_encoder_y;
+    if (label_encoder.find(static_cast<int>(j)) != label_encoder.end()) {
+        label_encoder_y[0] = std::move(label_encoder[static_cast<int>(j)]); 
+        label_encoder.erase(static_cast<int>(j));
+    }
+    
+    // Need to fix the indexes of others cols
+    std::unordered_map<int, std::unordered_map<std::string, int>> new_label_encoder;
+    for (const auto& [col_idx, encoder] : label_encoder) {
+        int new_idx = col_idx > static_cast<int>(j) ? col_idx - 1 : col_idx;
+        new_label_encoder[new_idx] = encoder;
+    }
+    label_encoder = std::move(new_label_encoder);
+
     cols--;
 
-    // By precaution since we have not created a direct link, 
-    // we are not sure that certain values belong to our columns so getting whole label_encoder
     return {rows, 1, false, std::move(col_y), std::move(headers_y), 
-        label_encoder, std::move(encoded_cols_y)};
+        std::move(label_encoder_y), std::move(encoded_cols_y)};
 }
 
 Dataframe Dataframe::transfer_col(const std::string& col_name) {
@@ -259,14 +272,33 @@ std::vector<double> Dataframe::transpose_blocks_avx2(size_t rows_, size_t cols_,
 
 /*----------------------------------------CsvHandler-----------------------------------*/
 
-int CsvHandler::encode_label(std::string& label, std::unordered_map<std::string, int>& label_encoder) {
+int CsvHandler::encode_label(std::string& label, int col, 
+    std::unordered_map<int, std::unordered_map<std::string, int>>& label_encoder) {
 
     // Find if label in vector
-    auto it = label_encoder.find(label);
+    auto it = label_encoder[col].find(label);
 
-    if (it == label_encoder.end()) {
-        int new_id = label_encoder.size();
-        label_encoder[label] = new_id;
+    // Encode label
+    if (it == label_encoder[col].end()) {
+        int new_id;
+
+        // If bool col
+        if ((label == "True" || label == "true" || label == "False" || label == "false") && label_encoder[col].size() != 0) {
+
+            if (label == "True" || label == "true") new_id = 1;
+            else new_id = 0;
+
+            label_encoder[col]["True"] = 1;
+            label_encoder[col]["False"] = 0;
+        }
+        else if (label == "") {
+            new_id = -999999; // NaN
+            label_encoder[col][label] = new_id;
+        }
+        else {
+            new_id = label_encoder[col].size();
+            label_encoder[col][label] = new_id;
+        }
         return new_id;
     }
     return it->second;
@@ -278,7 +310,7 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep, bool is_hea
     size_t rows = 0, cols = 0;
     std::vector<double> data;
     std::vector<std::string> headers;
-    std::unordered_map<std::string, int> label_encoder;
+    std::unordered_map<int, std::unordered_map<std::string, int>> label_encoder;
     std::unordered_set<int> encoded_cols;
 
     // Read file
@@ -310,17 +342,17 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep, bool is_hea
                 } catch (const std::invalid_argument&) {
                      
                     // If col of strings
-                    int val = encode_label(cell, label_encoder); 
+                    int val = encode_label(cell, current_cols, label_encoder); 
                     data.push_back(val);
 
                     // Get indexes of encoded_cols
-                    if (rows == 1 || (rows == 0 && !is_header)) encoded_cols.insert(current_cols); 
+                    if (rows == 1) encoded_cols.insert(current_cols); 
                 }
             }
-            if (rows == 1 || (rows == 0 && !is_header)) current_cols++;
+            current_cols++;
 
         }
-        if (rows == 1 || (rows == 0 && !is_header)) cols = current_cols;
+        if (rows == 1) cols = current_cols;
         rows++;
     }
 
