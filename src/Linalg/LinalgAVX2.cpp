@@ -425,38 +425,40 @@ Dataframe inverse(Dataframe& df) {
             for (; k < vec_size; k+=NB_DB) {
                 for (int i = static_cast<int>(n)-1; i >= 0; i--) {
 
-                            __m256d sum = _mm256_set_pd(
-                                df_id.at((k+3)*n + i),
-                                df_id.at((k+2)*n + i),
-                                df_id.at((k+1)*n + i),
-                                df_id.at((k+0)*n + i)
-                            );
-                            
-                            for (size_t j = i+1; j < n; j++) {
-                                
-                                __m256d LU_vec = _mm256_set1_pd(df.at(j*n + i));
+                    double diag_i = df.at(i*n + i);
 
-                                __m256d y_vals = _mm256_set_pd(
-                                    y[(k+3)*n + j],
-                                    y[(k+2)*n + j],
-                                    y[(k+1)*n + j],
-                                    y[(k+0)*n + j]
-                                );
-                                
-                                sum = _mm256_fnmadd_pd(LU_vec, y_vals, sum);
-                            }
-                            
-                            double result[4];
-                            _mm256_storeu_pd(result, sum);
-                            
-                            y[(k+0)*n + i] = result[0];
-                            y[(k+1)*n + i] = result[1];
-                            y[(k+2)*n + i] = result[2];
-                            y[(k+3)*n + i] = result[3];
+                    __m256d sum = _mm256_set_pd(
+                        df_id.at((k+3)*n + i),
+                        df_id.at((k+2)*n + i),
+                        df_id.at((k+1)*n + i),
+                        df_id.at((k+0)*n + i)
+                    );
+                    
+                    for (size_t j = i+1; j < n; j++) {
+                        
+                        __m256d LU_vec = _mm256_set1_pd(df.at(j*n + i));
+
+                        __m256d y_vals = _mm256_set_pd(
+                            y[(k+3)*n + j],
+                            y[(k+2)*n + j],
+                            y[(k+1)*n + j],
+                            y[(k+0)*n + j]
+                        );
+                        
+                        sum = _mm256_fnmadd_pd(LU_vec, y_vals, sum);
+                    }
+                    
+                    double result[4];
+                    _mm256_storeu_pd(result, sum);
+                    
+                    y[(k+0)*n + i] = result[0];
+                    y[(k+1)*n + i] = result[1];
+                    y[(k+2)*n + i] = result[2];
+                    y[(k+3)*n + i] = result[3];
 
                     for(size_t p = 0; p < NB_DB; p++) {
                         if (std::abs(y[(k+p)*n + i]) < 1e-14) y[(k+p)*n + i] = 0;
-                        else y[(k+p)*n + i] /= df.at(i*n+i);
+                        else y[(k+p)*n + i] /= diag_i;
                     }
                 }
             }
@@ -487,6 +489,8 @@ Dataframe inverse(Dataframe& df) {
 
                 for (size_t i = 0; i < n; i++) {
 
+                    double diag_i = df.at(i*n + i);
+
                     __m256d sum = _mm256_set_pd(
                         df_id.at((k+3)*n + i),
                         df_id.at((k+2)*n + i),
@@ -510,10 +514,15 @@ Dataframe inverse(Dataframe& df) {
                     double result[4];
                     _mm256_storeu_pd(result, sum);
 
-                    y[(k+0)*n + i] = result[0] / df.at(i*n + i);
-                    y[(k+1)*n + i] = result[1] / df.at(i*n + i);
-                    y[(k+2)*n + i] = result[2] / df.at(i*n + i);
-                    y[(k+3)*n + i] = result[3] / df.at(i*n + i);
+                    y[(k+0)*n + i] = result[0];
+                    y[(k+1)*n + i] = result[1];
+                    y[(k+2)*n + i] = result[2];
+                    y[(k+3)*n + i] = result[3];
+
+                    for(size_t p = 0; p < NB_DB; p++) {
+                        if (std::abs(y[(k+p)*n + i]) < 1e-14) y[(k+p)*n + i] = 0;
+                        else y[(k+p)*n + i] /= diag_i;
+                    }
                 }
             }
 
