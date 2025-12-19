@@ -19,7 +19,8 @@ endif()
 
 
 # Options
-option(BUILD_TEST "Build tests" ON)
+option(BUILD_TEST "Build tests" OFF)
+option(BUILD_BENCHMARK "Build benchmark" ON)
 option(BUILD_MAIN "Build main" ON)
 
 
@@ -52,6 +53,25 @@ if(BUILD_TEST)
     target_compile_options(test_all PRIVATE ${AVX2_FLAGS})
     target_link_libraries(test_all linalg_full)
     add_test(NAME AllTests COMMAND test_all)
+endif()
+
+
+# Get and build benchmark
+if(BUILD_BENCHMARK)
+    include(FetchContent)
+
+    set(BENCHMARK_ENABLE_TESTING OFF)
+    set(BENCHMARK_ENABLE_GTEST_TESTS OFF)
+
+    FetchContent_Declare(
+    benchmark
+    GIT_REPOSITORY https://github.com/google/benchmark.git
+    GIT_TAG main
+    )
+    FetchContent_MakeAvailable(benchmark)
+
+    add_executable(my_bench benchmark/bench_data.cpp)
+    target_link_libraries(my_bench benchmark::benchmark_main linalg_full)    
 endif()
 
 
