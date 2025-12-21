@@ -40,12 +40,12 @@ class Dataframe
         std::string decode_label(int value, int col) const;
 
         // Displaying our datas with encoded values
-        void display_raw(size_t nb_rows) const;
-        void display_raw() const {display_raw(rows);}
+        void display_raw(size_t nb_rows, int space = 15) const;
+        void display_raw() const {display_raw(rows, 15);}
 
         // Displaying our datas with decoded values
-        void display_decoded(size_t nb_rows) const;
-        void display_decoded() const {display_decoded(rows);}
+        void display_decoded(size_t nb_rows, int space = 15) const;
+        void display_decoded() const {display_decoded(rows, 15);}
 
         // Transfer a column from a Dataframe to a new one 
         Dataframe transfer_col(size_t j);  
@@ -60,9 +60,15 @@ class Dataframe
         // Tranpose Naive
         static std::vector<double> transpose_naive(size_t rows_, size_t cols_, const std::vector<double>& df);
 
+        // Tranpose Naive inplace only for square matrix
+        static void transpose_naive_inplace(size_t n, std::vector<double>& df);
+
         #ifdef __AVX2__
         // Tranpose AVX2 by blocks (see LinalgAVX2.hpp for NB_DB)
         static std::vector<double> transpose_blocks_avx2(size_t rows_, size_t cols_, const std::vector<double>& df);
+        
+        // Tranpose AVX2 by blocks inplace only for square matrix (see LinalgAVX2.hpp for NB_DB)
+        static void transpose_avx2_inplace(size_t n, std::vector<double>& df);
         #endif
 
     // Getters & Constructor

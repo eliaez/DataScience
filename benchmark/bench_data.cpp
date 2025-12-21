@@ -57,7 +57,7 @@ static void BM_TRANSPOSE(benchmark::State& state) {
 
 static void GenerateArgs(benchmark::internal::Benchmark* b) {
     for (int backend : {0, 1}) { // Naive and AVX2
-        for (int size : {64, 128, 256, 512, 1024}) {
+        for (int size : {128, 256, 512, 1024}) {
             b->Args({size, backend});
         }
     }

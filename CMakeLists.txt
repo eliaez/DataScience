@@ -21,7 +21,7 @@ endif()
 # Options
 option(BUILD_TEST "Build tests" OFF)
 option(BUILD_BENCHMARK "Build benchmark" ON)
-option(BUILD_MAIN "Build main" ON)
+option(BUILD_MAIN "Build main" OFF)
 
 
 # Inclusions
