@@ -70,7 +70,8 @@ if(BUILD_BENCHMARK)
     )
     FetchContent_MakeAvailable(benchmark)
 
-    add_executable(my_bench benchmark/bench_data.cpp)
+    add_executable(my_bench #benchmark/bench_data.cpp
+                            benchmark/bench_linalg.cpp)
     target_link_libraries(my_bench benchmark::benchmark_main linalg_full)    
 endif()
 

@@ -8,7 +8,7 @@ namespace Linalg {
         
         #ifdef __AVX2__
         constexpr size_t NB_DB = 4; // AVX2 (256 bits) so 4 doubles
-        constexpr size_t PREFETCH_DIST = 8; // Pre-fetch 8*64 bytes ahead for contigue memory only
+        constexpr size_t PREFETCH_DIST = 16; // Pre-fetch 16*64 bytes ahead for contigue memory only
 
         Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op = '+');
 

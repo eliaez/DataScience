@@ -31,6 +31,7 @@ namespace Linalg {
             
             // Setter 
             static void set_backend(Backend b);
+            static void set_backend(const std::string& b);
             
             // Will select the best one if AUTO
             static Backend get_backend();

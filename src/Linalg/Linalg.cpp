@@ -61,6 +61,20 @@ void Operations::set_backend(Backend b) {
     current_backend = b;
 }
 
+void Operations::set_backend(const std::string& b) {
+    
+    if (b == "Naive") current_backend = Backend::NAIVE;
+    else if (b == "Eigen") current_backend = Backend::EIGEN;
+    
+    #ifdef __AVX2__
+        else if (b == "AVX2") current_backend = Backend::AVX2;
+        else if (b == "AVX2_threaded") current_backend = Backend::AVX2_THREADED;
+        else current_backend = Backend::AVX2;
+    #else 
+        else current_backend = Backend::NAIVE;
+    #endif 
+}
+
 Backend Operations::get_backend() {
     
     // Select the best one
