@@ -14,7 +14,7 @@ void sum_avx2(Dataframe& df1, Dataframe& df2, char op, const std::vector<double>
     ASSERT_EQ(df.get_data(), res)
 }
 
-// Testing AVX2 Multiply v1
+// Testing AVX2 Multiply
 void multiply_avx2(Dataframe& df, Dataframe& df_t, const vector<double>& res) {
     
     Dataframe df_bis_t = df_t.change_layout("AVX2"); 

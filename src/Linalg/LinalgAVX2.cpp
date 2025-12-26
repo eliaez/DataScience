@@ -327,37 +327,78 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
     std::vector<double> data(m * p);
     
     // row - col
-    for (size_t i = 0; i < m; i++) {
+    size_t i = 0;
+    size_t vec_sizei = m - (m % NB_DB);
+    for (; i < vec_sizei; i+=NB_DB) {
         for (size_t j = 0; j < p; j++) {
 
             // Initialize variables
             size_t k = 0;
             size_t vec_size = n - (n % NB_DB);
-            __m256d sum_vec = _mm256_setzero_pd();
+            __m256d sum_vec0 = _mm256_setzero_pd();
+            __m256d sum_vec1 = _mm256_setzero_pd();
+            __m256d sum_vec2 = _mm256_setzero_pd();
+            __m256d sum_vec3 = _mm256_setzero_pd();
 
             for (;k < vec_size; k+=NB_DB) {
                 
                 if (k + PREFETCH_DIST < vec_size) {
                     // Pre-charged PREFETCH_DIST*8 bytes ahead
-                    _mm_prefetch((const char*)&df1.at(i * n + k + PREFETCH_DIST), _MM_HINT_T0);
+                    if (i + df1.PREFETCH_DIST1 < vec_sizei) {
+                        for (size_t l = 0; l < NB_DB; l++) {
+                            _mm_prefetch((const char*)&df1.at((i+l+df1.PREFETCH_DIST1) * n + k + PREFETCH_DIST), _MM_HINT_T0);
+                        }
+                    }
+                    else {
+                        _mm_prefetch((const char*)&df1.at(i * n + k + PREFETCH_DIST), _MM_HINT_T0);
+                    }
                     _mm_prefetch((const char*)&df2.at(j * o + k + PREFETCH_DIST), _MM_HINT_T0);
                 }
 
                 // df1 row major
                 // df2 col major
-                __m256d vec1 = _mm256_loadu_pd(&df1.at(i * n + k));
+                __m256d vec1_0 = _mm256_loadu_pd(&df1.at(i * n + k));
+                __m256d vec1_1 = _mm256_loadu_pd(&df1.at((i+1) * n + k));
+                __m256d vec1_2 = _mm256_loadu_pd(&df1.at((i+2) * n + k));
+                __m256d vec1_3 = _mm256_loadu_pd(&df1.at((i+3) * n + k));
+
                 __m256d vec2 = _mm256_loadu_pd(&df2.at(j * o + k)); 
                 
-                __m256d res = _mm256_mul_pd(vec1, vec2);
-
-                sum_vec = _mm256_add_pd(sum_vec, res);
+                sum_vec0 = _mm256_fmadd_pd(vec1_0, vec2, sum_vec0);
+                sum_vec1 = _mm256_fmadd_pd(vec1_1, vec2, sum_vec1);
+                sum_vec2 = _mm256_fmadd_pd(vec1_2, vec2, sum_vec2);
+                sum_vec3 = _mm256_fmadd_pd(vec1_3, vec2, sum_vec3);
             }
 
             // Horizontal Reduction
-            double sum = horizontal_red(sum_vec);
+            double sum0 = horizontal_red(sum_vec0);
+            double sum1 = horizontal_red(sum_vec1);
+            double sum2 = horizontal_red(sum_vec2);
+            double sum3 = horizontal_red(sum_vec3);
             
             // Scalar residual
             for (; k < n; k++) {
+                sum0 += df1.at(i * n + k) * df2.at(j * o + k);
+                sum1 += df1.at((i+1) * n + k) * df2.at(j * o + k);
+                sum2 += df1.at((i+2) * n + k) * df2.at(j * o + k);
+                sum3 += df1.at((i+3) * n + k) * df2.at(j * o + k);
+            }
+            // Write it directly in col major
+            data[j * m + i] = sum0;
+            data[j * m + i+1] = sum1;
+            data[j * m + i+2] = sum2;
+            data[j * m + i+3] = sum3;
+        }
+    }
+
+    // Scalar residual for i
+    for (; i < m; i++) {
+        for (size_t j = 0; j < p; j++) {
+
+            double sum = 0.0;
+            for (size_t k = 0; k < n; k++) {
+                // df1 row major
+                // df2 col major
                 sum += df1.at(i * n + k) * df2.at(j * o + k);
             }
             // Write it directly in col major

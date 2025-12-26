@@ -25,46 +25,46 @@ std::string Dataframe::decode_label(int value, int col) const {
     return "NaN - Issue";
 }
 
-void Dataframe::display_raw(size_t nb_rows) const {
+void Dataframe::display_raw(size_t nb_rows, int space) const {
 
     std::cout << std::left <<  "Displaying Raw Matrix:" << std::endl;
 
     // Displaying headers
     for (const auto& s : headers) {
-        std::cout << std::setw(20) << s;
+        std::cout << std::setw(space) << s;
     }
     std::cout << std::endl;
-    std::cout << std::string(20*headers.size(), '-') << std::endl;
+    std::cout << std::string(space*headers.size(), '-') << std::endl;
 
     for (size_t i = 0; i < nb_rows; i++) {
         for (size_t j = 0; j < cols; j++) {
 
-            std::cout << std::setw(20) << (*this)(i,j) ;
+            std::cout << std::setw(space) << (*this)(i,j) ;
         }
         // If end of row
         std::cout << std::endl;
     }
 }
 
-void Dataframe::display_decoded(size_t nb_rows) const {
+void Dataframe::display_decoded(size_t nb_rows, int space) const {
 
     std::cout << "Displaying Decoded Matrix:" << std::endl;
     
     // Displaying headers
     for (const auto& s : headers) {
-        std::cout << std::setw(20) << s;
+        std::cout << std::setw(space) << s;
     }
     std::cout << std::endl;
-    std::cout << std::string(20*headers.size(), '-') << std::endl;
+    std::cout << std::string(space*headers.size(), '-') << std::endl;
 
     for (size_t i = 0; i < nb_rows; i++) {
         for (size_t j = 0; j < cols; j++) {
 
             // If current col is encoded then decode value
             if (encoded_cols.find(j) != encoded_cols.end() ) {
-                    std::cout << std::setw(20) << decode_label((*this)(i,j), j);
+                    std::cout << std::setw(space) << decode_label((*this)(i,j), j);
                 }
-            else std::cout << std::setw(20) << (*this)(i,j);
+            else std::cout << std::setw(space) << (*this)(i,j);
         }
         // If end of row
         std::cout << std::endl;
@@ -165,24 +165,29 @@ void Dataframe::change_layout_inplace(const std::string& choice) {
     if (is_row_major) temp_i = cols, temp_j = rows;
     else temp_i = rows, temp_j = cols;
 
-    if (choice == "Naive") {
-        new_data = transpose_naive(temp_i, temp_j, data);
+    if (temp_i == temp_j) {
+        if (choice == "Naive") transpose_naive_inplace(temp_i, data);
+
+        #ifdef __AVX2__
+            else if (choice == "AVX2") transpose_avx2_inplace(temp_i, data);
+            else transpose_avx2_inplace(temp_i, data);
+        #else
+            transpose_naive_inplace(temp_i, data);
+        #endif
     }
-    #ifdef __AVX2__
-        else if (choice == "AVX2") {
-            new_data = transpose_blocks_avx2(temp_i, temp_j, data);
-        }
-        else {
-            new_data = transpose_blocks_avx2(temp_i, temp_j, data);
-        }
-    #else
-        else {
-            new_data = transpose_naive(temp_i, temp_j, data);
-        }
-    #endif
-    
+    else {
+        if (choice == "Naive") new_data = transpose_naive(temp_i, temp_j, data);
+
+        #ifdef __AVX2__
+            else if (choice == "AVX2") new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+            else new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+        #else
+            else new_data = transpose_naive(temp_i, temp_j, data);
+        #endif
+
+        data = std::move(new_data);
+    }    
     is_row_major = !is_row_major;
-    data = std::move(new_data);
 }
 
 std::vector<double> Dataframe::transpose_naive(size_t rows_, size_t cols_, 
@@ -197,6 +202,15 @@ std::vector<double> Dataframe::transpose_naive(size_t rows_, size_t cols_,
         }
     }   
     return new_data;
+}
+
+void Dataframe::transpose_naive_inplace(size_t n, std::vector<double>& df) {
+    
+    for (size_t i = 0; i < n; i++) {
+        for (size_t j = i + 1; j < n; j++) {
+            std::swap(df[i*n + j], df[j*n + i]);
+        }
+    }   
 }
 
 #ifdef __AVX2__
@@ -251,10 +265,10 @@ std::vector<double> Dataframe::transpose_blocks_avx2(size_t rows_, size_t cols_,
 
         // Scalar residual
         for(; j < cols_; j++) {
-                new_data[(i+0)*cols_ + j] = df[j*rows_ + (i+0)];
-                new_data[(i+1)*cols_ + j] = df[j*rows_ + (i+1)];
-                new_data[(i+2)*cols_ + j] = df[j*rows_ + (i+2)];
-                new_data[(i+3)*cols_ + j] = df[j*rows_ + (i+3)];
+            new_data[(i+0)*cols_ + j] = df[j*rows_ + (i+0)];
+            new_data[(i+1)*cols_ + j] = df[j*rows_ + (i+1)];
+            new_data[(i+2)*cols_ + j] = df[j*rows_ + (i+2)];
+            new_data[(i+3)*cols_ + j] = df[j*rows_ + (i+3)];
         }
         j = 0;
     }
@@ -267,6 +281,121 @@ std::vector<double> Dataframe::transpose_blocks_avx2(size_t rows_, size_t cols_,
     }   
 
     return new_data;
+}
+
+void Dataframe::transpose_avx2_inplace(size_t n, std::vector<double>& df) {
+    
+    const size_t vec_size = n - (n % NB_DB);
+    
+    // AVX2 blocks (only triangular up)
+    for (size_t i = 0; i < vec_size; i += NB_DB) {
+
+        size_t pi = i + PREFETCH_DIST1*NB_DB;
+        if (pi < vec_size) {
+            _mm_prefetch((const char*)&df[(pi+0) * n + pi], _MM_HINT_T0);
+            _mm_prefetch((const char*)&df[(pi+1) * n + pi], _MM_HINT_T0);
+            _mm_prefetch((const char*)&df[(pi+2) * n + pi], _MM_HINT_T0);
+            _mm_prefetch((const char*)&df[(pi+3) * n + pi], _MM_HINT_T0);
+        }
+        
+        // Diagonal block
+        {
+            __m256d col0 = _mm256_loadu_pd(&df[(i+0)*n + i]);
+            __m256d col1 = _mm256_loadu_pd(&df[(i+1)*n + i]);
+            __m256d col2 = _mm256_loadu_pd(&df[(i+2)*n + i]);
+            __m256d col3 = _mm256_loadu_pd(&df[(i+3)*n + i]);
+
+            __m256d t0 = _mm256_unpacklo_pd(col0, col1);
+            __m256d t1 = _mm256_unpackhi_pd(col0, col1);
+            __m256d t2 = _mm256_unpacklo_pd(col2, col3);
+            __m256d t3 = _mm256_unpackhi_pd(col2, col3);
+
+            __m256d row0 = _mm256_permute2f128_pd(t0, t2, 0x20);
+            __m256d row1 = _mm256_permute2f128_pd(t1, t3, 0x20);
+            __m256d row2 = _mm256_permute2f128_pd(t0, t2, 0x31);
+            __m256d row3 = _mm256_permute2f128_pd(t1, t3, 0x31);
+
+            _mm256_storeu_pd(&df[(i+0)*n + i], row0);
+            _mm256_storeu_pd(&df[(i+1)*n + i], row1);
+            _mm256_storeu_pd(&df[(i+2)*n + i], row2);
+            _mm256_storeu_pd(&df[(i+3)*n + i], row3);
+        }
+        
+        // Off-diagonal blocks
+        for (size_t j = i + NB_DB; j < vec_size; j += NB_DB) {
+            
+            size_t pj = j + PREFETCH_DIST1*NB_DB;
+            if (pj < vec_size) {
+                _mm_prefetch((const char*)&df[(i+0)*n + pj], _MM_HINT_T0);
+                _mm_prefetch((const char*)&df[(i+1)*n + pj], _MM_HINT_T0);
+                _mm_prefetch((const char*)&df[(i+2)*n + pj], _MM_HINT_T0);
+                _mm_prefetch((const char*)&df[(i+3)*n + pj], _MM_HINT_T0);
+                
+                _mm_prefetch((const char*)&df[(pj+0)*n + i], _MM_HINT_T0);
+                _mm_prefetch((const char*)&df[(pj+1)*n + i], _MM_HINT_T0);
+                _mm_prefetch((const char*)&df[(pj+2)*n + i], _MM_HINT_T0);
+                _mm_prefetch((const char*)&df[(pj+3)*n + i], _MM_HINT_T0);
+            }
+            
+            // Load A (i,j)
+            __m256d a0 = _mm256_loadu_pd(&df[(i+0)*n + j]);
+            __m256d a1 = _mm256_loadu_pd(&df[(i+1)*n + j]);
+            __m256d a2 = _mm256_loadu_pd(&df[(i+2)*n + j]);
+            __m256d a3 = _mm256_loadu_pd(&df[(i+3)*n + j]);
+
+            // Load B (j,i)
+            __m256d b0 = _mm256_loadu_pd(&df[(j+0)*n + i]);
+            __m256d b1 = _mm256_loadu_pd(&df[(j+1)*n + i]);
+            __m256d b2 = _mm256_loadu_pd(&df[(j+2)*n + i]);
+            __m256d b3 = _mm256_loadu_pd(&df[(j+3)*n + i]);
+
+            // Transpose A
+            __m256d t0 = _mm256_unpacklo_pd(a0, a1);
+            __m256d t1 = _mm256_unpackhi_pd(a0, a1);
+            __m256d t2 = _mm256_unpacklo_pd(a2, a3);
+            __m256d t3 = _mm256_unpackhi_pd(a2, a3);
+            __m256d a_t0 = _mm256_permute2f128_pd(t0, t2, 0x20);
+            __m256d a_t1 = _mm256_permute2f128_pd(t1, t3, 0x20);
+            __m256d a_t2 = _mm256_permute2f128_pd(t0, t2, 0x31);
+            __m256d a_t3 = _mm256_permute2f128_pd(t1, t3, 0x31);
+
+            // Transpose B
+            t0 = _mm256_unpacklo_pd(b0, b1);
+            t1 = _mm256_unpackhi_pd(b0, b1);
+            t2 = _mm256_unpacklo_pd(b2, b3);
+            t3 = _mm256_unpackhi_pd(b2, b3);
+            __m256d b_t0 = _mm256_permute2f128_pd(t0, t2, 0x20);
+            __m256d b_t1 = _mm256_permute2f128_pd(t1, t3, 0x20);
+            __m256d b_t2 = _mm256_permute2f128_pd(t0, t2, 0x31);
+            __m256d b_t3 = _mm256_permute2f128_pd(t1, t3, 0x31);
+
+            // Swap - B^T, A^T 
+            _mm256_storeu_pd(&df[(i+0)*n + j], b_t0);
+            _mm256_storeu_pd(&df[(i+1)*n + j], b_t1);
+            _mm256_storeu_pd(&df[(i+2)*n + j], b_t2);
+            _mm256_storeu_pd(&df[(i+3)*n + j], b_t3);
+
+            _mm256_storeu_pd(&df[(j+0)*n + i], a_t0);
+            _mm256_storeu_pd(&df[(j+1)*n + i], a_t1);
+            _mm256_storeu_pd(&df[(j+2)*n + i], a_t2);
+            _mm256_storeu_pd(&df[(j+3)*n + i], a_t3);
+        }
+        
+        // Scalar residual for j
+        for (size_t j = vec_size; j < n; j++) {
+            if (i+0 < j) std::swap(df[(i+0)*n + j], df[j*n + (i+0)]);
+            if (i+1 < j) std::swap(df[(i+1)*n + j], df[j*n + (i+1)]);
+            if (i+2 < j) std::swap(df[(i+2)*n + j], df[j*n + (i+2)]);
+            if (i+3 < j) std::swap(df[(i+3)*n + j], df[j*n + (i+3)]);
+        }
+    }
+    
+    // Scalar residual for i 
+    for (size_t i = vec_size; i < n; i++) {
+        for (size_t j = i+1; j < n; j++) {
+            std::swap(df[i*n + j], df[j*n + i]);
+        }
+    }
 }
 #endif
 
@@ -361,6 +490,7 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep, bool is_hea
     Dataframe csv = {rows, cols, true, std::move(data), std::move(headers), 
         std::move(label_encoder), std::move(encoded_cols)};
     
+        csv.change_layout_inplace(method);
     // return column-major dataframe
-    return csv.change_layout(method);
+    return csv;
 }

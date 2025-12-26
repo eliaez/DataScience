@@ -1,0 +1,67 @@
+#include <benchmark/benchmark.h>
+#include "Data/Data.hpp"
+#include <memory>
+#include <random>
+
+
+std::vector<double> gen_matrix(size_t rows, size_t cols) {
+    std::vector<double> mat(rows*cols);
+
+    // Generate mat
+    std::mt19937 gen(42);
+    std::uniform_real_distribution<double> dis(-1.0, 1.0);
+    for (auto& val : mat) {
+        val = dis(gen);
+    }
+    return mat;
+}
+
+static void BM_TRANSPOSE_IN(benchmark::State& state) {
+
+    const size_t N = state.range(0);
+    const int backend_int = state.range(1);
+
+    // Map backend_int
+    const std::string backend_names[] = {"Naive", "AVX2"};
+    const std::string backend = backend_names[backend_int];
+
+    Dataframe A = {N, N, false, gen_matrix(N,N)};
+
+    for (auto _ : state) {
+        A.change_layout_inplace(backend);
+        benchmark::DoNotOptimize(A);
+        benchmark::ClobberMemory();
+    }
+    state.SetLabel(backend);
+}
+
+static void BM_TRANSPOSE(benchmark::State& state) {
+
+    const size_t N = state.range(0);
+    const int backend_int = state.range(1);
+
+    // Map backend_int
+    const std::string backend_names[] = {"Naive", "AVX2"};
+    const std::string backend = backend_names[backend_int];
+
+    Dataframe A = {N, N, false, gen_matrix(N,N)};
+    Dataframe B;
+
+    for (auto _ : state) {
+        B = A.change_layout(backend);
+        benchmark::DoNotOptimize(B);
+        benchmark::ClobberMemory();
+    }
+    state.SetLabel(backend);
+}
+
+static void GenerateArgs(benchmark::internal::Benchmark* b) {
+    for (int backend : {0, 1}) { // Naive and AVX2
+        for (int size : {128, 256, 512, 1024}) {
+            b->Args({size, backend});
+        }
+    }
+}
+
+BENCHMARK(BM_TRANSPOSE_IN)->Apply(GenerateArgs)->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_TRANSPOSE)->Apply(GenerateArgs)->Unit(benchmark::kMicrosecond);
