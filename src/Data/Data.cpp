@@ -17,19 +17,19 @@ double& Dataframe::at(size_t idx) {
     return data[idx];
 }
 
-auto Dataframe::asEigen() {
+Eigen::Map<Eigen::MatrixXd> Dataframe::asEigen() {
     return Eigen::Map<Eigen::MatrixXd>(data.data(), rows, cols);
 }
 
-auto Dataframe::asEigen() const {
+Eigen::Map<const Eigen::MatrixXd> Dataframe::asEigen() const {
     return Eigen::Map<const Eigen::MatrixXd>(data.data(), rows, cols);
 }
 
-auto Dataframe::asEigen(std::vector<double>& d, size_t r, size_t c) {
+Eigen::Map<Eigen::MatrixXd> Dataframe::asEigen(std::vector<double>& d, size_t r, size_t c) {
     return Eigen::Map<Eigen::MatrixXd>(d.data(), r, c);
 }
 
-auto Dataframe::asEigen(const std::vector<double>& d, size_t r, size_t c) {
+Eigen::Map<const Eigen::MatrixXd> Dataframe::asEigen(const std::vector<double>& d, size_t r, size_t c) {
     return Eigen::Map<const Eigen::MatrixXd>(d.data(), r, c);
 }
 

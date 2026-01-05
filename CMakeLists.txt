@@ -27,7 +27,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Eigen)
 
 # Options
-option(BUILD_TEST "Build tests" OFF)
+option(BUILD_TEST "Build tests" ON)
 option(BUILD_BENCHMARK "Build benchmark" ON)
 option(BUILD_MAIN "Build main" OFF)
 
@@ -41,6 +41,7 @@ set(LIB_SOURCES src/Data/Data.cpp
                 src/Linalg/Linalg.cpp
                 src/Linalg/LinalgNaive.cpp
                 src/Linalg/LinalgAVX2.cpp
+                src/Linalg/LinalgEigen.cpp
                 src/Utils/TestSuite.cpp
 )
 
@@ -56,7 +57,8 @@ if(BUILD_TEST)
                 tests/tests_main.cpp
                 tests/tests_data.cpp
                 tests/tests_naive.cpp
-                tests/tests_AVX2.cpp)
+                tests/tests_AVX2.cpp
+                tests/tests_Eigen.cpp)
     
     target_compile_options(test_all PRIVATE ${AVX2_FLAGS})
     target_link_libraries(test_all linalg_full)

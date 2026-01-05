@@ -19,6 +19,14 @@ void changelayout_avx2(Dataframe df1, const std::vector<double>& res) {
     ASSERT_EQ(df1_t.get_data(), res)
 }
 
+// Testing data after change_layout Eigen
+void changelayout_eigen(Dataframe df1, const std::vector<double>& res) {
+    
+    Dataframe df1_t = df1.change_layout("Eigen");
+
+    ASSERT_EQ(df1_t.get_data(), res)
+}
+
 // Testing the transfer of a column from a Df to another new one
 void transfercol_t(Dataframe& iris, const string& col,
     const Dataframe& iris_x, const std::vector<double>& iris_y) {
@@ -65,6 +73,16 @@ void tests_data() {
     tests_data.add_test(
         bind(changelayout_avx2, mat, mat_t.get_data()), 
         "Change layout AVX2 v2"
+    );
+
+    tests_data.add_test(
+        bind(changelayout_eigen, iris, iris_t.get_data()), 
+        "Change layout Eigen v1"
+    );
+
+    tests_data.add_test(
+        bind(changelayout_eigen, mat, mat_t.get_data()), 
+        "Change layout Eigen v2"
     );
    
     tests_data.add_test(

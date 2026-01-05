@@ -89,10 +89,10 @@ class Dataframe
         double& at(size_t idx);
 
         // Convert to use Eigen fct 
-        auto asEigen() const;
-        auto asEigen();
-        static auto asEigen(const std::vector<double>& d, size_t r, size_t c);
-        static auto asEigen(std::vector<double>& d, size_t r, size_t c);
+        Eigen::Map<const Eigen::MatrixXd> asEigen() const;
+        Eigen::Map<Eigen::MatrixXd> asEigen();
+        static Eigen::Map<const Eigen::MatrixXd> asEigen(const std::vector<double>& d, size_t r, size_t c);
+        static Eigen::Map<Eigen::MatrixXd> asEigen(std::vector<double>& d, size_t r, size_t c);
         
         /*std::vector<double>& row(size_t i); // Getting row i
         std::vector<double>& col(size_t j); // Getting column j
