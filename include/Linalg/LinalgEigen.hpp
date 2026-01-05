@@ -4,7 +4,7 @@
 #include <tuple>
 
 namespace Linalg {
-    namespace Eigen {
+    namespace EigenNP {
 
         Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op = '+');
 
