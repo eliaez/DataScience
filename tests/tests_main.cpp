@@ -7,6 +7,8 @@ void tests_naive();
 void tests_avx2();
 #endif
 
+void tests_eigen();
+
 int main() {
     tests_data();
     tests_naive();
@@ -14,4 +16,6 @@ int main() {
     #ifdef __AVX2__
     tests_avx2();
     #endif
+
+    tests_eigen();
 }

@@ -229,7 +229,7 @@ std::vector<double> Dataframe::transpose_eigen(size_t rows_, size_t cols_,
     const std::vector<double>& df) {
 
     std::vector<double> new_data(rows_*cols_);
-    Eigen::Map<Eigen::MatrixXd> res(new_data.data(), rows_, cols_);
+    Eigen::Map<Eigen::MatrixXd> res(new_data.data(), cols_, rows_);
     
     auto eigen_mat = asEigen(df, rows_, cols_);
     res = eigen_mat.transpose();
