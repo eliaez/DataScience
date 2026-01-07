@@ -58,7 +58,7 @@ static void GenerateArgs(benchmark::internal::Benchmark* b, int backend_int) {
     }
 }
 
-
+/*
 // Naive Mult
 BENCHMARK(BM_MULT)
     ->Apply([](auto* b) { GenerateArgs(b, 0); })
@@ -70,13 +70,13 @@ BENCHMARK(BM_MULT)
     ->Apply([](auto* b) { GenerateArgs(b, 1); })
     ->Unit(benchmark::kMillisecond)
     ->MinTime(5.0);
-
+*/
 // Eigen Mult
 BENCHMARK(BM_MULT)
     ->Apply([](auto* b) { GenerateArgs(b, 2); })
     ->Unit(benchmark::kMillisecond)
     ->MinTime(5.0);
-
+/*
 // Naive Inv
 BENCHMARK(BM_INV)
     ->Apply([](auto* b) { GenerateArgs(b, 0); })
@@ -88,8 +88,8 @@ BENCHMARK(BM_INV)
     ->Apply([](auto* b) { GenerateArgs(b, 1); })
     ->Unit(benchmark::kMillisecond)
     ->MinTime(5.0);
-
-// Eigen Mult
+*/
+// Eigen Inv
 BENCHMARK(BM_INV)
     ->Apply([](auto* b) { GenerateArgs(b, 2); })
     ->Unit(benchmark::kMillisecond)
