@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cassert>
 #include <iostream>
+#include <Eigen/Dense>
 
 #ifdef __AVX2__
 #include <immintrin.h>
@@ -63,6 +64,12 @@ class Dataframe
         // Tranpose Naive inplace only for square matrix
         static void transpose_naive_inplace(size_t n, std::vector<double>& df);
 
+        // Transpose Eigen
+        static std::vector<double> transpose_eigen(size_t rows_, size_t cols_, const std::vector<double>& df);
+
+        // Transpose Eigen inplace only for square matrix
+        static void transpose_eigen_inplace(size_t n, std::vector<double>& df);
+
         #ifdef __AVX2__
         // Tranpose AVX2 by blocks (see LinalgAVX2.hpp for NB_DB)
         static std::vector<double> transpose_blocks_avx2(size_t rows_, size_t cols_, const std::vector<double>& df);
@@ -80,6 +87,12 @@ class Dataframe
         // Getting value from Dataframe according to index
         const double& at(size_t idx) const;
         double& at(size_t idx);
+
+        // Convert to use Eigen fct 
+        Eigen::Map<const Eigen::MatrixXd> asEigen() const;
+        Eigen::Map<Eigen::MatrixXd> asEigen();
+        static Eigen::Map<const Eigen::MatrixXd> asEigen(const std::vector<double>& d, size_t r, size_t c);
+        static Eigen::Map<Eigen::MatrixXd> asEigen(std::vector<double>& d, size_t r, size_t c);
         
         /*std::vector<double>& row(size_t i); // Getting row i
         std::vector<double>& col(size_t j); // Getting column j

@@ -2,6 +2,7 @@
 
 #include "Linalg/LinalgNaive.hpp"
 #include "Linalg/LinalgAVX2.hpp"
+#include "Linalg/LinalgEigen.hpp"
 #include <string>
 
 namespace Linalg {

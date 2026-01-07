@@ -2,7 +2,6 @@
 
 /*
         case Linalg::Backend::AVX2_THREADED: return Linalg::Avx2_threaded::func(__VA_ARGS__); \
-        case Linalg::Backend::EIGEN: return Linalg::Eigen::func(__VA_ARGS__); \ 
 */
 
 #ifdef __AVX2__
@@ -10,6 +9,7 @@
         switch(current_backend) { \
             case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
             case Linalg::Backend::AVX2: return Linalg::AVX2::func(__VA_ARGS__); \
+            case Linalg::Backend::EIGEN: return Linalg::EigenNP::func(__VA_ARGS__); \
             default: return Linalg::AVX2::func(__VA_ARGS__); \
         }
 
@@ -32,8 +32,8 @@
     #define DISPATCH_BACKEND(func, ...) \
         switch(current_backend) { \
             case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
-            case Linalg::Backend::EIGEN: return Linalg::Eigen::func(__VA_ARGS__); \
-            default: return Linalg::NAIVE::func(__VA_ARGS__); \
+            case Linalg::Backend::EIGEN: return Linalg::EigenNP::func(__VA_ARGS__); \
+            default: return Linalg::Naive::func(__VA_ARGS__); \
         }
 
     #define DISPATCH_BACKEND2(func, ...) \
@@ -42,12 +42,8 @@
                 std::tie(nb_swaps, swaps, LU) = Linalg::Naive::func(__VA_ARGS__); \
                 break; \
             } \
-            case Linalg::Backend::EIGEN: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::EIGEN::func(__VA_ARGS__); \
-                break; \
-            } \
             default: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::NAIVE::func(__VA_ARGS__); \
+                std::tie(nb_swaps, swaps, LU) = Linalg::Naive::func(__VA_ARGS__); \
                 break; \
             } \
         } 
@@ -84,7 +80,7 @@ Backend Operations::get_backend() {
         #ifdef __AVX2__
             return Backend::AVX2;
         #else
-            return Backend::NAIVE;
+            return Backend::EIGEN;
         #endif
 
         // return Backend::AVX2_THREADED;
@@ -123,7 +119,7 @@ std::string get_backend() {
     #ifdef __AVX2__
         default: return "AVX2";
     #else 
-        default: return "Naive";
+        default: return "Eigen";
     #endif
     }
 }

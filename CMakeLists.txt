@@ -17,6 +17,14 @@ else()
     message(WARNING "✗ AVX2")
 endif()
 
+# Add Eigen
+include(FetchContent)
+FetchContent_Declare(
+    Eigen
+    GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
+    GIT_TAG 3.4.1
+)
+FetchContent_MakeAvailable(Eigen)
 
 # Options
 option(BUILD_TEST "Build tests" OFF)
@@ -33,6 +41,7 @@ set(LIB_SOURCES src/Data/Data.cpp
                 src/Linalg/Linalg.cpp
                 src/Linalg/LinalgNaive.cpp
                 src/Linalg/LinalgAVX2.cpp
+                src/Linalg/LinalgEigen.cpp
                 src/Utils/TestSuite.cpp
 )
 
@@ -40,7 +49,7 @@ set(LIB_SOURCES src/Data/Data.cpp
 # Main Library
 add_library(linalg_full STATIC ${LIB_SOURCES})
 target_compile_options(linalg_full PRIVATE -Wall -Wextra -O3 -march=native ${AVX2_FLAGS})
-
+target_link_libraries(linalg_full PUBLIC Eigen3::Eigen)
 
 if(BUILD_TEST)
     enable_testing()
@@ -48,7 +57,8 @@ if(BUILD_TEST)
                 tests/tests_main.cpp
                 tests/tests_data.cpp
                 tests/tests_naive.cpp
-                tests/tests_AVX2.cpp)
+                tests/tests_AVX2.cpp
+                tests/tests_Eigen.cpp)
     
     target_compile_options(test_all PRIVATE ${AVX2_FLAGS})
     target_link_libraries(test_all linalg_full)

@@ -17,6 +17,22 @@ double& Dataframe::at(size_t idx) {
     return data[idx];
 }
 
+Eigen::Map<Eigen::MatrixXd> Dataframe::asEigen() {
+    return Eigen::Map<Eigen::MatrixXd>(data.data(), rows, cols);
+}
+
+Eigen::Map<const Eigen::MatrixXd> Dataframe::asEigen() const {
+    return Eigen::Map<const Eigen::MatrixXd>(data.data(), rows, cols);
+}
+
+Eigen::Map<Eigen::MatrixXd> Dataframe::asEigen(std::vector<double>& d, size_t r, size_t c) {
+    return Eigen::Map<Eigen::MatrixXd>(d.data(), r, c);
+}
+
+Eigen::Map<const Eigen::MatrixXd> Dataframe::asEigen(const std::vector<double>& d, size_t r, size_t c) {
+    return Eigen::Map<const Eigen::MatrixXd>(d.data(), r, c);
+}
+
 std::string Dataframe::decode_label(int value, int col) const {
 
     for (const auto& [key, val] : label_encoder.at(col)) {
@@ -137,20 +153,14 @@ Dataframe Dataframe::change_layout(const std::string& choice) const {
     if (is_row_major) temp_i = cols, temp_j = rows;
     else temp_i = rows, temp_j = cols;
     
-    if (choice == "Naive") {
-        new_data = transpose_naive(temp_i, temp_j, data);
-    }
+    if (choice == "Naive") new_data = transpose_naive(temp_i, temp_j, data);
+    else if (choice == "Eigen") new_data = transpose_eigen(temp_i, temp_j, data);
+
     #ifdef __AVX2__
-        else if (choice == "AVX2") {
-            new_data = transpose_blocks_avx2(temp_i, temp_j, data);
-        }
-        else {
-            new_data = transpose_blocks_avx2(temp_i, temp_j, data);
-        }
+        else if (choice == "AVX2") new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+        else new_data = transpose_blocks_avx2(temp_i, temp_j, data);
     #else
-        else {
-            new_data = transpose_naive(temp_i, temp_j, data);
-        }
+        else new_data = transpose_naive(temp_i, temp_j, data);
     #endif
 
     return {rows, cols, !is_row_major, std::move(new_data), headers, 
@@ -167,6 +177,7 @@ void Dataframe::change_layout_inplace(const std::string& choice) {
 
     if (temp_i == temp_j) {
         if (choice == "Naive") transpose_naive_inplace(temp_i, data);
+        else if (choice == "Eigen") transpose_eigen_inplace(temp_i, data);
 
         #ifdef __AVX2__
             else if (choice == "AVX2") transpose_avx2_inplace(temp_i, data);
@@ -177,7 +188,8 @@ void Dataframe::change_layout_inplace(const std::string& choice) {
     }
     else {
         if (choice == "Naive") new_data = transpose_naive(temp_i, temp_j, data);
-
+        else if (choice == "Eigen") new_data = transpose_eigen(temp_i, temp_j, data);
+        
         #ifdef __AVX2__
             else if (choice == "AVX2") new_data = transpose_blocks_avx2(temp_i, temp_j, data);
             else new_data = transpose_blocks_avx2(temp_i, temp_j, data);
@@ -211,6 +223,23 @@ void Dataframe::transpose_naive_inplace(size_t n, std::vector<double>& df) {
             std::swap(df[i*n + j], df[j*n + i]);
         }
     }   
+}
+
+std::vector<double> Dataframe::transpose_eigen(size_t rows_, size_t cols_, 
+    const std::vector<double>& df) {
+
+    std::vector<double> new_data(rows_*cols_);
+    Eigen::Map<Eigen::MatrixXd> res(new_data.data(), cols_, rows_);
+    
+    auto eigen_mat = asEigen(df, rows_, cols_);
+    res = eigen_mat.transpose();
+    
+    return new_data;
+}
+
+void Dataframe::transpose_eigen_inplace(size_t n, std::vector<double>& df) {
+    auto eigen_mat = asEigen(df, n, n);
+    eigen_mat.transposeInPlace();
 }
 
 #ifdef __AVX2__
