@@ -160,7 +160,7 @@ Dataframe Dataframe::change_layout(const std::string& choice) const {
         else if (choice == "AVX2") new_data = transpose_blocks_avx2(temp_i, temp_j, data);
         else new_data = transpose_blocks_avx2(temp_i, temp_j, data);
     #else
-        else new_data = transpose_eigen(temp_i, temp_j, data);
+        else new_data = transpose_naive(temp_i, temp_j, data);
     #endif
 
     return {rows, cols, !is_row_major, std::move(new_data), headers, 
@@ -183,7 +183,7 @@ void Dataframe::change_layout_inplace(const std::string& choice) {
             else if (choice == "AVX2") transpose_avx2_inplace(temp_i, data);
             else transpose_avx2_inplace(temp_i, data);
         #else
-            transpose_eigen_inplace(temp_i, data);
+            transpose_naive_inplace(temp_i, data);
         #endif
     }
     else {
@@ -194,7 +194,7 @@ void Dataframe::change_layout_inplace(const std::string& choice) {
             else if (choice == "AVX2") new_data = transpose_blocks_avx2(temp_i, temp_j, data);
             else new_data = transpose_blocks_avx2(temp_i, temp_j, data);
         #else
-            else new_data = transpose_eigen(temp_i, temp_j, data);
+            else new_data = transpose_naive(temp_i, temp_j, data);
         #endif
 
         data = std::move(new_data);
@@ -239,7 +239,7 @@ std::vector<double> Dataframe::transpose_eigen(size_t rows_, size_t cols_,
 
 void Dataframe::transpose_eigen_inplace(size_t n, std::vector<double>& df) {
     auto eigen_mat = asEigen(df, n, n);
-    eigen_mat.transpose();
+    eigen_mat.transposeInPlace();
 }
 
 #ifdef __AVX2__

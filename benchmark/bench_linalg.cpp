@@ -14,11 +14,14 @@ static void BM_MULT(benchmark::State& state) {
     const int backend_int = state.range(1);
 
     // Map backend_int and set it
-    const std::string backend_names[] = {"Naive", "AVX2"};
+    const std::string backend_names[] = {"Naive", "AVX2", "Eigen"};
     const std::string backend = backend_names[backend_int];
     Operations::set_backend(backend);
 
-    Dataframe A = {N, N, true, gen_matrix(N,N)};
+    Dataframe A;
+    if (backend == "Eigen") A = {N, N, false, gen_matrix(N,N)};
+    else A = {N, N, true, gen_matrix(N,N)};
+
     Dataframe B = {N, N, false, gen_matrix(N,N)};
 
     for (auto _ : state) {
@@ -35,7 +38,7 @@ static void BM_INV(benchmark::State& state) {
     const int backend_int = state.range(1);
 
     // Map backend_int and set it
-    const std::string backend_names[] = {"Naive", "AVX2"};
+    const std::string backend_names[] = {"Naive", "AVX2", "Eigen"};
     const std::string backend = backend_names[backend_int];
     Operations::set_backend(backend);
 
@@ -68,6 +71,12 @@ BENCHMARK(BM_MULT)
     ->Unit(benchmark::kMillisecond)
     ->MinTime(5.0);
 
+// Eigen Mult
+BENCHMARK(BM_MULT)
+    ->Apply([](auto* b) { GenerateArgs(b, 2); })
+    ->Unit(benchmark::kMillisecond)
+    ->MinTime(5.0);
+
 // Naive Inv
 BENCHMARK(BM_INV)
     ->Apply([](auto* b) { GenerateArgs(b, 0); })
@@ -77,5 +86,11 @@ BENCHMARK(BM_INV)
 // AVX2 Inv
 BENCHMARK(BM_INV)
     ->Apply([](auto* b) { GenerateArgs(b, 1); })
+    ->Unit(benchmark::kMillisecond)
+    ->MinTime(5.0);
+
+// Eigen Mult
+BENCHMARK(BM_INV)
+    ->Apply([](auto* b) { GenerateArgs(b, 2); })
     ->Unit(benchmark::kMillisecond)
     ->MinTime(5.0);

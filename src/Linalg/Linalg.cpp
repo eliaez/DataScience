@@ -33,7 +33,7 @@
         switch(current_backend) { \
             case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
             case Linalg::Backend::EIGEN: return Linalg::EigenNP::func(__VA_ARGS__); \
-            default: return Linalg::EigenNP::func(__VA_ARGS__); \
+            default: return Linalg::Naive::func(__VA_ARGS__); \
         }
 
     #define DISPATCH_BACKEND2(func, ...) \
