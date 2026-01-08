@@ -12,7 +12,11 @@
 #include <Eigen/Dense>
 
 #ifdef __AVX2__
-#include <immintrin.h>
+    #include <immintrin.h>
+#endif
+
+#ifdef USE_MKL
+    #include <mkl.h>
 #endif
 
 #pragma once
@@ -76,6 +80,14 @@ class Dataframe
         
         // Tranpose AVX2 by blocks inplace only for square matrix (see LinalgAVX2.hpp for NB_DB)
         static void transpose_avx2_inplace(size_t n, std::vector<double>& df);
+        #endif
+
+        #ifdef USE_MKL
+        // Tranpose MKL
+        static std::vector<double> transpose_mkl(size_t rows_, size_t cols_, const std::vector<double>& df);
+        
+        // Tranpose inplace only for square matrix
+        static void transpose_mkl_inplace(size_t n, std::vector<double>& df);
         #endif
 
     // Getters & Constructor
