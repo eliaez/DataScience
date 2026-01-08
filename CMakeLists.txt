@@ -35,13 +35,16 @@ if(USE_MLK)
         set(MKL_INTERFACE "lp64")
         set(MKL_THREADING "tbb") # Threading Building Blocks
         set(MKL_LINK "static") # Exe without dll
+        set(MKL_FLAGS "-fopenmp")
 
         add_compile_definitions(USE_MKL)
     else()
+        set(MKL_FLAGS "")
         message(WARNING "✗ MKL or/and TBB not found - continuing without")
         set(USE_MKL OFF)
     endif()
 else()
+    set(MKL_FLAGS "")
     message(STATUS "- MKL disabled by user")
 endif()
 
@@ -78,7 +81,7 @@ set(LIB_SOURCES src/Data/Data.cpp
 
 # Main Library
 add_library(linalg_full STATIC ${LIB_SOURCES})
-target_compile_options(linalg_full PRIVATE -Wall -Wextra -O3 -march=native ${AVX2_FLAGS})
+target_compile_options(linalg_full PRIVATE -Wall -Wextra -O3 -march=native ${MKL_FLAGS} ${AVX2_FLAGS})
 target_link_libraries(linalg_full PUBLIC Eigen3::Eigen)
 
 
