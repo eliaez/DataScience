@@ -106,10 +106,6 @@ class Dataframe
         static Eigen::Map<const Eigen::MatrixXd> asEigen(const std::vector<double>& d, size_t r, size_t c);
         static Eigen::Map<Eigen::MatrixXd> asEigen(std::vector<double>& d, size_t r, size_t c);
         
-        /*std::vector<double>& row(size_t i); // Getting row i
-        std::vector<double>& col(size_t j); // Getting column j
-        std::vector<double>& col(const std::string& header); // Getting column with header*/
-
         size_t get_rows() const { return rows; }
         size_t get_cols() const { return cols; }
 
@@ -118,6 +114,8 @@ class Dataframe
         bool get_storage() const {return is_row_major; }
 
         const std::vector<double>& get_data() const { return data; }
+        const double* get_db() const { return data.data(); }
+
         const std::vector<std::string>& get_headers() const { return headers; }
         const std::unordered_map<int, std::unordered_map<std::string, int>>& get_encoder() const { return label_encoder; }
         const std::unordered_set<int>& get_encodedCols() const { return encoded_cols; }
