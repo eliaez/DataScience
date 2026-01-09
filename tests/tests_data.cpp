@@ -3,26 +3,10 @@
 
 using namespace std;
 
-// Testing data after change_layout Naive
-void changelayout_naive(Dataframe iris, const std::vector<double>& iris_t) {
+// Testing data after change_layout
+void changelayout(Dataframe df1, const std::vector<double>& res, const std::string& backend) {
     
-    Dataframe iris_bis_t = iris.change_layout("Naive");
-
-    ASSERT_EQ(iris_bis_t.get_data(), iris_t)
-}
-
-// Testing data after change_layout AVX2
-void changelayout_avx2(Dataframe df1, const std::vector<double>& res) {
-    
-    Dataframe df1_t = df1.change_layout("AVX2");
-
-    ASSERT_EQ(df1_t.get_data(), res)
-}
-
-// Testing data after change_layout Eigen
-void changelayout_eigen(Dataframe df1, const std::vector<double>& res) {
-    
-    Dataframe df1_t = df1.change_layout("Eigen");
+    Dataframe df1_t = df1.change_layout(backend);
 
     ASSERT_EQ(df1_t.get_data(), res)
 }
@@ -61,30 +45,44 @@ void tests_data() {
     TestSuite::Tests tests_data;
 
     tests_data.add_test(
-        bind(changelayout_naive, iris, iris_t.get_data()), 
+        bind(changelayout, iris, iris_t.get_data(), "Naive"), 
         "Change layout Naive"
     );
 
-    tests_data.add_test(
-        bind(changelayout_avx2, iris, iris_t.get_data()), 
-        "Change layout AVX2 v1"
-    );
+    #ifdef __AVX2__
+        tests_data.add_test(
+            bind(changelayout, iris, iris_t.get_data(), "AVX2"), 
+            "Change layout AVX2 v1"
+        );
+
+        tests_data.add_test(
+            bind(changelayout, mat, mat_t.get_data(), "AVX2"), 
+            "Change layout AVX2 v2"
+        );
+    #endif
 
     tests_data.add_test(
-        bind(changelayout_avx2, mat, mat_t.get_data()), 
-        "Change layout AVX2 v2"
-    );
-
-    tests_data.add_test(
-        bind(changelayout_eigen, iris, iris_t.get_data()), 
+        bind(changelayout, iris, iris_t.get_data(), "Eigen"), 
         "Change layout Eigen v1"
     );
 
     tests_data.add_test(
-        bind(changelayout_eigen, mat, mat_t.get_data()), 
+        bind(changelayout, mat, mat_t.get_data(), "Eigen"), 
         "Change layout Eigen v2"
     );
-   
+
+    #ifdef USE_MKL
+        tests_data.add_test(
+            bind(changelayout, iris, iris_t.get_data(), "MKL"), 
+            "Change layout MKL v1"
+        );
+
+        tests_data.add_test(
+            bind(changelayout, mat, mat_t.get_data(), "MKL"), 
+            "Change layout MKL v2"
+        );
+    #endif
+
     tests_data.add_test(
         bind(transfercol_t, iris, "target", iris_x, iris_y.get_data()), 
         "Transfer column"
