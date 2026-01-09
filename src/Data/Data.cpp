@@ -455,8 +455,8 @@ std::vector<double> Dataframe::transpose_mkl(size_t rows_, size_t cols_,
     
     std::vector<double> new_data(rows_*cols_);
     mkl_domatcopy(
-        "C",              // "C" for Col-major, else "R"
-        "T",              // "N" no, "T" transpose, "C" transpose conjugate
+        'C',              // 'C' for Col-major, else 'R'
+        'T',              // 'N' no, 'T' transpose, 'C transpose conjugate
         rows_,
         cols_,          
         1.0,              // Scalar
@@ -470,14 +470,14 @@ std::vector<double> Dataframe::transpose_mkl(size_t rows_, size_t cols_,
 
 void Dataframe::transpose_mkl_inplace(size_t n, std::vector<double>& df) {
     mkl_dimatcopy(
-        "C",              // "C" for Col-major, else "R"
-        "T",              // "N" no, "T" transpose, "C" transpose conjugate
-        rows_,
-        cols_,          
+        'C',              // 'C' for Col-major, else 'R'
+        'T',              // 'N' no, 'T' transpose, 'C' transpose conjugate
+        n,
+        n,          
         1.0,              // Scalar
         df.data(),        // Input
-        rows_,            // Leading dim input
-        cols_             // Leading dim output
+        n,
+        n
     );
 }
 #endif

@@ -111,26 +111,27 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
 Dataframe inverse(Dataframe& df) {
 
     size_t n = df.get_cols();
-    std::vector<double> new_data(n * n) = df.get_data();
-    std::vector<int> swaps(n);
+    std::vector<double> new_data = df.get_data();
+    std::vector<lapack_int> swaps(n);
 
     int msg = LAPACKE_dgetrf(
         LAPACK_COL_MAJOR,   // LAPACK_ROW_MAJOR or LAPACK_COL_MAJOR
+        n,
         n,         
-        new_data.data(),       // Matrix (input: data, output: LU)
+        new_data.data(),    // Matrix (input: data, output: LU)
         n,      
-        swaps.data()    // Pivots
+        swaps.data()        // Pivots
     );
-
-    if(msg != 0) throw std::runtime_error("Matrice singulière ou erreur");
+    if(msg != 0) throw std::runtime_error("LU factorization failed");
 
     int msg1 = LAPACKE_dgetri(
         LAPACK_COL_MAJOR,   // LAPACK_ROW_MAJOR or LAPACK_COL_MAJOR
-        n,         
-        new_data.data(),       // Matrix (input: LU, output: inverse)
+        n,       
+        new_data.data(),    // Matrix (input: LU, output: inverse)
         n,      
-        swaps.data()    // Pivots
+        swaps.data()        // Pivots
     );
+    if(msg1 != 0) throw std::runtime_error("Matrix inversion failed");
 
     return Dataframe(n, n, false, std::move(new_data));
 }

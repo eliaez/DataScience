@@ -22,7 +22,7 @@ namespace Linalg {
             NAIVE,
             AVX2,
             AVX2_THREADED,
-            EIGEN
+            EIGEN,
             AUTO
         };
     #elif defined(USE_MKL)
