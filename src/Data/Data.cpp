@@ -1,6 +1,7 @@
 #include "Data/Data.hpp"
 #include "Linalg/Linalg.hpp"
 #include <iomanip>
+#include <system_error>
 
 /*----------------------------------------Dataframe-----------------------------------*/
 
@@ -156,9 +157,16 @@ Dataframe Dataframe::change_layout(const std::string& choice) const {
     if (choice == "Naive") new_data = transpose_naive(temp_i, temp_j, data);
     else if (choice == "Eigen") new_data = transpose_eigen(temp_i, temp_j, data);
 
-    #ifdef __AVX2__
+    #if defined(__AVX2__) && defined(USE_MKL)
+        else if (choice == "AVX2") new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+        else if (choice == "MKL") new_data = transpose_mkl(temp_i, temp_j, data);
+        else new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+    #elif defined(__AVX2__)
         else if (choice == "AVX2") new_data = transpose_blocks_avx2(temp_i, temp_j, data);
         else new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+    #elif defined(USE_MKL)
+        else if (choice == "MKL") new_data = transpose_mkl(temp_i, temp_j, data);
+        else new_data = transpose_naive(temp_i, temp_j, data);
     #else
         else new_data = transpose_naive(temp_i, temp_j, data);
     #endif
@@ -179,9 +187,16 @@ void Dataframe::change_layout_inplace(const std::string& choice) {
         if (choice == "Naive") transpose_naive_inplace(temp_i, data);
         else if (choice == "Eigen") transpose_eigen_inplace(temp_i, data);
 
-        #ifdef __AVX2__
+        #if defined(__AVX2__) && defined(USE_MKL)
+            else if (choice == "AVX2") transpose_avx2_inplace(temp_i, data);
+            else if (choice == "MKL") transpose_mkl_inplace(temp_i, data);
+            else transpose_avx2_inplace(temp_i, data);
+        #elif defined(__AVX2__)
             else if (choice == "AVX2") transpose_avx2_inplace(temp_i, data);
             else transpose_avx2_inplace(temp_i, data);
+        #elif defined(USE_MKL)
+            else if (choice == "MKL") transpose_mkl_inplace(temp_i, data);
+            else transpose_naive_inplace(temp_i, data);
         #else
             transpose_naive_inplace(temp_i, data);
         #endif
@@ -190,9 +205,16 @@ void Dataframe::change_layout_inplace(const std::string& choice) {
         if (choice == "Naive") new_data = transpose_naive(temp_i, temp_j, data);
         else if (choice == "Eigen") new_data = transpose_eigen(temp_i, temp_j, data);
         
-        #ifdef __AVX2__
+        #if defined(__AVX2__) && defined(USE_MKL)
+            else if (choice == "AVX2") new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+            else if (choice == "MKL") new_data = transpose_mkl(temp_i, temp_j, data);
+            else new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+        #elif defined(__AVX2__)
             else if (choice == "AVX2") new_data = transpose_blocks_avx2(temp_i, temp_j, data);
             else new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+        #elif defined(USE_MKL)
+            else if (choice == "MKL") new_data = transpose_mkl(temp_i, temp_j, data);
+            else new_data = transpose_naive(temp_i, temp_j, data);
         #else
             else new_data = transpose_naive(temp_i, temp_j, data);
         #endif
@@ -428,6 +450,39 @@ void Dataframe::transpose_avx2_inplace(size_t n, std::vector<double>& df) {
 }
 #endif
 
+#ifdef USE_MKL
+std::vector<double> Dataframe::transpose_mkl(size_t rows_, size_t cols_, 
+    const std::vector<double>& df) {
+    
+    std::vector<double> new_data(rows_*cols_);
+    mkl_domatcopy(
+        'C',              // 'C' for Col-major, else 'R'
+        'T',              // 'N' no, 'T' transpose, 'C transpose conjugate
+        rows_,
+        cols_,          
+        1.0,              // Scalar
+        df.data(),        // Input
+        rows_,            // Leading dim input
+        new_data.data(),  // Output
+        cols_             // Leading dim output
+    );
+    return new_data;
+}
+
+void Dataframe::transpose_mkl_inplace(size_t n, std::vector<double>& df) {
+    mkl_dimatcopy(
+        'C',              // 'C' for Col-major, else 'R'
+        'T',              // 'N' no, 'T' transpose, 'C' transpose conjugate
+        n,
+        n,          
+        1.0,              // Scalar
+        df.data(),        // Input
+        n,
+        n
+    );
+}
+#endif
+
 /*----------------------------------------CsvHandler-----------------------------------*/
 
 int CsvHandler::encode_label(std::string& label, int col, 
@@ -478,7 +533,7 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep, bool is_hea
     if (!file) {
         throw std::runtime_error(
             "Cannot open: " + filepath + 
-            " (" + std::strerror(errno) + ")"
+            " (" + std::generic_category().message(errno) + ")"
         );
     }
 

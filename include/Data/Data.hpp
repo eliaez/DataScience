@@ -12,7 +12,11 @@
 #include <Eigen/Dense>
 
 #ifdef __AVX2__
-#include <immintrin.h>
+    #include <immintrin.h>
+#endif
+
+#ifdef USE_MKL
+    #include <mkl.h>
 #endif
 
 #pragma once
@@ -78,6 +82,14 @@ class Dataframe
         static void transpose_avx2_inplace(size_t n, std::vector<double>& df);
         #endif
 
+        #ifdef USE_MKL
+        // Tranpose MKL
+        static std::vector<double> transpose_mkl(size_t rows_, size_t cols_, const std::vector<double>& df);
+        
+        // Tranpose inplace only for square matrix
+        static void transpose_mkl_inplace(size_t n, std::vector<double>& df);
+        #endif
+
     // Getters & Constructor
     public:
 
@@ -94,10 +106,6 @@ class Dataframe
         static Eigen::Map<const Eigen::MatrixXd> asEigen(const std::vector<double>& d, size_t r, size_t c);
         static Eigen::Map<Eigen::MatrixXd> asEigen(std::vector<double>& d, size_t r, size_t c);
         
-        /*std::vector<double>& row(size_t i); // Getting row i
-        std::vector<double>& col(size_t j); // Getting column j
-        std::vector<double>& col(const std::string& header); // Getting column with header*/
-
         size_t get_rows() const { return rows; }
         size_t get_cols() const { return cols; }
 
@@ -106,6 +114,8 @@ class Dataframe
         bool get_storage() const {return is_row_major; }
 
         const std::vector<double>& get_data() const { return data; }
+        const double* get_db() const { return data.data(); }
+
         const std::vector<std::string>& get_headers() const { return headers; }
         const std::unordered_map<int, std::unordered_map<std::string, int>>& get_encoder() const { return label_encoder; }
         const std::unordered_set<int>& get_encodedCols() const { return encoded_cols; }

@@ -1,10 +1,35 @@
 #include "Linalg/Linalg.hpp"
 
 /*
-        case Linalg::Backend::AVX2_THREADED: return Linalg::Avx2_threaded::func(__VA_ARGS__); \
+        case Linalg::Backend::AVX2_THREADED: return Linalg::AVX2_threaded::func(__VA_ARGS__); \
 */
 
-#ifdef __AVX2__
+#if defined(__AVX2__) && defined(USE_MKL)
+    #define DISPATCH_BACKEND(func, ...) \
+        switch(current_backend) { \
+            case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
+            case Linalg::Backend::AVX2: return Linalg::AVX2::func(__VA_ARGS__); \
+            case Linalg::Backend::EIGEN: return Linalg::EigenNP::func(__VA_ARGS__); \
+            case Linalg::Backend::MKL: return Linalg::MKL::func(__VA_ARGS__); \
+            default: return Linalg::AVX2::func(__VA_ARGS__); \
+        }
+
+    #define DISPATCH_BACKEND2(func, ...) \
+        switch(Operations::get_backend()) { \
+            case Linalg::Backend::NAIVE: { \
+                std::tie(nb_swaps, swaps, LU) = Linalg::Naive::func(__VA_ARGS__); \
+                break; \
+            } \
+            case Linalg::Backend::AVX2: { \
+                std::tie(nb_swaps, swaps, LU) = Linalg::AVX2::func(__VA_ARGS__); \
+                break; \
+            } \
+            default: { \
+                std::tie(nb_swaps, swaps, LU) = Linalg::AVX2::func(__VA_ARGS__); \
+                break; \
+            } \
+        } 
+#elif defined(__AVX2__)
     #define DISPATCH_BACKEND(func, ...) \
         switch(current_backend) { \
             case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
@@ -25,6 +50,26 @@
             } \
             default: { \
                 std::tie(nb_swaps, swaps, LU) = Linalg::AVX2::func(__VA_ARGS__); \
+                break; \
+            } \
+        } 
+#elif defined(USE_MKL)
+    #define DISPATCH_BACKEND(func, ...) \
+        switch(current_backend) { \
+            case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
+            case Linalg::Backend::EIGEN: return Linalg::EigenNP::func(__VA_ARGS__); \
+            case Linalg::Backend::MKL: return Linalg::MKL::func(__VA_ARGS__); \
+            default: return Linalg::MKL::func(__VA_ARGS__); \
+        }
+
+    #define DISPATCH_BACKEND2(func, ...) \
+        switch(Operations::get_backend()) { \
+            case Linalg::Backend::NAIVE: { \
+                std::tie(nb_swaps, swaps, LU) = Linalg::Naive::func(__VA_ARGS__); \
+                break; \
+            } \
+            default: { \
+                std::tie(nb_swaps, swaps, LU) = Linalg::Naive::func(__VA_ARGS__); \
                 break; \
             } \
         } 
@@ -62,10 +107,18 @@ void Operations::set_backend(const std::string& b) {
     if (b == "Naive") current_backend = Backend::NAIVE;
     else if (b == "Eigen") current_backend = Backend::EIGEN;
     
-    #ifdef __AVX2__
+    #if defined(__AVX2__) && defined(USE_MKL)
         else if (b == "AVX2") current_backend = Backend::AVX2;
-        else if (b == "AVX2_threaded") current_backend = Backend::AVX2_THREADED;
+        //else if (b == "AVX2_threaded") current_backend = Backend::AVX2_THREADED;
+        else if (b == "MKL") current_backend = Backend::MKL;
         else current_backend = Backend::AVX2;
+    #elif defined(__AVX2__)
+        else if (b == "AVX2") current_backend = Backend::AVX2;
+        //else if (b == "AVX2_threaded") current_backend = Backend::AVX2_THREADED;
+        else current_backend = Backend::AVX2;
+    #elif defined(USE_MKL)
+        else if (b == "MKL") current_backend = Backend::MKL;
+        else current_backend = Backend::NAIVE;
     #else 
         else current_backend = Backend::NAIVE;
     #endif 
@@ -77,10 +130,10 @@ Backend Operations::get_backend() {
     if (current_backend == Backend::AUTO) {
 
         // AVX2 for now
-        #ifdef __AVX2__
+        #if defined(__AVX2__)
             return Backend::AVX2;
         #else
-            return Backend::EIGEN;
+            return Backend::NAIVE;
         #endif
 
         // return Backend::AVX2_THREADED;
@@ -113,13 +166,17 @@ std::string get_backend() {
         case Backend::AVX2: return "AVX2";
         case Backend::AVX2_THREADED: return "AVX2_threaded";
     #endif
+
+    #ifdef USE_MKL
+        case Backend::MKL: return "MKL";
+    #endif
     
     case Backend::EIGEN: return "Eigen"; 
 
     #ifdef __AVX2__
         default: return "AVX2";
     #else 
-        default: return "Eigen";
+        default: return "Naive";
     #endif
     }
 }

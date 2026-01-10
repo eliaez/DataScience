@@ -22,7 +22,7 @@ static void BM_TRANSPOSE_IN(benchmark::State& state) {
     const int backend_int = state.range(1);
 
     // Map backend_int
-    const std::string backend_names[] = {"Naive", "AVX2", "Eigen"};
+    const std::string backend_names[] = {"Naive", "AVX2", "Eigen", "MKL"};
     const std::string backend = backend_names[backend_int];
 
     Dataframe A = {N, N, false, gen_matrix(N,N)};
@@ -41,7 +41,7 @@ static void BM_TRANSPOSE(benchmark::State& state) {
     const int backend_int = state.range(1);
 
     // Map backend_int
-    const std::string backend_names[] = {"Naive", "AVX2", "Eigen"};
+    const std::string backend_names[] = {"Naive", "AVX2", "Eigen", "MKL"};
     const std::string backend = backend_names[backend_int];
 
     Dataframe A = {N, N, false, gen_matrix(N,N)};
@@ -56,7 +56,18 @@ static void BM_TRANSPOSE(benchmark::State& state) {
 }
 
 static void GenerateArgs(benchmark::internal::Benchmark* b) {
-    for (int backend : {0, 1, 2}) { // Naive, AVX2, Eigen
+    
+    #if defined(__AVX2__) && defined(USE_MKL)
+        std::vector<int> backend_opt = {0, 1, 2, 3};    // Naive, AVX2, Eigen, MKL 
+    #elif defined(__AVX2__)
+        std::vector<int> backend_opt = {0, 1, 2};       // Naive, AVX2, Eigen
+    #elif defined(USE_MKL)
+        std::vector<int> backend_opt = {0, 2, 3};       // Naive, Eigen, MKL 
+    #else
+        std::vector<int> backend_opt = {0, 2};          // Naive, Eigen 
+    #endif
+
+    for (int backend : backend_opt) {
         for (int size : {128, 256, 512, 1024}) {
             b->Args({size, backend});
         }

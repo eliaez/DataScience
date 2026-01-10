@@ -3,19 +3,36 @@
 #include "Linalg/LinalgNaive.hpp"
 #include "Linalg/LinalgAVX2.hpp"
 #include "Linalg/LinalgEigen.hpp"
+#include "Linalg/LinalgMKL.hpp"
 #include <string>
 
 namespace Linalg {
 
-    #ifdef __AVX2__
+    #if defined(__AVX2__) && defined(USE_MKL)
         enum class Backend {
-            NAIVE, // Still col-major and cache friendly
+            NAIVE,
+            AVX2,
+            AVX2_THREADED,
+            EIGEN,
+            MKL,
+            AUTO
+        };
+    #elif defined(__AVX2__)
+        enum class Backend {
+            NAIVE,
             AVX2,
             AVX2_THREADED,
             EIGEN,
             AUTO
         };
-    #else
+    #elif defined(USE_MKL)
+        enum class Backend {
+            NAIVE,
+            EIGEN,
+            MKL,
+            AUTO
+        };
+    #else 
         enum class Backend {
             NAIVE, // Still col-major and cache friendly
             EIGEN,
