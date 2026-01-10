@@ -4,7 +4,7 @@ project(DataScience)
 set(CMAKE_CXX_STANDARD 20)
 
 
-# COMPILATER : MSVC vs MinGW-GCC
+# COMPILER : MSVC vs MinGW-GCC
 # ============================================
 if(MSVC)
     add_compile_options(
@@ -75,7 +75,7 @@ if(USE_MKL AND MSVC)
     endif()
 else()
     set(USE_MKL OFF)
-    message(STATUS "Warning - MKL disabled by user or to avoid MinGW-GCC compilater (you may want to change to use MKL)")
+    message(STATUS "Warning - MKL disabled by user or to avoid MinGW-GCC compiler (you may want to change to use MKL)")
 endif()
 
 
