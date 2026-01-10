@@ -7,7 +7,14 @@ set(CMAKE_CXX_STANDARD 20)
 # COMPILATER : MSVC vs MinGW-GCC
 # ============================================
 if(MSVC)
-    add_compile_options(/W4 /O2) # W4 to get warnings, /02 opti-max for balance size/speed
+    add_compile_options(
+        /W4         # /W4 to get warnings
+        /O2         # /02 opti-max for balance size/speed
+        /wd4127     # Constant conditionnal expression
+        /wd4267     # size_t to int
+        /wd4244     # double to int
+        /wd5054)    # operator& between enums (Eigen) 
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 else()
     add_compile_options(-Wall -Wextra -O3 -march=native) # -Wall -Wextra to get warnings, -03 for performance, -march=native for opti 
 endif()
@@ -83,8 +90,8 @@ FetchContent_MakeAvailable(Eigen)
 # OPTIONS OF BUILD
 # ============================================
 option(BUILD_TEST "Build tests" ON)
-option(BUILD_BENCHMARK "Build benchmark" OFF)
-option(BUILD_MAIN "Build main" OFF)
+option(BUILD_BENCHMARK "Build benchmark" ON)
+option(BUILD_MAIN "Build main" ON)
 
 
 # SOURCES

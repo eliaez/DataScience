@@ -1,6 +1,7 @@
 #include "Data/Data.hpp"
 #include "Linalg/Linalg.hpp"
 #include <iomanip>
+#include <system_error>
 
 /*----------------------------------------Dataframe-----------------------------------*/
 
@@ -532,7 +533,7 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep, bool is_hea
     if (!file) {
         throw std::runtime_error(
             "Cannot open: " + filepath + 
-            " (" + std::strerror(errno) + ")"
+            " (" + std::generic_category().message(errno) + ")"
         );
     }
 

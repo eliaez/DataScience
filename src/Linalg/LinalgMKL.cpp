@@ -114,7 +114,7 @@ Dataframe inverse(Dataframe& df) {
     std::vector<double> new_data = df.get_data();
     std::vector<lapack_int> swaps(n);
 
-    int msg = LAPACKE_dgetrf(
+    lapack_int msg = LAPACKE_dgetrf(
         LAPACK_COL_MAJOR,   // LAPACK_ROW_MAJOR or LAPACK_COL_MAJOR
         n,
         n,         
@@ -124,7 +124,7 @@ Dataframe inverse(Dataframe& df) {
     );
     if(msg != 0) throw std::runtime_error("LU factorization failed");
 
-    int msg1 = LAPACKE_dgetri(
+    lapack_int msg1 = LAPACKE_dgetri(
         LAPACK_COL_MAJOR,   // LAPACK_ROW_MAJOR or LAPACK_COL_MAJOR
         n,       
         new_data.data(),    // Matrix (input: LU, output: inverse)

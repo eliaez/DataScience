@@ -224,7 +224,6 @@ Dataframe inverse(Dataframe& df) {
 
         // Diag
         if (swaps[0] == 3) {
-            std::vector<double> y(n*n, 0.0);
             for (size_t i = 0; i < n; i++) {
                y[i*n + i] = 1 / df.at(i*n+i);
             }
