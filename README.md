@@ -20,4 +20,4 @@ Industry-standard C++ template library.
 Intel's optimized Math Kernel Library for high-performance computing.
 
 #### Note: 
-By default, the backend used will be the best performing one among the three custom implementations, excluding MKL and Eigen libraries.
+By default, the backend used will be the best performing one among the three custom implementations, excluding MKL and Eigen libraries. Moreover, to compile MKL, the option MSVC is available to avoid any issue with MinGW-GCC.

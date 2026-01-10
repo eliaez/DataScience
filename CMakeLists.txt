@@ -57,6 +57,8 @@ set(MKL_FOUND FALSE)
 set(TBB_FOUND FALSE)
 
 if(USE_MKL AND MSVC)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+    
     set(MKL_INTERFACE ilp64)
     set(MKL_THREADING tbb_thread) # Threading Building Blocks
     set(MKL_LINK static)

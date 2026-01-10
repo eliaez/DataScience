@@ -19,7 +19,7 @@ static void BM_MULT(benchmark::State& state) {
     Operations::set_backend(backend);
 
     Dataframe A;
-    if (backend == "Eigen") A = {N, N, false, gen_matrix(N,N)};
+    if (backend == "Eigen" || backend == "MKL") A = {N, N, false, gen_matrix(N,N)};
     else A = {N, N, true, gen_matrix(N,N)};
 
     Dataframe B = {N, N, false, gen_matrix(N,N)};
@@ -59,61 +59,32 @@ static void GenerateArgs(benchmark::internal::Benchmark* b, int backend_int) {
 }
 
 // ------------------------ MULT ------------------------
-
-// Naive Mult
 BENCHMARK(BM_MULT)
-    ->Apply([](auto* b) { GenerateArgs(b, 0); })
-    ->Unit(benchmark::kMillisecond)
-    ->MinTime(5.0);
-
-// AVX2 Mult
+    ->Apply([](auto* b) { 
+        GenerateArgs(b, 0);  // Naive
 #ifdef __AVX2__
-    BENCHMARK(BM_MULT)
-        ->Apply([](auto* b) { GenerateArgs(b, 1); })
-        ->Unit(benchmark::kMillisecond)
-        ->MinTime(5.0);
+        GenerateArgs(b, 1);  // AVX2
 #endif
-
-// Eigen Mult
-BENCHMARK(BM_MULT)
-    ->Apply([](auto* b) { GenerateArgs(b, 2); })
+        GenerateArgs(b, 2);  // Eigen
+#ifdef USE_MKL
+        GenerateArgs(b, 3);  // MKL
+#endif
+    })
     ->Unit(benchmark::kMillisecond)
     ->MinTime(5.0);
-
-// MKL Mult
-#ifdef USE_MKL
-    BENCHMARK(BM_MULT)
-        ->Apply([](auto* b) { GenerateArgs(b, 3); })
-        ->Unit(benchmark::kMillisecond)
-        ->MinTime(5.0);
-#endif
 
 // ------------------------ INV ------------------------
-
-// Naive Inv
 BENCHMARK(BM_INV)
-    ->Apply([](auto* b) { GenerateArgs(b, 0); })
-    ->Unit(benchmark::kMillisecond)
-    ->MinTime(5.0);
-
-// AVX2 Inv
+    ->Apply([](auto* b) { 
+        GenerateArgs(b, 0);  // Naive
 #ifdef __AVX2__
-    BENCHMARK(BM_INV)
-        ->Apply([](auto* b) { GenerateArgs(b, 1); })
-        ->Unit(benchmark::kMillisecond)
-        ->MinTime(5.0);
+        GenerateArgs(b, 1);  // AVX2
 #endif
-
-// Eigen Inv
-BENCHMARK(BM_INV)
-    ->Apply([](auto* b) { GenerateArgs(b, 2); })
+        GenerateArgs(b, 2);  // Eigen
+#ifdef USE_MKL
+        GenerateArgs(b, 3);  // MKL
+#endif
+    })
     ->Unit(benchmark::kMillisecond)
     ->MinTime(5.0);
 
-// MKL Inv
-#ifdef USE_MKL
-    BENCHMARK(BM_INV)
-        ->Apply([](auto* b) { GenerateArgs(b, 3); })
-        ->Unit(benchmark::kMillisecond)
-        ->MinTime(5.0);
-#endif
