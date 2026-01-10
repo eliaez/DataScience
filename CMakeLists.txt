@@ -38,6 +38,7 @@ if(MSVC)
     message(STATUS "✓ AVX2 (MSVC)")
 else()
     CHECK_CXX_COMPILER_FLAG("-mavx2" COMPILER_SUPPORTS_AVX2)
+
     if(COMPILER_SUPPORTS_AVX2)
         set(AVX2_FLAGS "-mavx2")
         message(STATUS "✓ AVX2 (GCC)")
@@ -113,12 +114,7 @@ set(LIB_SOURCES
 # ============================================
 add_library(linalg_full STATIC ${LIB_SOURCES})
 
-if(MSVC)
-    target_compile_options(linalg_full PRIVATE ${AVX2_FLAGS})
-else()
-    target_compile_options(linalg_full PRIVATE ${AVX2_FLAGS})
-endif()
-
+target_compile_options(linalg_full PUBLIC ${AVX2_FLAGS})
 target_link_libraries(linalg_full PUBLIC Eigen3::Eigen OpenMP::OpenMP_CXX)
 
 # Link MKL + TBB
@@ -141,14 +137,19 @@ if(BUILD_TEST)
         tests/tests_Eigen.cpp
     )
     
-    if(MSVC)
-        target_compile_options(test_all PRIVATE ${AVX2_FLAGS})
-    else()
-        target_compile_options(test_all PRIVATE ${AVX2_FLAGS})
-    endif()
-    
     target_link_libraries(test_all linalg_full)
-    add_test(NAME AllTests COMMAND test_all)
+    add_test(NAME TestData   COMMAND test_all data)
+    add_test(NAME TestNaive  COMMAND test_all naive)
+
+    if(AVX2_FLAGS)
+        add_test(NAME TestAVX2   COMMAND test_all avx2)
+    endif()
+
+    add_test(NAME TestEigen  COMMAND test_all eigen)
+
+    if(USE_MKL)
+        add_test(NAME TestMKL    COMMAND test_all mkl)
+    endif()
 endif()
 
 
@@ -177,12 +178,5 @@ endif()
 # ============================================
 if(BUILD_MAIN)
     add_executable(Main src/main.cpp)
-    
-    if(MSVC)
-        target_compile_options(Main PRIVATE ${AVX2_FLAGS})
-    else()
-        target_compile_options(Main PRIVATE ${AVX2_FLAGS})
-    endif()
-    
     target_link_libraries(Main linalg_full)
 endif()
