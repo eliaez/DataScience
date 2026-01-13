@@ -1,5 +1,6 @@
 #include "Data/Data.hpp"
 #include "Linalg/Linalg.hpp"
+#include "Utils/ThreadPool.hpp"
 #include <iomanip>
 #include <system_error>
 
@@ -159,10 +160,12 @@ Dataframe Dataframe::change_layout(const std::string& choice) const {
 
     #if defined(__AVX2__) && defined(USE_MKL)
         else if (choice == "AVX2") new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+        else if (choice == "AVX2_threaded") new_data = transpose_avx2_th(temp_i, temp_j, data);
         else if (choice == "MKL") new_data = transpose_mkl(temp_i, temp_j, data);
         else new_data = transpose_blocks_avx2(temp_i, temp_j, data);
     #elif defined(__AVX2__)
         else if (choice == "AVX2") new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+        else if (choice == "AVX2_threaded") new_data = transpose_avx2_th(temp_i, temp_j, data);
         else new_data = transpose_blocks_avx2(temp_i, temp_j, data);
     #elif defined(USE_MKL)
         else if (choice == "MKL") new_data = transpose_mkl(temp_i, temp_j, data);
@@ -447,6 +450,102 @@ void Dataframe::transpose_avx2_inplace(size_t n, std::vector<double>& df) {
             std::swap(df[i*n + j], df[j*n + i]);
         }
     }
+}
+
+std::vector<double> Dataframe::transpose_avx2_th(size_t rows_, size_t cols_, 
+    const std::vector<double>& df) {
+
+    // After multiple tests a minimum was decided
+    constexpr size_t THREADING_THRESHOLD = 512;
+    if (rows_ < THREADING_THRESHOLD) {
+        return transpose_blocks_avx2(rows_, cols_, df);
+    }
+    
+    // Variables
+    std::vector<double> new_data(rows_*cols_);
+    size_t vec_sizei = rows_ - (rows_ % NB_DB);
+    size_t vec_sizej = cols_ - (cols_ % NB_DB);
+    
+    // ThreadPool Variables
+    ThreadPool& pool = ThreadPool::instance();
+    size_t nb_threads = pool.nb_threads;
+
+    std::vector<std::future<void>> futures;
+    futures.reserve(nb_threads);
+
+    size_t chunk = (int)(vec_sizei / nb_threads);
+    size_t start_i = 0, end_i = chunk;
+    
+    for (size_t n = 0; n < nb_threads; n++) {
+        if (n+1 == nb_threads) end_i = vec_sizei;
+
+        auto fut = pool.enqueue([start_i, end_i, rows_, cols_, vec_sizej, &df, &new_data] {
+            for (size_t i = start_i; i < end_i; i += NB_DB) {
+                for (size_t j = 0; j < vec_sizej; j += NB_DB) {
+
+                    if (j + PREFETCH_DIST1 < vec_sizej) {
+                        _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+0) * rows_ + i], _MM_HINT_T0);
+                        _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+1) * rows_ + i], _MM_HINT_T0);
+                        _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+2) * rows_ + i], _MM_HINT_T0);
+                        _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+3) * rows_ + i], _MM_HINT_T0);
+                    }
+                    
+                    // Load 4 cols
+                    __m256d col0 = _mm256_loadu_pd(&df[(j+0)*rows_ + i]);
+                    __m256d col1 = _mm256_loadu_pd(&df[(j+1)*rows_ + i]);
+                    __m256d col2 = _mm256_loadu_pd(&df[(j+2)*rows_ + i]);
+                    __m256d col3 = _mm256_loadu_pd(&df[(j+3)*rows_ + i]);
+                    
+                    // Get pair elements of each
+                    __m256d t0 = _mm256_unpacklo_pd(col0, col1);
+
+                    // Get odd elements of each 
+                    __m256d t1 = _mm256_unpackhi_pd(col0, col1);
+
+                    __m256d t2 = _mm256_unpacklo_pd(col2, col3);
+                    __m256d t3 = _mm256_unpackhi_pd(col2, col3);
+                    
+                    // Get two first elements of each 
+                    __m256d row0 = _mm256_permute2f128_pd(t0, t2, 0x20);
+                    __m256d row1 = _mm256_permute2f128_pd(t1, t3, 0x20);
+
+                    // Get two last elements of each
+                    __m256d row2 = _mm256_permute2f128_pd(t0, t2, 0x31);
+                    __m256d row3 = _mm256_permute2f128_pd(t1, t3, 0x31);
+                    
+                    _mm256_storeu_pd(&new_data[(i+0)*cols_ + j], row0);
+                    _mm256_storeu_pd(&new_data[(i+1)*cols_ + j], row1);
+                    _mm256_storeu_pd(&new_data[(i+2)*cols_ + j], row2);
+                    _mm256_storeu_pd(&new_data[(i+3)*cols_ + j], row3);
+                }
+
+                // Scalar residual
+                for(size_t j = vec_sizej; j < cols_; j++) {
+                    new_data[(i+0)*cols_ + j] = df[j*rows_ + (i+0)];
+                    new_data[(i+1)*cols_ + j] = df[j*rows_ + (i+1)];
+                    new_data[(i+2)*cols_ + j] = df[j*rows_ + (i+2)];
+                    new_data[(i+3)*cols_ + j] = df[j*rows_ + (i+3)];
+                }
+            }
+        });
+
+        futures.push_back(std::move(fut));
+        start_i += chunk;
+        end_i += chunk;
+    }
+
+    for (auto& fut : futures) {
+        fut.wait();
+    }
+
+    // Scalar residual 
+    for (size_t i = vec_sizei; i < rows_; i++) {
+        for(size_t j = 0; j < cols_; j++) {
+            new_data[i*cols_ + j] = df[j*rows_ + i];
+        }
+    }   
+
+    return new_data;
 }
 #endif
 

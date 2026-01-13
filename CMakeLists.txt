@@ -116,6 +116,7 @@ set(LIB_SOURCES
     src/Linalg/LinalgEigen.cpp
     src/Linalg/LinalgMKL.cpp
     src/Utils/TestSuite.cpp
+    src/Utils/ThreadPool.cpp
 )
 
 
@@ -182,7 +183,7 @@ if(BUILD_BENCHMARK)
 
     add_executable(my_bench 
         benchmark/bench_data.cpp
-        benchmark/bench_linalg.cpp
+        #benchmark/bench_linalg.cpp
     )
     target_link_libraries(my_bench benchmark::benchmark_main linalg_full)    
 endif()

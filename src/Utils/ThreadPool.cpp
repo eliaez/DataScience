@@ -1,10 +1,10 @@
 #include "Utils/ThreadPool.hpp"
 
 ThreadPool::ThreadPool() 
-    : stop(false), nb_threads(std::thread::hardware_concurrency())
+    : nb_threads(std::thread::hardware_concurrency()), stop(false)
 {
 
-    for (size_t i = 0; i < nb_threads; i++) {
+    for (int i = 0; i < nb_threads; i++) {
         workers.emplace_back([this]() {         // Create new thread
             while (true) {
                 std::function<void()> task;
@@ -33,6 +33,11 @@ ThreadPool::~ThreadPool() {
     cv.notify_all();
     
     for (auto& worker : workers) {
-        worker.join();
+        if (worker.joinable()) worker.join();
     } 
+}
+
+ThreadPool& ThreadPool::instance() {
+    static ThreadPool pool;
+    return pool;
 }

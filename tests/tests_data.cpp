@@ -59,6 +59,16 @@ void tests_data() {
             bind(changelayout, mat, mat_t.get_data(), "AVX2"), 
             "Change layout AVX2 v2"
         );
+
+        tests_data.add_test(
+            bind(changelayout, iris, iris_t.get_data(), "AVX2_threaded"), 
+            "Change layout AVX2_Threaded v1"
+        );
+
+        tests_data.add_test(
+            bind(changelayout, mat, mat_t.get_data(), "AVX2_threaded"), 
+            "Change layout AVX2_Threaded v2"
+        );
     #endif
 
     tests_data.add_test(
