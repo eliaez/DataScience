@@ -60,7 +60,7 @@ static void GenerateArgs(benchmark::internal::Benchmark* b) {
     #if defined(__AVX2__) && defined(USE_MKL)
         std::vector<int> backend_opt = {0, 1, 2, 3, 4};    // Naive, AVX2, Eigen, MKL, AVX2_threaded
     #elif defined(__AVX2__)
-        std::vector<int> backend_opt = {1, 4};       // {0, 1, 2, 4} Naive, AVX2, Eigen, AVX2_threaded
+        std::vector<int> backend_opt = {0, 1, 2, 4};       // {0, 1, 2, 4} Naive, AVX2, Eigen, AVX2_threaded
     #elif defined(USE_MKL)
         std::vector<int> backend_opt = {0, 2, 3};       // Naive, Eigen, MKL 
     #else
@@ -68,16 +68,24 @@ static void GenerateArgs(benchmark::internal::Benchmark* b) {
     #endif
 
     for (int backend : backend_opt) {
-        for (int size : {128, 256, 512, 1024}) {
+        for (int size : {128, 256, 512, 1024, 2048}) { 
             b->Args({size, backend});
         }
     }
 }
 
-//BENCHMARK(BM_TRANSPOSE_IN)
-//    ->Apply(GenerateArgs)
-//    ->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_TRANSPOSE_IN)
+    ->Apply(GenerateArgs)
+/*    ->MinTime(2.0) // Only for final bench
+    ->Repetitions(10)
+    ->ReportAggregatesOnly(true) 
+    ->DisplayAggregatesOnly(true)*/
+    ->Unit(benchmark::kMicrosecond);
 
 BENCHMARK(BM_TRANSPOSE)
     ->Apply(GenerateArgs)
+/*    ->MinTime(2.0) // Only for final bench
+    ->Repetitions(10)
+    ->ReportAggregatesOnly(true) 
+    ->DisplayAggregatesOnly(true)*/
     ->Unit(benchmark::kMicrosecond);

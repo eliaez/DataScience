@@ -70,8 +70,11 @@ BENCHMARK(BM_MULT)
         GenerateArgs(b, 3);  // MKL
 #endif
     })
-    ->Unit(benchmark::kMillisecond)
-    ->MinTime(5.0);
+/*    ->MinTime(2.0) // Only for final bench
+    ->Repetitions(10)
+    ->ReportAggregatesOnly(true) 
+    ->DisplayAggregatesOnly(true)*/
+    ->Unit(benchmark::kMillisecond);
 
 // ------------------------ INV ------------------------
 BENCHMARK(BM_INV)
@@ -85,6 +88,9 @@ BENCHMARK(BM_INV)
         GenerateArgs(b, 3);  // MKL
 #endif
     })
-    ->Unit(benchmark::kMillisecond)
-    ->MinTime(5.0);
+/*    ->MinTime(2.0) // Only for final bench
+    ->Repetitions(10)
+    ->ReportAggregatesOnly(true) 
+    ->DisplayAggregatesOnly(true)*/
+    ->Unit(benchmark::kMillisecond);
 
