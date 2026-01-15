@@ -55,7 +55,7 @@ static void BM_TRANSPOSE(benchmark::State& state) {
     state.SetLabel(backend);
 }
 
-static void GenerateArgs(benchmark::internal::Benchmark* b) {
+static void GenerateArgs(benchmark::Benchmark* b) {
     
     #if defined(__AVX2__) && defined(USE_MKL)
         std::vector<int> backend_opt = {0, 1, 2, 3, 4};    // Naive, AVX2, Eigen, MKL, AVX2_threaded

@@ -3,7 +3,6 @@
 ThreadPool::ThreadPool() // Use physical cores instead of logical threads
     : nb_threads(std::thread::hardware_concurrency()/2), stop(false) 
 {
-
     for (int i = 0; i < nb_threads; i++) {
         workers.emplace_back([this]() {         // Create new thread
             while (true) {
