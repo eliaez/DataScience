@@ -1,6 +1,7 @@
 #include "Linalg/LinalgAVX2_threaded.hpp"
 #include "Linalg/LinalgAVX2.hpp"
 #include "Linalg/Linalg.hpp"
+#include "Utils/ThreadPool.hpp"
 
 namespace Linalg {
 namespace AVX2_threaded {
@@ -196,7 +197,7 @@ Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<dou
     for (size_t nb = 0; nb < nb_threads; nb++) {
         if (nb+1 == nb_threads) end = vec_size;
 
-        auto fut = pool.enqueue([start, end, n, &perm, &y, &diag_U, &LU] {
+        auto fut = pool.enqueue([start, end, n, prefetch_dist, &perm, &y, &diag_U, &LU] {
             
             // By Blocks with AVX2
             for (size_t k = start; k < end; k+=NB_DB) {
@@ -367,7 +368,7 @@ Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
         for (size_t nb = 0; nb < nb_threads; nb++) {
             if (nb+1 == nb_threads) end = vec_size;
 
-            auto fut = pool.enqueue([start, end, &df, &new_data] {
+            auto fut = pool.enqueue([start, end, &df1, &df2, &new_data] {
                 for (size_t i = start; i < end; i += NB_DB) {
 
                     if (i + PREFETCH_DIST < end) {
@@ -400,7 +401,7 @@ Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
         for (size_t n = 0; n < nb_threads; n++) {
             if (n+1 == nb_threads) end = vec_size;
 
-            auto fut = pool.enqueue([start, end, &df, &new_data] {
+            auto fut = pool.enqueue([start, end, &df1, &df2, &new_data] {
                 for (size_t i = start; i < end; i += NB_DB) {
 
                     if (i + PREFETCH_DIST < end) {
@@ -469,7 +470,7 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
     for (size_t nb = 0; nb < nb_threads; nb++) {
         if (nb+1 == nb_threads) end = vec_sizei;
 
-        auto fut = pool.enqueue([start, end, m, n, o, p, &df, &data] {
+        auto fut = pool.enqueue([start, end, m, n, o, p, &df1, &df2, &data] {
             for (size_t i = start; i < end; i += NB_DB) {
                 for (size_t j = 0; j < p; j++) {
 
@@ -579,7 +580,7 @@ Dataframe transpose(Dataframe& df) {
         df.get_encoder(), df.get_encodedCols()};
 }
 
-/*Dataframe inverse(Dataframe& df) {
+Dataframe inverse(Dataframe& df) {
 
     auto [det, swaps, LU] = determinant(df);
 
@@ -741,8 +742,7 @@ Dataframe transpose(Dataframe& df) {
         Dataframe res = solveLU_inplace(perm.get_data(), LU, n);
         return res;
     }
-}*/
-
+}
 #endif
 }
 }

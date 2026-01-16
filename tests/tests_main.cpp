@@ -7,6 +7,7 @@ void tests_naive();
 
 #ifdef __AVX2__
     void tests_avx2();
+    void tests_avx2_th();
 #endif
 
 #ifdef USE_MKL
@@ -30,6 +31,10 @@ int main(int argc, char* argv[]) {
     } else if (test == "avx2") {
         #ifdef __AVX2__
             tests_avx2();
+        #endif
+    } else if (test == "avx2_th") {
+        #ifdef __AVX2__
+            tests_avx2_th();
         #endif
     } else if (test == "eigen") {
         tests_eigen();

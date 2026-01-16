@@ -16,7 +16,7 @@ if(MSVC)
         /wd5054)    # operator& between enums (Eigen) 
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 else()
-    add_compile_options(-Wall -Wextra -O3 -march=native) # -Wall -Wextra to get warnings, -03 for performance, -march=native for opti 
+    add_compile_options(-Wall -Wextra -O2 -march=native) # -Wall -Wextra to get warnings, -03 for performance, -march=native for opti 
 endif()
 
 
@@ -113,6 +113,7 @@ set(LIB_SOURCES
     src/Linalg/Linalg.cpp
     src/Linalg/LinalgNaive.cpp
     src/Linalg/LinalgAVX2.cpp
+    src/Linalg/LinalgAVX2_threaded.cpp
     src/Linalg/LinalgEigen.cpp
     src/Linalg/LinalgMKL.cpp
     src/Utils/TestSuite.cpp
@@ -148,6 +149,7 @@ if(BUILD_TEST)
         tests/tests_data.cpp
         tests/tests_naive.cpp
         tests/tests_AVX2.cpp
+        tests/tests_AVX2_threaded.cpp
         tests/tests_MKL.cpp
         tests/tests_Eigen.cpp
     )
@@ -158,6 +160,7 @@ if(BUILD_TEST)
 
     if(AVX2_FLAGS)
         add_test(NAME TestAVX2 COMMAND test_all avx2)
+        add_test(NAME TestAVX2_TH COMMAND test_all avx2_th)
     endif()
 
     add_test(NAME TestEigen COMMAND test_all eigen)

@@ -191,21 +191,24 @@ int triangular_matrix(const Dataframe& df) {
     bool is_trig_up = true;
     bool is_trig_down = true;
 
-    // Triangular sup
-    for (size_t i = 0; i < n && is_trig_up; i++) {
-        for(size_t j = 0; j < i && is_trig_up; j++) {
+    // Triangular inf in row major
+    for (size_t j = 0; j < n && is_trig_down; j++) {
+        for(size_t i = 0; i < j && is_trig_down; i++) {
+            
+            if (df.at(j*n + i) != 0) is_trig_down = false;
+        }
+    }
+
+    // Triangular sup in row major
+    for (size_t j = 0; j < n && is_trig_up; j++) {
+        for(size_t i = j+1; i < n && is_trig_up; i++) {
             
             if (df.at(j*n + i) != 0) is_trig_up = false;
         }
     }
 
-    // Triangular inf 
-    for (size_t i = 0; i < n && is_trig_down; i++) {
-        for(size_t j = i+1; j < n && is_trig_down; j++) {
-            
-            if (df.at(j*n + i) != 0) is_trig_down = false;
-        }
-    }
+    // We detected in row major config
+    if (!df.get_storage()) std::swap(is_trig_up, is_trig_down);
 
     if (is_trig_up && (is_trig_up && is_trig_down)) return 3; // Diag
     else if (is_trig_up) return 2; // Up
@@ -214,11 +217,105 @@ int triangular_matrix(const Dataframe& df) {
     return 0; // Not triangular
 }
 
+#ifdef __AVX2__
+    int triangular_matrix_avx2(const Dataframe& df) {
+
+        size_t n = df.get_rows(); 
+        bool is_trig_up = true;
+        bool is_trig_down = true;
+
+        // AVX2 variables
+        size_t NB_DB = Linalg::AVX2::NB_DB;
+        size_t PREFETCH_DIST = Linalg::AVX2::PREFETCH_DIST;
+        __m256d zero_vec = _mm256_set1_pd(0.0);
+
+        // Triangular inf in row major
+        size_t j = 0;
+        size_t vec_sizej = n - (n % NB_DB);
+        for (; j < vec_sizej && is_trig_down; j+=NB_DB) {
+
+            size_t i = 0;
+            size_t vec_sizei = j - (j % NB_DB);
+            for(; i < vec_sizei && is_trig_down; i+=NB_DB) {
+
+                if (i + PREFETCH_DIST < vec_sizei) {
+                    _mm_prefetch((const char*)&df.at(j*n + i + PREFETCH_DIST), _MM_HINT_T0);
+                }
+                __m256d vec = _mm256_loadu_pd(&df.at(j*n + i));
+                __m256d cmp = _mm256_cmp_pd(vec, zero_vec, _CMP_EQ_OQ);
+                int mask = _mm256_movemask_pd(cmp);
+                
+                if (mask != 0xF) {
+                    is_trig_down = false;
+                }
+            }
+
+            // Scalar residual for i
+            for(; i < j && is_trig_down; i++) {
+                if (df.at(j*n + i) != 0) is_trig_down = false;
+            }
+        }
+
+        // Scalar residual for j
+        for (; j < n && is_trig_down; j++) {
+            for(size_t i = 0; i < j && is_trig_down; i++) {
+                
+                if (df.at(j*n + i) != 0) is_trig_down = false;
+            }
+        }
+
+        // Triangular sup in row major 
+        j = 0;
+        for (; j < vec_sizej && is_trig_up; j+=NB_DB) {
+
+            size_t i = j+1;
+            size_t vec_sizei = n - ((n - j - 1) % NB_DB);
+            for(; i < vec_sizei && is_trig_up; i+=NB_DB) {
+
+                if (i + PREFETCH_DIST < vec_sizei) {
+                    _mm_prefetch((const char*)&df.at(j*n + i + PREFETCH_DIST), _MM_HINT_T0);
+                }
+                __m256d vec = _mm256_loadu_pd(&df.at(j*n + i));
+                __m256d cmp = _mm256_cmp_pd(vec, zero_vec, _CMP_EQ_OQ);
+                int mask = _mm256_movemask_pd(cmp);
+                
+                if (mask != 0xF) {
+                    is_trig_up = false;
+                }
+            }
+
+            // Scalar residual for i
+            for(;i < n && is_trig_up; i++) {
+                if (df.at(j*n + i) != 0) is_trig_up = false;
+            }
+        }
+
+        // Scalar residual for j
+        for (; j < n && is_trig_up; j++) {
+            for(size_t i = j+1; i < n && is_trig_up; i++) {
+                
+                if (df.at(j*n + i) != 0) is_trig_up = false;
+            }
+        }
+
+        // We detected in row major config
+        if (!df.get_storage()) std::swap(is_trig_up, is_trig_down);
+
+        if (is_trig_up && (is_trig_up && is_trig_down)) return 3; // Diag
+        else if (is_trig_up) return 2; // Up
+        else if (is_trig_down) return 1; // Down
+
+        return 0; // Not triangular
+    }
+#endif
+
 std::tuple<double, std::vector<double>, std::vector<double>> determinant(Dataframe& df) {
     
+    std::string backend_str = get_backend();
+
     // Changing layout for better performances
     if (df.get_storage()){
-        df.change_layout_inplace(get_backend());
+        df.change_layout_inplace(backend_str);
     }
 
     size_t rows = df.get_rows(), cols = df.get_cols();
@@ -229,7 +326,15 @@ std::tuple<double, std::vector<double>, std::vector<double>> determinant(Datafra
     std::vector<double> LU;
 
     // Let's see if the matrix is diagonal or triangular 
-    int test_v = triangular_matrix(df);
+    int test_v;
+    if (backend_str == "Naive") test_v = triangular_matrix(df);
+    #ifdef __AVX2__
+        else if (backend_str == "AVX2") test_v = triangular_matrix_avx2(df);
+        else test_v = triangular_matrix_avx2(df);
+    #else
+        else test_v = triangular_matrix(df);
+    #endif
+
     if (test_v != 0) {
         
         double det = 1;
