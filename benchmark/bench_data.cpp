@@ -80,6 +80,7 @@ BENCHMARK(BM_TRANSPOSE_IN)
     ->Repetitions(10)
     ->ReportAggregatesOnly(true) 
     ->DisplayAggregatesOnly(true)*/
+    ->UseRealTime()
     ->Unit(benchmark::kMicrosecond);
 
 BENCHMARK(BM_TRANSPOSE)
@@ -88,4 +89,5 @@ BENCHMARK(BM_TRANSPOSE)
     ->Repetitions(10)
     ->ReportAggregatesOnly(true) 
     ->DisplayAggregatesOnly(true)*/
+    ->UseRealTime()
     ->Unit(benchmark::kMicrosecond);

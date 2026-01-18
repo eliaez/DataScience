@@ -16,7 +16,7 @@ if(MSVC)
         /wd5054)    # operator& between enums (Eigen) 
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 else()
-    add_compile_options(-Wall -Wextra -O2 -march=native) # -Wall -Wextra to get warnings, -03 for performance, -march=native for opti 
+    add_compile_options(-Wall -Wextra -O3 -march=native) # -Wall -Wextra to get warnings, -03 for performance, -march=native for opti 
 endif()
 
 
@@ -186,7 +186,7 @@ if(BUILD_BENCHMARK)
 
     add_executable(my_bench 
         benchmark/bench_data.cpp
-        #benchmark/bench_linalg.cpp
+        benchmark/bench_linalg.cpp
     )
     target_link_libraries(my_bench benchmark::benchmark_main linalg_full)    
 endif()

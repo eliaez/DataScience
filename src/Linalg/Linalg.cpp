@@ -208,7 +208,7 @@ int triangular_matrix(const Dataframe& df) {
     }
 
     // We detected in row major config
-    if (!df.get_storage()) std::swap(is_trig_up, is_trig_down);
+    if (df.get_storage()) std::swap(is_trig_up, is_trig_down);
 
     if (is_trig_up && (is_trig_up && is_trig_down)) return 3; // Diag
     else if (is_trig_up) return 2; // Up
@@ -299,7 +299,7 @@ int triangular_matrix(const Dataframe& df) {
         }
 
         // We detected in row major config
-        if (!df.get_storage()) std::swap(is_trig_up, is_trig_down);
+        if (df.get_storage()) std::swap(is_trig_up, is_trig_down);
 
         if (is_trig_up && (is_trig_up && is_trig_down)) return 3; // Diag
         else if (is_trig_up) return 2; // Up
