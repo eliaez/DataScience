@@ -14,7 +14,7 @@ static void BM_MULT(benchmark::State& state) {
     const int backend_int = state.range(1);
 
     // Map backend_int and set it
-    const std::string backend_names[] = {"Naive", "AVX2", "Eigen", "MKL"};
+    const std::string backend_names[] = {"Naive", "AVX2", "Eigen", "MKL", "AVX2_threaded"};
     const std::string backend = backend_names[backend_int];
     Operations::set_backend(backend);
 
@@ -38,7 +38,7 @@ static void BM_INV(benchmark::State& state) {
     const int backend_int = state.range(1);
 
     // Map backend_int and set it
-    const std::string backend_names[] = {"Naive", "AVX2", "Eigen", "MKL"};
+    const std::string backend_names[] = {"Naive", "AVX2", "Eigen", "MKL", "AVX2_threaded"};
     const std::string backend = backend_names[backend_int];
     Operations::set_backend(backend);
 
@@ -52,9 +52,9 @@ static void BM_INV(benchmark::State& state) {
     state.SetLabel(get_backend());
 }
 
-static void GenerateArgs(benchmark::internal::Benchmark* b, int backend_int) {
-    for (int size : {128, 256, 512, 1024}) {
-        b->Args({size, backend_int});
+static void GenerateArgs(benchmark::Benchmark* b, int backend_int) {
+    for (int size : {128, 256, 512, 1024, 2048}) {
+        if (backend_int != 0 && size != 2048) b->Args({size, backend_int});
     }
 }
 
@@ -64,14 +64,19 @@ BENCHMARK(BM_MULT)
         GenerateArgs(b, 0);  // Naive
 #ifdef __AVX2__
         GenerateArgs(b, 1);  // AVX2
+        GenerateArgs(b, 4);  // AVX2_threaded
 #endif
         GenerateArgs(b, 2);  // Eigen
 #ifdef USE_MKL
         GenerateArgs(b, 3);  // MKL
 #endif
     })
-    ->Unit(benchmark::kMillisecond)
-    ->MinTime(5.0);
+/*    ->MinTime(2.0) // Only for final bench
+    ->Repetitions(10)
+    ->ReportAggregatesOnly(true) 
+    ->DisplayAggregatesOnly(true)*/
+    ->UseRealTime()
+    ->Unit(benchmark::kMillisecond);
 
 // ------------------------ INV ------------------------
 BENCHMARK(BM_INV)
@@ -79,12 +84,17 @@ BENCHMARK(BM_INV)
         GenerateArgs(b, 0);  // Naive
 #ifdef __AVX2__
         GenerateArgs(b, 1);  // AVX2
+        GenerateArgs(b, 4);  // AVX2_threaded
 #endif
         GenerateArgs(b, 2);  // Eigen
 #ifdef USE_MKL
         GenerateArgs(b, 3);  // MKL
 #endif
     })
-    ->Unit(benchmark::kMillisecond)
-    ->MinTime(5.0);
+/*    ->MinTime(2.0) // Only for final bench
+    ->Repetitions(10)
+    ->ReportAggregatesOnly(true) 
+    ->DisplayAggregatesOnly(true)*/
+    ->UseRealTime()
+    ->Unit(benchmark::kMillisecond);
 

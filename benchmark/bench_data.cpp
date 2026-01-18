@@ -22,7 +22,7 @@ static void BM_TRANSPOSE_IN(benchmark::State& state) {
     const int backend_int = state.range(1);
 
     // Map backend_int
-    const std::string backend_names[] = {"Naive", "AVX2", "Eigen", "MKL"};
+    const std::string backend_names[] = {"Naive", "AVX2", "Eigen", "MKL", "AVX2_threaded"};
     const std::string backend = backend_names[backend_int];
 
     Dataframe A = {N, N, false, gen_matrix(N,N)};
@@ -41,7 +41,7 @@ static void BM_TRANSPOSE(benchmark::State& state) {
     const int backend_int = state.range(1);
 
     // Map backend_int
-    const std::string backend_names[] = {"Naive", "AVX2", "Eigen", "MKL"};
+    const std::string backend_names[] = {"Naive", "AVX2", "Eigen", "MKL", "AVX2_threaded"};
     const std::string backend = backend_names[backend_int];
 
     Dataframe A = {N, N, false, gen_matrix(N,N)};
@@ -55,12 +55,12 @@ static void BM_TRANSPOSE(benchmark::State& state) {
     state.SetLabel(backend);
 }
 
-static void GenerateArgs(benchmark::internal::Benchmark* b) {
+static void GenerateArgs(benchmark::Benchmark* b) {
     
     #if defined(__AVX2__) && defined(USE_MKL)
-        std::vector<int> backend_opt = {0, 1, 2, 3};    // Naive, AVX2, Eigen, MKL 
+        std::vector<int> backend_opt = {0, 1, 2, 3, 4};    // Naive, AVX2, Eigen, MKL, AVX2_threaded
     #elif defined(__AVX2__)
-        std::vector<int> backend_opt = {0, 1, 2};       // Naive, AVX2, Eigen
+        std::vector<int> backend_opt = {0, 1, 2, 4};       // {0, 1, 2, 4} Naive, AVX2, Eigen, AVX2_threaded
     #elif defined(USE_MKL)
         std::vector<int> backend_opt = {0, 2, 3};       // Naive, Eigen, MKL 
     #else
@@ -68,11 +68,26 @@ static void GenerateArgs(benchmark::internal::Benchmark* b) {
     #endif
 
     for (int backend : backend_opt) {
-        for (int size : {128, 256, 512, 1024}) {
+        for (int size : {128, 256, 512, 1024, 2048}) { 
             b->Args({size, backend});
         }
     }
 }
 
-BENCHMARK(BM_TRANSPOSE_IN)->Apply(GenerateArgs)->Unit(benchmark::kMicrosecond);
-BENCHMARK(BM_TRANSPOSE)->Apply(GenerateArgs)->Unit(benchmark::kMicrosecond);
+BENCHMARK(BM_TRANSPOSE_IN)
+    ->Apply(GenerateArgs)
+/*    ->MinTime(2.0) // Only for final bench
+    ->Repetitions(10)
+    ->ReportAggregatesOnly(true) 
+    ->DisplayAggregatesOnly(true)*/
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);
+
+BENCHMARK(BM_TRANSPOSE)
+    ->Apply(GenerateArgs)
+/*    ->MinTime(2.0) // Only for final bench
+    ->Repetitions(10)
+    ->ReportAggregatesOnly(true) 
+    ->DisplayAggregatesOnly(true)*/
+    ->UseRealTime()
+    ->Unit(benchmark::kMicrosecond);

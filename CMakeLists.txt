@@ -29,6 +29,13 @@ if(NOT OpenMP_FOUND)
 endif()
 
 
+# THREAD
+# ============================================
+find_package(Threads REQUIRED)
+if(NOT Threads_FOUND)
+    message(FATAL_ERROR "Threads not found")
+endif()
+
 # AVX2
 # ============================================
 include(CheckCXXCompilerFlag)
@@ -106,9 +113,11 @@ set(LIB_SOURCES
     src/Linalg/Linalg.cpp
     src/Linalg/LinalgNaive.cpp
     src/Linalg/LinalgAVX2.cpp
+    src/Linalg/LinalgAVX2_threaded.cpp
     src/Linalg/LinalgEigen.cpp
     src/Linalg/LinalgMKL.cpp
     src/Utils/TestSuite.cpp
+    src/Utils/ThreadPool.cpp
 )
 
 
@@ -118,6 +127,11 @@ add_library(linalg_full STATIC ${LIB_SOURCES})
 
 target_compile_options(linalg_full PUBLIC ${AVX2_FLAGS})
 target_link_libraries(linalg_full PUBLIC Eigen3::Eigen OpenMP::OpenMP_CXX)
+
+# Link Thread (MSVC do it automatically)
+if(MINGW)
+    target_link_libraries(linalg_full PUBLIC Threads::Threads)
+endif()
 
 # Link MKL + TBB
 if(USE_MKL)
@@ -135,22 +149,24 @@ if(BUILD_TEST)
         tests/tests_data.cpp
         tests/tests_naive.cpp
         tests/tests_AVX2.cpp
+        tests/tests_AVX2_threaded.cpp
         tests/tests_MKL.cpp
         tests/tests_Eigen.cpp
     )
     
     target_link_libraries(test_all linalg_full)
-    add_test(NAME TestData   COMMAND test_all data)
-    add_test(NAME TestNaive  COMMAND test_all naive)
+    add_test(NAME TestData COMMAND test_all data)
+    add_test(NAME TestNaive COMMAND test_all naive)
 
     if(AVX2_FLAGS)
-        add_test(NAME TestAVX2   COMMAND test_all avx2)
+        add_test(NAME TestAVX2 COMMAND test_all avx2)
+        add_test(NAME TestAVX2_TH COMMAND test_all avx2_th)
     endif()
 
-    add_test(NAME TestEigen  COMMAND test_all eigen)
+    add_test(NAME TestEigen COMMAND test_all eigen)
 
     if(USE_MKL)
-        add_test(NAME TestMKL    COMMAND test_all mkl)
+        add_test(NAME TestMKL COMMAND test_all mkl)
     endif()
 endif()
 

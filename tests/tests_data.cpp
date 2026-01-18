@@ -11,6 +11,14 @@ void changelayout(Dataframe df1, const std::vector<double>& res, const std::stri
     ASSERT_EQ(df1_t.get_data(), res)
 }
 
+// Testing data after change_layout_inplace
+void changelayout_inplace(Dataframe df1, const std::vector<double>& res, const std::string& backend) {
+    
+    df1.change_layout_inplace(backend);
+
+    ASSERT_EQ(df1.get_data(), res)
+}
+
 // Testing the transfer of a column from a Df to another new one
 void transfercol_t(Dataframe& iris, const string& col,
     const Dataframe& iris_x, const std::vector<double>& iris_y) {
@@ -59,6 +67,16 @@ void tests_data() {
             bind(changelayout, mat, mat_t.get_data(), "AVX2"), 
             "Change layout AVX2 v2"
         );
+
+        tests_data.add_test(
+            bind(changelayout, iris, iris_t.get_data(), "AVX2_threaded"), 
+            "Change layout AVX2_Threaded v1"
+        );
+
+        tests_data.add_test(
+            bind(changelayout, mat, mat_t.get_data(), "AVX2_threaded"), 
+            "Change layout AVX2_Threaded v2"
+        );
     #endif
 
     tests_data.add_test(
@@ -82,6 +100,69 @@ void tests_data() {
             "Change layout MKL v2"
         );
     #endif
+
+    tests_data.add_test(
+        bind(changelayout_inplace, iris, iris_t.get_data(), "Naive"), 
+        "Change layout inplace Naive"
+    );
+
+    #ifdef __AVX2__
+        iris = CsvHandler::loadCsv("../tests/datasets/iris.csv");
+        
+        tests_data.add_test(
+            bind(changelayout_inplace, iris, iris_t.get_data(), "AVX2"), 
+            "Change layout inplace AVX2 v1"
+        );
+
+        tests_data.add_test(
+            bind(changelayout_inplace, mat, mat_t.get_data(), "AVX2"), 
+            "Change layout inplace AVX2 v2"
+        );
+
+        iris = CsvHandler::loadCsv("../tests/datasets/iris.csv");
+        mat = CsvHandler::loadCsv("../tests/datasets/mat.csv", ',', false);
+
+        tests_data.add_test(
+            bind(changelayout_inplace, iris, iris_t.get_data(), "AVX2_threaded"), 
+            "Change layout inplace AVX2_Threaded v1"
+        );
+
+        tests_data.add_test(
+            bind(changelayout_inplace, mat, mat_t.get_data(), "AVX2_threaded"), 
+            "Change layout inplace AVX2_Threaded v2"
+        );
+    #endif
+
+    iris = CsvHandler::loadCsv("../tests/datasets/iris.csv");
+    mat = CsvHandler::loadCsv("../tests/datasets/mat.csv", ',', false);
+
+    tests_data.add_test(
+        bind(changelayout_inplace, iris, iris_t.get_data(), "Eigen"), 
+        "Change layout inplace Eigen v1"
+    );
+
+    tests_data.add_test(
+        bind(changelayout_inplace, mat, mat_t.get_data(), "Eigen"), 
+        "Change layout inplace Eigen v2"
+    );
+
+    #ifdef USE_MKL
+
+        iris = CsvHandler::loadCsv("../tests/datasets/iris.csv");
+        mat = CsvHandler::loadCsv("../tests/datasets/mat.csv", ',', false);
+
+        tests_data.add_test(
+            bind(changelayout_inplace, iris, iris_t.get_data(), "MKL"), 
+            "Change layout inplace MKL v1"
+        );
+
+        tests_data.add_test(
+            bind(changelayout_inplace, mat, mat_t.get_data(), "MKL"), 
+            "Change layout inplace MKL v2"
+        );
+    #endif
+
+    iris = CsvHandler::loadCsv("../tests/datasets/iris.csv");
 
     tests_data.add_test(
         bind(transfercol_t, iris, "target", iris_x, iris_y.get_data()), 

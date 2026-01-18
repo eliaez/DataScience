@@ -1,17 +1,14 @@
 #include "Linalg/Linalg.hpp"
 
-/*
-        case Linalg::Backend::AVX2_THREADED: return Linalg::AVX2_threaded::func(__VA_ARGS__); \
-*/
-
 #if defined(__AVX2__) && defined(USE_MKL)
     #define DISPATCH_BACKEND(func, ...) \
         switch(current_backend) { \
             case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
             case Linalg::Backend::AVX2: return Linalg::AVX2::func(__VA_ARGS__); \
+            case Linalg::Backend::AVX2_THREADED: return Linalg::AVX2_threaded::func(__VA_ARGS__); \
             case Linalg::Backend::EIGEN: return Linalg::EigenNP::func(__VA_ARGS__); \
             case Linalg::Backend::MKL: return Linalg::MKL::func(__VA_ARGS__); \
-            default: return Linalg::AVX2::func(__VA_ARGS__); \
+            default: return Linalg::AVX2_threaded::func(__VA_ARGS__); \
         }
 
     #define DISPATCH_BACKEND2(func, ...) \
@@ -24,8 +21,12 @@
                 std::tie(nb_swaps, swaps, LU) = Linalg::AVX2::func(__VA_ARGS__); \
                 break; \
             } \
+            case Linalg::Backend::AVX2_THREADED: { \
+                std::tie(nb_swaps, swaps, LU) = Linalg::AVX2_threaded::func(__VA_ARGS__); \
+                break; \
+            } \
             default: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::AVX2::func(__VA_ARGS__); \
+                std::tie(nb_swaps, swaps, LU) = Linalg::AVX2_threaded::func(__VA_ARGS__); \
                 break; \
             } \
         } 
@@ -34,8 +35,9 @@
         switch(current_backend) { \
             case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
             case Linalg::Backend::AVX2: return Linalg::AVX2::func(__VA_ARGS__); \
+            case Linalg::Backend::AVX2_THREADED: return Linalg::AVX2_threaded::func(__VA_ARGS__); \
             case Linalg::Backend::EIGEN: return Linalg::EigenNP::func(__VA_ARGS__); \
-            default: return Linalg::AVX2::func(__VA_ARGS__); \
+            default: return Linalg::AVX2_threaded::func(__VA_ARGS__); \
         }
 
     #define DISPATCH_BACKEND2(func, ...) \
@@ -48,8 +50,12 @@
                 std::tie(nb_swaps, swaps, LU) = Linalg::AVX2::func(__VA_ARGS__); \
                 break; \
             } \
+            case Linalg::Backend::AVX2_THREADED: { \
+                std::tie(nb_swaps, swaps, LU) = Linalg::AVX2_threaded::func(__VA_ARGS__); \
+                break; \
+            } \
             default: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::AVX2::func(__VA_ARGS__); \
+                std::tie(nb_swaps, swaps, LU) = Linalg::AVX2_threaded::func(__VA_ARGS__); \
                 break; \
             } \
         } 
@@ -109,13 +115,13 @@ void Operations::set_backend(const std::string& b) {
     
     #if defined(__AVX2__) && defined(USE_MKL)
         else if (b == "AVX2") current_backend = Backend::AVX2;
-        //else if (b == "AVX2_threaded") current_backend = Backend::AVX2_THREADED;
+        else if (b == "AVX2_threaded") current_backend = Backend::AVX2_THREADED;
         else if (b == "MKL") current_backend = Backend::MKL;
-        else current_backend = Backend::AVX2;
+        else current_backend = Backend::AVX2_THREADED;
     #elif defined(__AVX2__)
         else if (b == "AVX2") current_backend = Backend::AVX2;
-        //else if (b == "AVX2_threaded") current_backend = Backend::AVX2_THREADED;
-        else current_backend = Backend::AVX2;
+        else if (b == "AVX2_threaded") current_backend = Backend::AVX2_THREADED;
+        else current_backend = Backend::AVX2_THREADED;
     #elif defined(USE_MKL)
         else if (b == "MKL") current_backend = Backend::MKL;
         else current_backend = Backend::NAIVE;
@@ -131,12 +137,10 @@ Backend Operations::get_backend() {
 
         // AVX2 for now
         #if defined(__AVX2__)
-            return Backend::AVX2;
+            return Backend::AVX2_THREADED;
         #else
             return Backend::NAIVE;
         #endif
-
-        // return Backend::AVX2_THREADED;
     } 
     return current_backend;
 }
@@ -174,7 +178,7 @@ std::string get_backend() {
     case Backend::EIGEN: return "Eigen"; 
 
     #ifdef __AVX2__
-        default: return "AVX2";
+        default: return "AVX2_threaded";
     #else 
         default: return "Naive";
     #endif
@@ -187,21 +191,24 @@ int triangular_matrix(const Dataframe& df) {
     bool is_trig_up = true;
     bool is_trig_down = true;
 
-    // Triangular sup
-    for (size_t i = 0; i < n && is_trig_up; i++) {
-        for(size_t j = 0; j < i && is_trig_up; j++) {
+    // Triangular inf in row major
+    for (size_t j = 0; j < n && is_trig_down; j++) {
+        for(size_t i = 0; i < j && is_trig_down; i++) {
+            
+            if (df.at(j*n + i) != 0) is_trig_down = false;
+        }
+    }
+
+    // Triangular sup in row major
+    for (size_t j = 0; j < n && is_trig_up; j++) {
+        for(size_t i = j+1; i < n && is_trig_up; i++) {
             
             if (df.at(j*n + i) != 0) is_trig_up = false;
         }
     }
 
-    // Triangular inf 
-    for (size_t i = 0; i < n && is_trig_down; i++) {
-        for(size_t j = i+1; j < n && is_trig_down; j++) {
-            
-            if (df.at(j*n + i) != 0) is_trig_down = false;
-        }
-    }
+    // We detected in row major config
+    if (df.get_storage()) std::swap(is_trig_up, is_trig_down);
 
     if (is_trig_up && (is_trig_up && is_trig_down)) return 3; // Diag
     else if (is_trig_up) return 2; // Up
@@ -210,11 +217,105 @@ int triangular_matrix(const Dataframe& df) {
     return 0; // Not triangular
 }
 
+#ifdef __AVX2__
+    int triangular_matrix_avx2(const Dataframe& df) {
+
+        size_t n = df.get_rows(); 
+        bool is_trig_up = true;
+        bool is_trig_down = true;
+
+        // AVX2 variables
+        size_t NB_DB = Linalg::AVX2::NB_DB;
+        size_t PREFETCH_DIST = Linalg::AVX2::PREFETCH_DIST;
+        __m256d zero_vec = _mm256_set1_pd(0.0);
+
+        // Triangular inf in row major
+        size_t j = 0;
+        size_t vec_sizej = n - (n % NB_DB);
+        for (; j < vec_sizej && is_trig_down; j+=NB_DB) {
+
+            size_t i = 0;
+            size_t vec_sizei = j - (j % NB_DB);
+            for(; i < vec_sizei && is_trig_down; i+=NB_DB) {
+
+                if (i + PREFETCH_DIST < vec_sizei) {
+                    _mm_prefetch((const char*)&df.at(j*n + i + PREFETCH_DIST), _MM_HINT_T0);
+                }
+                __m256d vec = _mm256_loadu_pd(&df.at(j*n + i));
+                __m256d cmp = _mm256_cmp_pd(vec, zero_vec, _CMP_EQ_OQ);
+                int mask = _mm256_movemask_pd(cmp);
+                
+                if (mask != 0xF) {
+                    is_trig_down = false;
+                }
+            }
+
+            // Scalar residual for i
+            for(; i < j && is_trig_down; i++) {
+                if (df.at(j*n + i) != 0) is_trig_down = false;
+            }
+        }
+
+        // Scalar residual for j
+        for (; j < n && is_trig_down; j++) {
+            for(size_t i = 0; i < j && is_trig_down; i++) {
+                
+                if (df.at(j*n + i) != 0) is_trig_down = false;
+            }
+        }
+
+        // Triangular sup in row major 
+        j = 0;
+        for (; j < vec_sizej && is_trig_up; j+=NB_DB) {
+
+            size_t i = j+1;
+            size_t vec_sizei = n - ((n - j - 1) % NB_DB);
+            for(; i < vec_sizei && is_trig_up; i+=NB_DB) {
+
+                if (i + PREFETCH_DIST < vec_sizei) {
+                    _mm_prefetch((const char*)&df.at(j*n + i + PREFETCH_DIST), _MM_HINT_T0);
+                }
+                __m256d vec = _mm256_loadu_pd(&df.at(j*n + i));
+                __m256d cmp = _mm256_cmp_pd(vec, zero_vec, _CMP_EQ_OQ);
+                int mask = _mm256_movemask_pd(cmp);
+                
+                if (mask != 0xF) {
+                    is_trig_up = false;
+                }
+            }
+
+            // Scalar residual for i
+            for(;i < n && is_trig_up; i++) {
+                if (df.at(j*n + i) != 0) is_trig_up = false;
+            }
+        }
+
+        // Scalar residual for j
+        for (; j < n && is_trig_up; j++) {
+            for(size_t i = j+1; i < n && is_trig_up; i++) {
+                
+                if (df.at(j*n + i) != 0) is_trig_up = false;
+            }
+        }
+
+        // We detected in row major config
+        if (df.get_storage()) std::swap(is_trig_up, is_trig_down);
+
+        if (is_trig_up && (is_trig_up && is_trig_down)) return 3; // Diag
+        else if (is_trig_up) return 2; // Up
+        else if (is_trig_down) return 1; // Down
+
+        return 0; // Not triangular
+    }
+#endif
+
 std::tuple<double, std::vector<double>, std::vector<double>> determinant(Dataframe& df) {
     
+    std::string backend_str = get_backend();
+
     // Changing layout for better performances
     if (df.get_storage()){
-        df.change_layout_inplace(get_backend());
+        df.change_layout_inplace(backend_str);
     }
 
     size_t rows = df.get_rows(), cols = df.get_cols();
@@ -225,7 +326,15 @@ std::tuple<double, std::vector<double>, std::vector<double>> determinant(Datafra
     std::vector<double> LU;
 
     // Let's see if the matrix is diagonal or triangular 
-    int test_v = triangular_matrix(df);
+    int test_v;
+    if (backend_str == "Naive") test_v = triangular_matrix(df);
+    #ifdef __AVX2__
+        else if (backend_str == "AVX2") test_v = triangular_matrix_avx2(df);
+        else test_v = triangular_matrix_avx2(df);
+    #else
+        else test_v = triangular_matrix(df);
+    #endif
+
     if (test_v != 0) {
         
         double det = 1;

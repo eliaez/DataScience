@@ -1,5 +1,6 @@
 #include "Data/Data.hpp"
 #include "Linalg/Linalg.hpp"
+#include "Utils/ThreadPool.hpp"
 #include <iomanip>
 #include <system_error>
 
@@ -159,11 +160,13 @@ Dataframe Dataframe::change_layout(const std::string& choice) const {
 
     #if defined(__AVX2__) && defined(USE_MKL)
         else if (choice == "AVX2") new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+        else if (choice == "AVX2_threaded") new_data = transpose_avx2_th(temp_i, temp_j, data);
         else if (choice == "MKL") new_data = transpose_mkl(temp_i, temp_j, data);
-        else new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+        else new_data = transpose_avx2_th(temp_i, temp_j, data);
     #elif defined(__AVX2__)
         else if (choice == "AVX2") new_data = transpose_blocks_avx2(temp_i, temp_j, data);
-        else new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+        else if (choice == "AVX2_threaded") new_data = transpose_avx2_th(temp_i, temp_j, data);
+        else new_data = transpose_avx2_th(temp_i, temp_j, data);
     #elif defined(USE_MKL)
         else if (choice == "MKL") new_data = transpose_mkl(temp_i, temp_j, data);
         else new_data = transpose_naive(temp_i, temp_j, data);
@@ -189,11 +192,13 @@ void Dataframe::change_layout_inplace(const std::string& choice) {
 
         #if defined(__AVX2__) && defined(USE_MKL)
             else if (choice == "AVX2") transpose_avx2_inplace(temp_i, data);
+            else if (choice == "AVX2_threaded") transpose_avx2_th_inplace(temp_i, data);
             else if (choice == "MKL") transpose_mkl_inplace(temp_i, data);
-            else transpose_avx2_inplace(temp_i, data);
+            else transpose_avx2_th_inplace(temp_i, data);
         #elif defined(__AVX2__)
             else if (choice == "AVX2") transpose_avx2_inplace(temp_i, data);
-            else transpose_avx2_inplace(temp_i, data);
+            else if (choice == "AVX2_threaded") transpose_avx2_th_inplace(temp_i, data);
+            else transpose_avx2_th_inplace(temp_i, data);
         #elif defined(USE_MKL)
             else if (choice == "MKL") transpose_mkl_inplace(temp_i, data);
             else transpose_naive_inplace(temp_i, data);
@@ -207,11 +212,13 @@ void Dataframe::change_layout_inplace(const std::string& choice) {
         
         #if defined(__AVX2__) && defined(USE_MKL)
             else if (choice == "AVX2") new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+            else if (choice == "AVX2_threaded") new_data = transpose_avx2_th(temp_i, temp_j, data);
             else if (choice == "MKL") new_data = transpose_mkl(temp_i, temp_j, data);
-            else new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+            else new_data = transpose_avx2_th(temp_i, temp_j, data);
         #elif defined(__AVX2__)
             else if (choice == "AVX2") new_data = transpose_blocks_avx2(temp_i, temp_j, data);
-            else new_data = transpose_blocks_avx2(temp_i, temp_j, data);
+            else if (choice == "AVX2_threaded") new_data = transpose_avx2_th(temp_i, temp_j, data);
+            else new_data = transpose_avx2_th(temp_i, temp_j, data);
         #elif defined(USE_MKL)
             else if (choice == "MKL") new_data = transpose_mkl(temp_i, temp_j, data);
             else new_data = transpose_naive(temp_i, temp_j, data);
@@ -445,6 +452,213 @@ void Dataframe::transpose_avx2_inplace(size_t n, std::vector<double>& df) {
     for (size_t i = vec_size; i < n; i++) {
         for (size_t j = i+1; j < n; j++) {
             std::swap(df[i*n + j], df[j*n + i]);
+        }
+    }
+}
+
+std::vector<double> Dataframe::transpose_avx2_th(size_t rows_, size_t cols_, 
+    const std::vector<double>& df) {
+
+    // After multiple tests a minimum was decided
+    constexpr size_t THREADING_THRESHOLD = 512;
+    if (rows_ < THREADING_THRESHOLD) {
+        return transpose_blocks_avx2(rows_, cols_, df);
+    }
+    
+    // Variables
+    std::vector<double> new_data(rows_*cols_);
+    size_t vec_sizei = rows_ - (rows_ % NB_DB);
+    size_t vec_sizej = cols_ - (cols_ % NB_DB);
+    
+    // ThreadPool Variables
+    ThreadPool& pool = ThreadPool::instance();
+    size_t nb_threads = pool.nb_threads;
+
+    std::vector<std::future<void>> futures;
+    futures.reserve(nb_threads);
+
+    size_t chunk = (int)(vec_sizei / nb_threads);
+    size_t start_i = 0, end_i = chunk;
+    
+    for (size_t n = 0; n < nb_threads; n++) {
+        if (n+1 == nb_threads) end_i = vec_sizei;
+
+        auto fut = pool.enqueue([start_i, end_i, rows_, cols_, vec_sizej, &df, &new_data] {
+            for (size_t i = start_i; i < end_i; i += NB_DB) {
+                for (size_t j = 0; j < vec_sizej; j += NB_DB) {
+
+                    if (j + PREFETCH_DIST1 < vec_sizej) {
+                        _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+0) * rows_ + i], _MM_HINT_T0);
+                        _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+1) * rows_ + i], _MM_HINT_T0);
+                        _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+2) * rows_ + i], _MM_HINT_T0);
+                        _mm_prefetch((const char*)&df[(j+PREFETCH_DIST1+3) * rows_ + i], _MM_HINT_T0);
+                    }
+                    
+                    // Load 4 cols
+                    __m256d col0 = _mm256_loadu_pd(&df[(j+0)*rows_ + i]);
+                    __m256d col1 = _mm256_loadu_pd(&df[(j+1)*rows_ + i]);
+                    __m256d col2 = _mm256_loadu_pd(&df[(j+2)*rows_ + i]);
+                    __m256d col3 = _mm256_loadu_pd(&df[(j+3)*rows_ + i]);
+                    
+                    // Get pair elements of each
+                    __m256d t0 = _mm256_unpacklo_pd(col0, col1);
+
+                    // Get odd elements of each 
+                    __m256d t1 = _mm256_unpackhi_pd(col0, col1);
+
+                    __m256d t2 = _mm256_unpacklo_pd(col2, col3);
+                    __m256d t3 = _mm256_unpackhi_pd(col2, col3);
+                    
+                    // Get two first elements of each 
+                    __m256d row0 = _mm256_permute2f128_pd(t0, t2, 0x20);
+                    __m256d row1 = _mm256_permute2f128_pd(t1, t3, 0x20);
+
+                    // Get two last elements of each
+                    __m256d row2 = _mm256_permute2f128_pd(t0, t2, 0x31);
+                    __m256d row3 = _mm256_permute2f128_pd(t1, t3, 0x31);
+                    
+                    _mm256_storeu_pd(&new_data[(i+0)*cols_ + j], row0);
+                    _mm256_storeu_pd(&new_data[(i+1)*cols_ + j], row1);
+                    _mm256_storeu_pd(&new_data[(i+2)*cols_ + j], row2);
+                    _mm256_storeu_pd(&new_data[(i+3)*cols_ + j], row3);
+                }
+
+                // Scalar residual
+                for(size_t j = vec_sizej; j < cols_; j++) {
+                    new_data[(i+0)*cols_ + j] = df[j*rows_ + (i+0)];
+                    new_data[(i+1)*cols_ + j] = df[j*rows_ + (i+1)];
+                    new_data[(i+2)*cols_ + j] = df[j*rows_ + (i+2)];
+                    new_data[(i+3)*cols_ + j] = df[j*rows_ + (i+3)];
+                }
+            }
+        });
+
+        futures.push_back(std::move(fut));
+        start_i += chunk;
+        end_i += chunk;
+    }
+
+    for (auto& fut : futures) {
+        fut.wait();
+    }
+
+    // Scalar residual 
+    for (size_t i = vec_sizei; i < rows_; i++) {
+        for(size_t j = 0; j < cols_; j++) {
+            new_data[i*cols_ + j] = df[j*rows_ + i];
+        }
+    }   
+
+    return new_data;
+}
+
+void Dataframe::transpose_avx2_th_inplace(size_t n, std::vector<double>& df) {
+    
+    // After multiple tests a minimum was decided
+    constexpr size_t THREADING_THRESHOLD = 512;
+    if (n < THREADING_THRESHOLD) {
+        return transpose_avx2_inplace(n, df);
+    }
+
+    size_t vec_size = n - (n % NB_DB);
+
+    // ThreadPool Variables
+    ThreadPool& pool = ThreadPool::instance();
+    size_t nb_blocks = vec_size / NB_DB;
+
+    std::vector<std::future<void>> futures;
+    futures.reserve(nb_blocks);
+
+    // By diagonals only, to avoid collision
+    for (size_t diag = 0; diag < nb_blocks; diag++) {
+        auto fut = pool.enqueue([n, diag, &df] {
+            
+            // Blocks on this diagonal are independant
+            for (size_t k = 0; k <= diag; k++) {
+                size_t i = k * NB_DB;
+                size_t j = (diag - k) * NB_DB;
+                
+                if (i == j) { // Diagonal Block
+                    __m256d col0 = _mm256_loadu_pd(&df[(i+0)*n + i]);
+                    __m256d col1 = _mm256_loadu_pd(&df[(i+1)*n + i]);
+                    __m256d col2 = _mm256_loadu_pd(&df[(i+2)*n + i]);
+                    __m256d col3 = _mm256_loadu_pd(&df[(i+3)*n + i]);
+
+                    __m256d t0 = _mm256_unpacklo_pd(col0, col1);
+                    __m256d t1 = _mm256_unpackhi_pd(col0, col1);
+                    __m256d t2 = _mm256_unpacklo_pd(col2, col3);
+                    __m256d t3 = _mm256_unpackhi_pd(col2, col3);
+
+                    __m256d row0 = _mm256_permute2f128_pd(t0, t2, 0x20);
+                    __m256d row1 = _mm256_permute2f128_pd(t1, t3, 0x20);
+                    __m256d row2 = _mm256_permute2f128_pd(t0, t2, 0x31);
+                    __m256d row3 = _mm256_permute2f128_pd(t1, t3, 0x31);
+
+                    _mm256_storeu_pd(&df[(i+0)*n + i], row0);
+                    _mm256_storeu_pd(&df[(i+1)*n + i], row1);
+                    _mm256_storeu_pd(&df[(i+2)*n + i], row2);
+                    _mm256_storeu_pd(&df[(i+3)*n + i], row3);
+                    
+                } else if (i < j) { // Off-diagonal blocks
+                    __m256d a0 = _mm256_loadu_pd(&df[(i+0)*n + j]);
+                    __m256d a1 = _mm256_loadu_pd(&df[(i+1)*n + j]);
+                    __m256d a2 = _mm256_loadu_pd(&df[(i+2)*n + j]);
+                    __m256d a3 = _mm256_loadu_pd(&df[(i+3)*n + j]);
+
+                    __m256d b0 = _mm256_loadu_pd(&df[(j+0)*n + i]);
+                    __m256d b1 = _mm256_loadu_pd(&df[(j+1)*n + i]);
+                    __m256d b2 = _mm256_loadu_pd(&df[(j+2)*n + i]);
+                    __m256d b3 = _mm256_loadu_pd(&df[(j+3)*n + i]);
+
+                    // Transpose A
+                    __m256d t0 = _mm256_unpacklo_pd(a0, a1);
+                    __m256d t1 = _mm256_unpackhi_pd(a0, a1);
+                    __m256d t2 = _mm256_unpacklo_pd(a2, a3);
+                    __m256d t3 = _mm256_unpackhi_pd(a2, a3);
+                    __m256d a_t0 = _mm256_permute2f128_pd(t0, t2, 0x20);
+                    __m256d a_t1 = _mm256_permute2f128_pd(t1, t3, 0x20);
+                    __m256d a_t2 = _mm256_permute2f128_pd(t0, t2, 0x31);
+                    __m256d a_t3 = _mm256_permute2f128_pd(t1, t3, 0x31);
+
+                    // Transpose B
+                    t0 = _mm256_unpacklo_pd(b0, b1);
+                    t1 = _mm256_unpackhi_pd(b0, b1);
+                    t2 = _mm256_unpacklo_pd(b2, b3);
+                    t3 = _mm256_unpackhi_pd(b2, b3);
+                    __m256d b_t0 = _mm256_permute2f128_pd(t0, t2, 0x20);
+                    __m256d b_t1 = _mm256_permute2f128_pd(t1, t3, 0x20);
+                    __m256d b_t2 = _mm256_permute2f128_pd(t0, t2, 0x31);
+                    __m256d b_t3 = _mm256_permute2f128_pd(t1, t3, 0x31);
+
+                    // Swap - B^T, A^T
+                    _mm256_storeu_pd(&df[(i+0)*n + j], b_t0);
+                    _mm256_storeu_pd(&df[(i+1)*n + j], b_t1);
+                    _mm256_storeu_pd(&df[(i+2)*n + j], b_t2);
+                    _mm256_storeu_pd(&df[(i+3)*n + j], b_t3);
+
+                    _mm256_storeu_pd(&df[(j+0)*n + i], a_t0);
+                    _mm256_storeu_pd(&df[(j+1)*n + i], a_t1);
+                    _mm256_storeu_pd(&df[(j+2)*n + i], a_t2);
+                    _mm256_storeu_pd(&df[(j+3)*n + i], a_t3);
+                }
+            }
+        });
+        futures.push_back(std::move(fut));
+    }
+
+    for (auto& f : futures) f.wait();
+
+    // Scalar résidual for i
+    for (size_t i = vec_size; i < n; i++) {
+        for (size_t j = i+1; j < n; j++) {
+            std::swap(df[i*n + j], df[j*n + i]);
+        }
+    }
+    
+    // Scalar résidual for j
+    for (size_t i = 0; i < vec_size; i++) {
+        for (size_t j = vec_size; j < n; j++) {
+            if (i < j) std::swap(df[i*n + j], df[j*n + i]);
         }
     }
 }

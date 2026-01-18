@@ -80,6 +80,12 @@ class Dataframe
         
         // Tranpose AVX2 by blocks inplace only for square matrix (see LinalgAVX2.hpp for NB_DB)
         static void transpose_avx2_inplace(size_t n, std::vector<double>& df);
+
+        // Tranpose AVX2_Threaded by blocks (see LinalgAVX2.hpp for NB_DB)
+        static std::vector<double> transpose_avx2_th(size_t rows_, size_t cols_, const std::vector<double>& df);
+        
+        // Tranpose AVX2_Threaded by blocks inplace only for square matrix (see LinalgAVX2.hpp for NB_DB)
+        static void transpose_avx2_th_inplace(size_t n, std::vector<double>& df);
         #endif
 
         #ifdef USE_MKL
