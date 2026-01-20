@@ -60,7 +60,7 @@ class Dataframe
         Dataframe change_layout(const std::string& choice = "AVX2") const;
 
         // Change from row - major to col - major inplace, choose between Naive, AVX2...
-        void change_layout_inplace(const std::string& choice = "AVX2");
+        void change_layout_inplace(const std::string& choice = "AVX2_threaded");
 
         // Tranpose Naive
         static std::vector<double> transpose_naive(size_t rows_, size_t cols_, const std::vector<double>& df);
@@ -141,13 +141,9 @@ class CsvHandler {
     
     public:
         // Returns a column-major Dataframe from Csv path
-        #ifdef __AVX2__
-            static Dataframe loadCsv(const std::string& filepath, 
-                char sep = ',', bool is_header = true, const std::string& method = "AVX2");
-        #else 
-            static Dataframe loadCsv(const std::string& filepath, 
-                char sep = ',', bool is_header = true, const std::string& method = "Naive");
-        #endif
+        static Dataframe loadCsv(const std::string& filepath, 
+            char sep = ',', bool is_header = true, const std::string& method = "AVX2_threaded");
+
 
     private:
         // Function to encode potential columns using string for categories

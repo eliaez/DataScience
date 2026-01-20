@@ -1,4 +1,4 @@
-# II - Linear Algebra Benchmark
+# III - Linear Algebra Benchmark
 Comparison between backends using Google Benchmark across 4 operations
 
 **Test Environment:**
