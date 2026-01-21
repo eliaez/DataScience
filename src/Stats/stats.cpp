@@ -1,0 +1,150 @@
+#include "Stats/stats.hpp"
+#include <stdexcept>
+
+namespace Stats {
+
+#ifdef __AVX2__
+    double horizontal_red(__m256d& vec) {
+        // hadd1 = [a+b, a+b, c+d, c+d] 
+        __m256d hadd1 = _mm256_hadd_pd(vec, vec); 
+
+        // sum128 = [a+b+c+d, ...]
+        __m128d sum128 = _mm_add_pd(_mm256_castpd256_pd128(hadd1),  // [a+b, a+b]
+                                    _mm256_extractf128_pd(hadd1, 1));  // [c+d, c+d]
+        
+        // Extract result
+        return _mm_cvtsd_f64(sum128);
+    }
+#endif
+
+double mean(const std::vector<double>& x) {
+    if (x.empty()) {
+        throw std::invalid_argument("Cannot calculate mean of empty vector");
+    }
+
+    double sum;
+    const size_t n = x.size();
+
+    #ifdef __AVX2__
+        size_t i = 0;
+        const size_t vec_size = n - (n % NB_DB);
+        __m256d sum_vec = _mm256_set1_pd(0.0);
+
+        for (; i < vec_size; i+=NB_DB) {
+            // Pre-charged PREFETCH_DIST*8 bytes ahead
+            if ( i + PREFETECH_DIST < vec_size) {
+                _mm_prefetch((const char*)&x[i + PREFETECH_DIST], _MM_HINT_T0);
+            }
+
+            __m256d vec = _mm256_loadu_pd(&x[i]); 
+            sum_vec = _mm256_add_pd(sum_vec, vec);
+        }
+        sum = horizontal_red(sum_vec);
+
+        // Scalar residual
+        for (; i < n; i++) {
+            sum += x[i];
+        }
+
+    #else
+        sum = 0.0;
+        for (const double& val : x) {
+            sum += val;
+        }
+    #endif
+
+    return sum / n;
+}
+
+double var(const std::vector<double>& x) {
+    if (x.empty() || x.size() < 2) {
+        throw std::invalid_argument("Cannot calculate var with an empty vector or n < 2");
+    }
+
+    double sum;
+    const size_t n = x.size();
+    const double x_mean = mean(x);
+
+    #ifdef __AVX2__
+        size_t i = 0;
+        const size_t vec_size = n - (n % NB_DB);
+        __m256d sum_vec = _mm256_set1_pd(0.0);
+        __m256d mean_vec = _mm256_set1_pd(x_mean);
+
+        for (; i < vec_size; i+=NB_DB) {
+            // Pre-charged PREFETCH_DIST*8 bytes ahead
+            if ( i + PREFETECH_DIST < vec_size) {
+                _mm_prefetch((const char*)&x[i + PREFETECH_DIST], _MM_HINT_T0);
+            }
+
+            __m256d vec = _mm256_loadu_pd(&x[i]); 
+            __m256d sub_vec = _mm256_sub_pd(vec, mean_vec); // (xi - x_mean)
+            sum_vec = _mm256_fmadd_pd(sub_vec, sub_vec, sum_vec); // ... + (xi - x_mean)**2
+        }
+        sum = horizontal_red(sum_vec);
+
+        // Scalar residual
+        for (; i < n; i++) {
+            sum += (x[i] - x_mean) * (x[i] - x_mean);
+        }
+
+    #else
+        sum = 0.0;
+        for (const double& val : x) {
+            sum += (val - x_mean) * (val - x_mean); // ... + (xi - x_mean)**2
+        }
+    #endif
+
+    return sum / (n-1);
+}
+
+double cov(const std::vector<double>& x, const std::vector<double>& y) {
+    if (x.empty() || x.size() < 2 || y.empty() || y.size() < 2 || x.size() != y.size()) {
+        throw std::invalid_argument("Cannot calculate cov with an empty vector, n < 2 or x and y of different size");
+    }
+
+    double sum;
+    const size_t n = x.size();
+    const double x_mean = mean(x);
+    const double y_mean = mean(y);
+
+    #ifdef __AVX2__
+        size_t i = 0;
+        const size_t vec_size = n - (n % NB_DB);
+        __m256d sum_vec = _mm256_set1_pd(0.0);
+        __m256d x_mean_vec = _mm256_set1_pd(x_mean);
+        __m256d y_mean_vec = _mm256_set1_pd(y_mean);
+
+        for (; i < vec_size; i+=NB_DB) {
+            // Pre-charged PREFETCH_DIST*8 bytes ahead
+            if ( i + PREFETECH_DIST < vec_size) {
+                _mm_prefetch((const char*)&x[i + PREFETECH_DIST], _MM_HINT_T0);
+                _mm_prefetch((const char*)&y[i + PREFETECH_DIST], _MM_HINT_T0);
+            }
+
+            __m256d x_vec = _mm256_loadu_pd(&x[i]); 
+            __m256d y_vec = _mm256_loadu_pd(&y[i]);
+
+            __m256d x_sub_vec = _mm256_sub_pd(x_vec, x_mean_vec); // (xi - x_mean)
+            __m256d y_sub_vec = _mm256_sub_pd(y_vec, y_mean_vec); // (yi - y_mean)
+
+            sum_vec = _mm256_fmadd_pd(x_sub_vec, y_sub_vec, sum_vec); // ... + (xi - x_mean)*(yi - y_mean)
+        }
+        sum = horizontal_red(sum_vec);
+
+        // Scalar residual
+        for (; i < n; i++) {
+            sum += (x[i] - x_mean) * (y[i] - y_mean);
+        }
+
+    #else
+        sum = 0.0;
+        for (size_t i = 0; i < n; i++) {
+            sum += (x[i] - x_mean) * (y[i] - y_mean); // ... + (xi - x_mean)*(yi - y_mean)
+        }
+    #endif
+
+    return sum / (n-1);
+}
+
+}
