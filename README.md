@@ -1,23 +1,41 @@
 # Machine Learning From Scratch
-Educational project implementing fundamental machine learning and regression algorithms in C++ without relying on external ML libraries.
+Educational project implementing fundamental machine learning and regression algorithms in C++ **without relying on external ML libraries**.
 
-## Linear Algebra
-Before implementing ML and regression algorithms, we need fundamental linear algebra operations and functions. It's the core of the optimization process to get better performances, so we'll try 5 different approachs to compare: 
+## I - Dataframe
+As a first step, we need a class to handle and manipulate our data. Thus, our **Dataframe** class which provides the structure for numerical data manipulation and is specifically designed for machine learning and linear algebra operations. It supports both row-major and column-major storage. Additionally, the class handles heterogeneous data types through automatic categorical encoding.
 
-### Naive
-Basic C++ implementation using standard loops and operations. Still with basic optimization: column-major storage for cache-friendly operations. Serves as baseline for performance comparison.
+**To test it yourself**, you can check the corresponding [**Test file**](tests/tests_data.cpp) or **the following document** to have an idea of how to use the various functions. <br>
+For further details, see [**I - Dataframe**](docs/I_dataframe.md).
 
-### AVX2
-Implementation using AVX2 SIMD instructions for vectorized operations, processing 256-bit registers (4 doubles simultaneously) in blocks where applicable.
+## II - Linear Algebra
+Before implementing any ML and regression algorithms, we need fundamental linear algebra operations and functions. It's the core of the optimization process to get better performance, so we will implement 3 different approaches and add 2 external libraries to compare:
 
-### AVX2 Threaded
-Multi-threaded AVX2 implementation combining SIMD vectorization with parallel processing across CPU cores, operating on blocks where applicable, for maximum performance.
+- Implemented:
+  - Naive
+  - AVX2
+  - AVX2 Threaded
+- External:
+  - Eigen
+  - MKL
 
-### Eigen
-Industry-standard C++ template library.
+Moreover, to enable backend selection and operation dispatching, the **`Linalg`** namespace was created to provide a unified interface. This abstraction layer enables transparent backend switching without altering function signatures.
 
-### MKL
-Intel's optimized Math Kernel Library for high-performance computing.
+**To test it yourself**, you can check the [**Tests folder**](tests/) or **the following document** to have an idea of how to use the various backends and their functions. <br>
+For further details, see [**II - Linear Algebra**](docs/II_linalg.md).
 
-#### Note: 
-By default, the backend used will be the best performing one among the three custom implementations, excluding MKL and Eigen libraries. Moreover, to compile MKL, the option MSVC is available to avoid any issue with MinGW-GCC.
+## III - Linear Algebra Benchmark
+Comparison between backends using Google Benchmark across 4 operations:
+
+
+| Operation           | Backend Ranking                     |
+|:--------------------|:-----------------------------------:|
+| Transpose           | Naive < Eigen < AVX2TH < AVX2 = MKL |
+| In-place Transpose  | Naive < Eigen < AVX2 < MKL < AVX2TH |
+| Matrix Multiply     | Naive < AVX2 < AVX2TH < Eigen = MKL |
+| Inverse             | Naive < AVX2 < AVX2TH < Eigen = MKL |
+
+For further details, see [**III - Linear Algebra Benchmark**](docs/III_benchmark.md).
+
+## VI - Regression Algorithms
+
+**In progress...**

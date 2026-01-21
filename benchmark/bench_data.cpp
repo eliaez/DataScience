@@ -58,9 +58,9 @@ static void BM_TRANSPOSE(benchmark::State& state) {
 static void GenerateArgs(benchmark::Benchmark* b) {
     
     #if defined(__AVX2__) && defined(USE_MKL)
-        std::vector<int> backend_opt = {0, 1, 2, 3, 4};    // Naive, AVX2, Eigen, MKL, AVX2_threaded
+        std::vector<int> backend_opt = {0, 1, 2, 3, 4}; // Naive, AVX2, Eigen, MKL, AVX2_threaded
     #elif defined(__AVX2__)
-        std::vector<int> backend_opt = {0, 1, 2, 4};       // {0, 1, 2, 4} Naive, AVX2, Eigen, AVX2_threaded
+        std::vector<int> backend_opt = {0, 1, 2, 4};    // Naive, AVX2, Eigen, AVX2_threaded
     #elif defined(USE_MKL)
         std::vector<int> backend_opt = {0, 2, 3};       // Naive, Eigen, MKL 
     #else
@@ -68,15 +68,16 @@ static void GenerateArgs(benchmark::Benchmark* b) {
     #endif
 
     for (int backend : backend_opt) {
-        for (int size : {128, 256, 512, 1024, 2048}) { 
+        for (int size : {64, 128, 192, 256, 384, 512, 768, 1024}) {  // {64, 128, 192, 256, 384, 512, 768, 1024} {768, 1024, 1536, 2048, 3072, 4096}
             b->Args({size, backend});
         }
     }
 }
 
+
 BENCHMARK(BM_TRANSPOSE_IN)
     ->Apply(GenerateArgs)
-/*    ->MinTime(2.0) // Only for final bench
+    /*->MinTime(2.0) // Only for final bench
     ->Repetitions(10)
     ->ReportAggregatesOnly(true) 
     ->DisplayAggregatesOnly(true)*/
@@ -85,7 +86,7 @@ BENCHMARK(BM_TRANSPOSE_IN)
 
 BENCHMARK(BM_TRANSPOSE)
     ->Apply(GenerateArgs)
-/*    ->MinTime(2.0) // Only for final bench
+    /*->MinTime(2.0) // Only for final bench
     ->Repetitions(10)
     ->ReportAggregatesOnly(true) 
     ->DisplayAggregatesOnly(true)*/

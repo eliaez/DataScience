@@ -398,8 +398,8 @@ Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
         }
     }
     else if (op == '-') {
-        for (size_t n = 0; n < nb_threads; n++) {
-            if (n+1 == nb_threads) end = vec_size;
+        for (size_t nb = 0; nb < nb_threads; nb++) {
+            if (nb+1 == nb_threads) end = vec_size;
 
             auto fut = pool.enqueue([start, end, &df1, &df2, &new_data] {
                 for (size_t i = start; i < end; i += NB_DB) {

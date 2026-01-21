@@ -53,8 +53,8 @@ static void BM_INV(benchmark::State& state) {
 }
 
 static void GenerateArgs(benchmark::Benchmark* b, int backend_int) {
-    for (int size : {128, 256, 512, 1024, 2048}) {
-        if (backend_int != 0 && size != 2048) b->Args({size, backend_int});
+    for (int size : {64, 128, 192, 256, 384, 512, 768, 1024}) { // {64, 128, 192, 256, 384, 512, 768, 1024} {768, 1024, 1536, 2048, 3072, 4096}
+        b->Args({size, backend_int});
     }
 }
 
@@ -71,7 +71,7 @@ BENCHMARK(BM_MULT)
         GenerateArgs(b, 3);  // MKL
 #endif
     })
-/*    ->MinTime(2.0) // Only for final bench
+    /*->MinTime(2.0) // Only for final bench
     ->Repetitions(10)
     ->ReportAggregatesOnly(true) 
     ->DisplayAggregatesOnly(true)*/
@@ -91,7 +91,7 @@ BENCHMARK(BM_INV)
         GenerateArgs(b, 3);  // MKL
 #endif
     })
-/*    ->MinTime(2.0) // Only for final bench
+    /*->MinTime(2.0) // Only for final bench
     ->Repetitions(10)
     ->ReportAggregatesOnly(true) 
     ->DisplayAggregatesOnly(true)*/
