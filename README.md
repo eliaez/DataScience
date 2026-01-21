@@ -18,6 +18,8 @@ Before implementing any ML and regression algorithms, we need fundamental linear
   - Eigen
   - MKL
 
+Moreover, to enable backend selection and operation dispatching, the **`Linalg`** namespace was created to provide a unified interface. This abstraction layer enables transparent backend switching without altering function signatures.
+
 **To test it yourself**, you can check the [**Tests folder**](tests/) or **the following document** to have an idea of how to use the various backends and their functions. <br>
 For further details, see [**II - Linear Algebra**](docs/II_linalg.md).
 
