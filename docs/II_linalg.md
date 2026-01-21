@@ -68,6 +68,7 @@ Linalg::Operations::set_backend("AVX2_threaded");
 Linalg::Operations::set_backend(Backend::AVX2_THREADED);
 
 // Perform operations
+auto df_t = Linalg::Operations::transpose(df);
 auto df_sum = Linalg::Operations::sum(df1, df2);
 auto df_mult = Linalg::Operations::multiply(df1, df2);
 auto df_inv = Linalg::Operations::inverse(df);
