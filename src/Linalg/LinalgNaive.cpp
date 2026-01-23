@@ -2,11 +2,10 @@
 
 namespace Linalg::Naive {
 
-std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const Dataframe& df) {
+std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const std::vector<double>& v1, size_t n) {
 
     int nb_swaps = 0;
-    size_t n = df.get_cols();
-    std::vector<double> LU = df.get_data();
+    std::vector<double> LU = v1;
 
     // Permutation matrix is Id at first
     std::vector<double> swaps(n*n, 0.0);
@@ -112,7 +111,7 @@ std::vector<double> multiply(const std::vector<double>& v1, const std::vector<do
     return new_data;
 }
 
-Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n) {
+std::vector<double> solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n) {
 
     std::vector<double> y(n*n, 0.0);
 
@@ -150,22 +149,18 @@ Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<dou
             
         }
     }
-    return {n, n, false, std::move(y)};
+    return y;
 }
 
 
-Dataframe inverse(Dataframe& df) {
-
-    auto [det, swaps, LU] = determinant(df);
-
-    size_t n = df.get_cols();
+std::vector<double> inverse(const std::vector<double>& v1, size_t n,
+    std::vector<double> swaps, std::vector<double> LU) {
     
     // Id matrix
     std::vector<double> id(n*n, 0.0);
     for (size_t i = 0; i < n; i++) {
         id[i*n + i] = 1;
     }
-    Dataframe df_id = {n, n, true, std::move(id)};
 
     // If no LU matrix was returned, then the matrix is triangular
     if (LU.empty()) {
@@ -174,9 +169,9 @@ Dataframe inverse(Dataframe& df) {
         // Diag
         if (swaps[0] == 3) {
             for (size_t i = 0; i < n; i++) {
-               y[i*n + i] = 1 / df.at(i*n+i);
+               y[i*n + i] = 1 / v1[i*n+i];
             }
-            return {n, n, false, std::move(y)};
+            return y;
         }
         // Up
         else if (swaps[0] == 2) {
@@ -186,16 +181,16 @@ Dataframe inverse(Dataframe& df) {
             for (size_t k = 0; k < n; k++) {
                 for (int i = static_cast<int>(n)-1; i >= 0; i--) {
 
-                    double sum = df_id.at(k*n + i);
+                    double sum = id[k*n + i];
                     for (size_t j = i+1; j < n; j++) {
-                        sum -= df.at(j*n + i) * y[k*n + j];
+                        sum -= v1[j*n + i] * y[k*n + j];
                     }
                     y[k*n + i] = sum;
                     if (std::abs(y[k*n + i]) < 1e-14) y[k*n + i] = 0;
-                    else y[k*n + i] /= df.at(i*n+i);
+                    else y[k*n + i] /= v1[i*n+i];
                 }
             }
-            return {n, n, false, std::move(y)};
+            return y;
         }
         // Down
         else {
@@ -206,23 +201,22 @@ Dataframe inverse(Dataframe& df) {
                 for (size_t i = 0; i < n; i++) {
 
                     double sum = 0.0;
-                    sum = df_id.at(k*n + i);
+                    sum = id[k*n + i];
                     for (size_t j = 0; j < i; j++) {
-                        sum -= df.at(j*n + i) * y[k*n + j];
+                        sum -= v1[j*n + i] * y[k*n + j];
                     }
-                    y[k*n + i] = sum / df.at(i*n + i);
+                    y[k*n + i] = sum / v1[i*n + i];
                 }
             }
-            return {n, n, false, std::move(y)};
+            return y;
         }
     }
     else {
         
         // Permutation matrix
-        Dataframe df_swaps = {n, n, false, std::move(swaps)};
-        Dataframe perm = multiply(df_swaps, df_id); 
+        std::vector<double> perm = multiply(swaps, id, n, n, n, n); 
 
-        return solveLU_inplace(perm.get_data(), LU, n);
+        return solveLU_inplace(perm, LU, n);
     }
 }
 }

@@ -11,13 +11,13 @@ namespace Linalg::AVX2_threaded {
     constexpr size_t PREFETCH_DIST = 16; // Pre-fetch 16*64 bytes ahead for contigue memory only
     static constexpr size_t PREFETCH_DIST1 = 4; // Pre-fetch 4*64 bytes ahead for Blocks algo
 
-    // Sum AVX2 TH col col or row row only
+    // Sum AVX2 TH col col or row row only, will use AVX2 if threshold not crossed
     std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2,
         size_t m, size_t n,     // Rows / Cols
         char op = '+'           // Operator
     );
 
-    // Mult AVX2 TH row - col config only
+    // Mult AVX2 TH row - col config only, will use AVX2 if threshold not crossed
     std::vector<double> multiply(const std::vector<double>& v1, const std::vector<double>& v2,
         size_t m, size_t n,     // Rows / Cols v1
         size_t o, size_t p     // Rows / Cols v2
@@ -29,13 +29,19 @@ namespace Linalg::AVX2_threaded {
     );
 
     // LU decomposition, returns nb_swaps, swap - permutation matrix and LU in the same matrix
-    std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const Dataframe& df);
+    std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const std::vector<double>& v1, size_t n);
 
     // Function to solve LU system with Forward substitution and Backward substitution
-    Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n);
+    std::vector<double> solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n);
 
-    // Function to inverse matrix by using LU decomposition 
-    Dataframe inverse(Dataframe& df);
+    // Function to inverse matrix by using LU decomposition with AVX2 TH and by blocks,
+    // will use AVX2 if threshold not crossed
+    std::vector<double> inverse(
+        const std::vector<double>& v1, 
+        size_t n,
+        std::vector<double> swaps,
+        std::vector<double> LU
+    );
 
     // Horizontal Reduction
     double horizontal_red(__m256d& vec);

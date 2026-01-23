@@ -3,11 +3,10 @@
 namespace Linalg::AVX2_threaded {
 #ifdef __AVX2__
 
-std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const Dataframe& df) {
+std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const std::vector<double>& v1, size_t n) {
 
     int nb_swaps = 0;
-    size_t n = df.get_cols();
-    std::vector<double> LU = df.get_data();
+    std::vector<double> LU = v1;
 
     // Permutation matrix is Id at first
     std::vector<double> swaps(n*n, 0.0);
@@ -161,7 +160,7 @@ std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const
     return std::make_tuple(nb_swaps, std::move(swaps), std::move(LU));
 }
 
-Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n) {
+std::vector<double> solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n) {
 
     // After multiple tests a minimum was decided
     constexpr size_t THREADING_THRESHOLD = 512;
@@ -170,7 +169,6 @@ Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<dou
     }
 
     std::vector<double> y(n*n, 0.0);
-    size_t prefetch_dist = NB_DB;
 
     // Store the Diag
     std::vector<double> diag_U(n);
@@ -193,7 +191,7 @@ Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<dou
     for (size_t nb = 0; nb < nb_threads; nb++) {
         if (nb+1 == nb_threads) end = vec_size;
 
-        auto fut = pool.enqueue([start, end, n, prefetch_dist, &perm, &y, &diag_U, &LU] {
+        auto fut = pool.enqueue([start, end, n, PREFETCH_DIST1, &perm, &y, &diag_U, &LU] {
             
             // By Blocks with AVX2
             for (size_t k = start; k < end; k+=NB_DB) {
@@ -202,9 +200,9 @@ Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<dou
                 // Forward substitution 
                 for (size_t i = 0; i < n; i++) {
 
-                    if (k + prefetch_dist < end) {
+                    if (k + PREFETCH_DIST1 < end) {
                         for (size_t p = 0; p < NB_DB; p++) {
-                            _mm_prefetch((const char*)&perm[(k+p+prefetch_dist)*n + i], _MM_HINT_T0);
+                            _mm_prefetch((const char*)&perm[(k+p+PREFETCH_DIST1)*n + i], _MM_HINT_T0);
                         }        
                     }
 
@@ -217,9 +215,9 @@ Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<dou
                     
                     for (size_t j = 0; j < i; j++) {
 
-                        if (j + prefetch_dist < i) {
+                        if (j + PREFETCH_DIST1 < i) {
                             for (size_t p = 0; p < NB_DB; p++) {
-                                _mm_prefetch((const char*)&y[(k+p)*n + j + prefetch_dist], _MM_HINT_T0);
+                                _mm_prefetch((const char*)&y[(k+p)*n + j + PREFETCH_DIST1], _MM_HINT_T0);
                             }
                         }
 
@@ -318,7 +316,7 @@ Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<dou
             
         }
     }
-    return {n, n, false, std::move(y)};
+    return y;
 }
 
 double horizontal_red(__m256d& vec) {
@@ -545,18 +543,14 @@ std::vector<double> transpose(const std::vector<double>& v1,
     return new_data;
 }
 
-Dataframe inverse(Dataframe& df) {
+std::vector<double> inverse(const std::vector<double>& v1, size_t n,
+    std::vector<double> swaps, std::vector<double> LU) {
 
-    auto [det, swaps, LU] = determinant(df);
-
-    size_t n = df.get_cols();
-    
     // Id matrix
     std::vector<double> id(n*n, 0.0);
     for (size_t i = 0; i < n; i++) {
         id[i*n + i] = 1;
     }
-    Dataframe df_id = {n, n, false, std::move(id)};
 
     // If no LU matrix was returned, then the matrix is triangular
     if (LU.empty()) {
@@ -565,9 +559,9 @@ Dataframe inverse(Dataframe& df) {
         // Diag
         if (swaps[0] == 3) {
             for (size_t i = 0; i < n; i++) {
-               y[i*n + i] = 1 / df.at(i*n+i);
+               y[i*n + i] = 1 / v1[i*n+i];
             }
-            return {n, n, false, std::move(y)};
+            return y;
         }
         // Up
         else if (swaps[0] == 2) {
@@ -579,18 +573,18 @@ Dataframe inverse(Dataframe& df) {
             for (; k < vec_size; k+=NB_DB) {
                 for (int i = static_cast<int>(n)-1; i >= 0; i--) {
 
-                    double diag_i = df.at(i*n + i);
+                    double diag_i = v1[i*n + i];
 
                     __m256d sum = _mm256_set_pd(
-                        df_id.at((k+3)*n + i),
-                        df_id.at((k+2)*n + i),
-                        df_id.at((k+1)*n + i),
-                        df_id.at((k+0)*n + i)
+                        id[(k+3)*n + i],
+                        id[(k+2)*n + i],
+                        id[(k+1)*n + i],
+                        id[(k+0)*n + i]
                     );
                     
                     for (size_t j = i+1; j < n; j++) {
                         
-                        __m256d LU_vec = _mm256_set1_pd(df.at(j*n + i));
+                        __m256d LU_vec = _mm256_set1_pd(v1[j*n + i]);
 
                         __m256d y_vals = _mm256_set_pd(
                             y[(k+3)*n + j],
@@ -621,15 +615,15 @@ Dataframe inverse(Dataframe& df) {
             for (; k < n; k++) {
                 for (int i = static_cast<int>(n)-1; i >= 0; i--) {
 
-                    y[k*n + i] = df_id.at(k*n + i);
+                    y[k*n + i] = id[k*n + i];
                     for (size_t j = i+1; j < n; j++) {
-                        y[k*n + i] -= df.at(j*n + i) * y[k*n + j];
+                        y[k*n + i] -= v1[j*n + i] * y[k*n + j];
                     }
                     if (std::abs(y[k*n + i]) < 1e-14) y[k*n + i] = 0;
-                    else y[k*n + i] /= df.at(i*n+i);
+                    else y[k*n + i] /= v1[i*n+i];
                 }
             }
-            return {n, n, false, std::move(y)};
+            return y;
         }
         // Down
         else {
@@ -643,18 +637,18 @@ Dataframe inverse(Dataframe& df) {
 
                 for (size_t i = 0; i < n; i++) {
 
-                    double diag_i = df.at(i*n + i);
+                    double diag_i = v1[i*n + i];
 
                     __m256d sum = _mm256_set_pd(
-                        df_id.at((k+3)*n + i),
-                        df_id.at((k+2)*n + i),
-                        df_id.at((k+1)*n + i),
-                        df_id.at((k+0)*n + i)
+                        id[(k+3)*n + i],
+                        id[(k+2)*n + i],
+                        id[(k+1)*n + i],
+                        id[(k+0)*n + i]
                     );
                     
                     for (size_t j = 0; j < i; j++) {
 
-                        __m256d LU_val = _mm256_set1_pd(df.at(j*n + i));
+                        __m256d LU_val = _mm256_set1_pd(v1[j*n + i]);
                         
                         __m256d y_vals = _mm256_set_pd(
                             y[(k+3)*n + j],
@@ -685,26 +679,24 @@ Dataframe inverse(Dataframe& df) {
                 for (size_t i = 0; i < n; i++) {
 
                     double sum = 0.0;
-                    sum = df_id.at(k*n + i);
+                    sum = id[k*n + i];
                     for (size_t j = 0; j < i; j++) {
-                        sum -= df.at(j*n + i) * y[k*n + j];
+                        sum -= v1[j*n + i] * y[k*n + j];
                     }
-                    y[k*n + i] = sum / df.at(i*n + i);
+                    y[k*n + i] = sum / v1[i*n + i];
                 }
             }
-            return {n, n, false, std::move(y)};
+            return y;
         }
     }
     else {
-        
         // Permutation matrix
-        Dataframe df_swaps = {n, n, false, std::move(swaps)};
-        df_swaps.change_layout_inplace("AVX2_threaded");
+        swaps = transpose(swaps, n, n);
 
         // Row - Col to use multiply from AVX2
-        Dataframe perm = multiply(df_swaps, df_id); 
+        std::vector<double> perm = multiply(df_swaps.get_data(), id, n, n, n, n); 
 
-        Dataframe res = solveLU_inplace(perm.get_data(), LU, n);
+        Dataframe res = solveLU_inplace(perm, LU, n);
         return res;
     }
 }

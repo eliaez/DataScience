@@ -53,7 +53,15 @@ namespace Linalg {
             // Transpose function, will choose the backend accordingly to your config.
             // If your dataframe layout is row major then it will change it to col major by default.
             static Dataframe transpose(Dataframe& df);
+
+            // Inv function, will choose the backend accordingly to your config.
+            // Layout need to be col major for performance purpose. 
             static Dataframe inverse(Dataframe& df);
+
+            // Function to calculate determinant of Matrix from Df data, through either the product of 
+            // the diagonal if the matrix is triangular or with LU decomposition. 
+            // Returns determinant, permutation matrix and LU matrix 
+            static std::tuple<double, std::vector<double>, std::vector<double>> determinant(Dataframe& df);
 
             // Function to test if the data from df is a triangular matrix, 
             // 3 for diagonal, 2 for Up, 1 for Down and 0 if not.
@@ -64,11 +72,6 @@ namespace Linalg {
                 // 3 for diagonal, 2 for Up, 1 for Down and 0 if not.
                 static int triangular_matrix_avx2(const Dataframe& df);
             #endif
-
-            // Function to calculate determinant of Matrix from Df data, through either the product of 
-            // the diagonal if the matrix is triangular or with LU decomposition. 
-            // Returns determinant, LU matrix 
-            static  std::tuple<double, std::vector<double>, std::vector<double>> determinant(Dataframe& df);
     };
 
     // Function to get Backend in string

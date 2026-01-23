@@ -28,13 +28,18 @@ namespace Linalg::AVX2 {
     );
 
     // LU decomposition, returns nb_swaps, swap - permutation matrix and LU in the same matrix
-    std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const Dataframe& df);
+    std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const std::vector<double>& v1, size_t n);
 
     // Function to solve LU system with Forward substitution and Backward substitution
-    Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n);
+    std::vector<double> solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n);
 
-    // Function to inverse matrix by using LU decomposition 
-    Dataframe inverse(Dataframe& df);
+    // Function to inverse matrix by using LU decomposition with AVX2 and by blocks 
+    std::vector<double> inverse(
+        const std::vector<double>& v1, 
+        size_t n,
+        std::vector<double> swaps,
+        std::vector<double> LU
+    );
 
     // Horizontal Reduction
     double horizontal_red(__m256d& vec);

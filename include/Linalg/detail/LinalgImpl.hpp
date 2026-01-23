@@ -40,37 +40,36 @@ namespace Linalg::detail {
             static std::vector<double> transpose_impl(
                 const std::vector<double>& v1, 
                 size_t v1_rows,
-                size_t v1_cols
+                size_t v1_cols,
+                bool v1_layout
             );
 
+            // Intermediary inverse function to check requirements and dispatch to backend
             static std::vector<double> inverse_impl(
                 const std::vector<double>& v1, 
                 size_t v1_rows,
-                size_t v1_cols,
+                bool v1_layout
+            );
+
+            // Determinant function
+            static std::tuple<double, std::vector<double>, std::vector<double>> determinant_impl(
+                const std::vector<double>& v1, 
+                size_t v1_rows,
                 bool v1_layout
             );
 
             static int triangular_impl(
                 const std::vector<double>& v1, 
                 size_t v1_rows,
-                size_t v1_cols,
                 bool v1_layout
             );
 
             #ifdef __AVX2__
-                static int triangular_avx2_impl(
-                    const std::vector<double>& v1, 
-                    size_t v1_rows,
-                    size_t v1_cols,
-                    bool v1_layout
-                );
-            #endif
-
-            static std::tuple<double, std::vector<double>, std::vector<double>> determinant_impl(
+            static int triangular_avx2_impl(
                 const std::vector<double>& v1, 
                 size_t v1_rows,
-                size_t v1_cols,
                 bool v1_layout
             );
+            #endif
     };
 }

@@ -22,6 +22,11 @@ namespace Linalg::EigenNP {
         size_t v1_rows, size_t v1_cols
     );
 
-    // Function to inverse matrix by using LU decomposition 
-    Dataframe inverse(Dataframe& df);
+    // Function to inverse matrix Eigen
+    std::vector<double> inverse(
+        const std::vector<double>& v1, 
+        size_t n,
+        std::vector<double> swaps,
+        std::vector<double> LU
+    );
 }
