@@ -6,8 +6,13 @@
 namespace Linalg {
     namespace Naive {
 
-        Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op = '+');
+        std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, // Data
+            size_t m, size_t n,     // Rows / Cols
+            char op = '+'           // Operator
+        );
+        
         Dataframe multiply(const Dataframe& df1, const Dataframe& df2);
+        
         Dataframe transpose(Dataframe& df);
 
         // LU decomposition, returns nb_swaps, swap - permutation matrix and LU in the same matrix

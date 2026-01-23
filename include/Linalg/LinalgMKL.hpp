@@ -7,7 +7,10 @@ namespace Linalg {
     namespace MKL {
         
         #ifdef USE_MKL
-        Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op = '+');
+        std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, // Data
+            size_t m, size_t n,     // Rows / Cols
+            char op = '+'           // Operator
+        );
 
         // Mult row - col config only
         Dataframe multiply(const Dataframe& df1, const Dataframe& df2);

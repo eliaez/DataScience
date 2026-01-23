@@ -1,8 +1,13 @@
 #include "Linalg/Linalg.hpp"
+#include "Linalg/detail/LinalgImpl.hpp"
+
+// ============================================
+// Macro Dispatch
+// ============================================
 
 #if defined(__AVX2__) && defined(USE_MKL)
     #define DISPATCH_BACKEND(func, ...) \
-        switch(current_backend) { \
+        switch(Operations::get_backend()) { \
             case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
             case Linalg::Backend::AVX2: return Linalg::AVX2::func(__VA_ARGS__); \
             case Linalg::Backend::AVX2_THREADED: return Linalg::AVX2_threaded::func(__VA_ARGS__); \
@@ -32,7 +37,7 @@
         } 
 #elif defined(__AVX2__)
     #define DISPATCH_BACKEND(func, ...) \
-        switch(current_backend) { \
+        switch(Operations::get_backend()) { \
             case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
             case Linalg::Backend::AVX2: return Linalg::AVX2::func(__VA_ARGS__); \
             case Linalg::Backend::AVX2_THREADED: return Linalg::AVX2_threaded::func(__VA_ARGS__); \
@@ -61,7 +66,7 @@
         } 
 #elif defined(USE_MKL)
     #define DISPATCH_BACKEND(func, ...) \
-        switch(current_backend) { \
+        switch(Operations::get_backend()) { \
             case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
             case Linalg::Backend::EIGEN: return Linalg::EigenNP::func(__VA_ARGS__); \
             case Linalg::Backend::MKL: return Linalg::MKL::func(__VA_ARGS__); \
@@ -81,7 +86,7 @@
         } 
 #else
     #define DISPATCH_BACKEND(func, ...) \
-        switch(current_backend) { \
+        switch(Operations::get_backend()) { \
             case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
             case Linalg::Backend::EIGEN: return Linalg::EigenNP::func(__VA_ARGS__); \
             default: return Linalg::Naive::func(__VA_ARGS__); \
@@ -99,6 +104,43 @@
             } \
         } 
 #endif
+
+// ============================================
+// Internal Implementation 
+// ============================================
+
+namespace Linalg::detail {
+
+std::vector<double> sum_impl(
+    const std::vector<double>& v1, const std::vector<double>& v2,   // Data
+    size_t v1_rows, size_t v1_cols, size_t v2_rows, size_t v2_cols, // Size
+    bool v1_layout, bool v2_layout,                                 // Layouts
+    char op ) {                                                     // Operator
+    
+    // Verify if we can sum them
+    if (v1_rows != v2_rows || v1_cols != v2_cols) throw std::runtime_error("Need two Matrix of equal dimensions");
+    
+    // Condition to have better performance and match backend requirements
+    const std::string backend = get_backend();
+    if (backend == "MKL" || backend == "Eigen") {
+
+        if ((v1_layout != v2_layout) && v1_layout) {
+            throw std::runtime_error("Need two Matrix with the same storage and Col-major for performances purpose");
+        }
+    }
+    else {
+        throw std::runtime_error("Need two Matrix with the same storage Col-major or Row-major for performances purpose");
+    }
+
+    // Dispatch
+    DISPATCH_BACKEND(sum, v1, v2, v1_rows, v1_cols, op)
+}
+
+}
+
+// ============================================
+// Public API
+// ============================================
 
 namespace Linalg {
 
@@ -146,7 +188,20 @@ Backend Operations::get_backend() {
 }
 
 Dataframe Operations::sum(const Dataframe& df1, const Dataframe& df2, char op) {
-    DISPATCH_BACKEND(sum, df1, df2, op)
+    
+    size_t m = df1.get_rows();
+    size_t n = df1.get_cols();
+    bool is_row_major = df1.get_storage();
+
+    std::vector<double> res = detail::sum_impl(
+        df1.get_data(), df2.get_data(), 
+        m, n,
+        df2.get_rows(), df2.get_cols(),
+        is_row_major, df2.get_storage(), 
+        op
+    );
+
+    return Dataframe(m, n, is_row_major, std::move(res));
 }
 
 Dataframe Operations::multiply(const Dataframe& df1, const Dataframe& df2) {
@@ -185,7 +240,7 @@ std::string get_backend() {
     }
 }
 
-int triangular_matrix(const Dataframe& df) {
+int Operations::triangular_matrix(const Dataframe& df) {
 
     size_t n = df.get_rows(); 
     bool is_trig_up = true;
@@ -218,7 +273,7 @@ int triangular_matrix(const Dataframe& df) {
 }
 
 #ifdef __AVX2__
-    int triangular_matrix_avx2(const Dataframe& df) {
+    int Operations::triangular_matrix_avx2(const Dataframe& df) {
 
         size_t n = df.get_rows(); 
         bool is_trig_up = true;
@@ -309,9 +364,9 @@ int triangular_matrix(const Dataframe& df) {
     }
 #endif
 
-std::tuple<double, std::vector<double>, std::vector<double>> determinant(Dataframe& df) {
+std::tuple<double, std::vector<double>, std::vector<double>> Operations::determinant(Dataframe& df) {
     
-    std::string backend_str = get_backend();
+    std::string backend_str = Linalg::get_backend();
 
     // Changing layout for better performances
     if (df.get_storage()){

@@ -329,25 +329,13 @@ double horizontal_red(__m256d& vec) {
     return AVX2::horizontal_red(vec);
 }
 
-Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
-
-    size_t m = df1.get_rows();
-    size_t n = df1.get_cols();
-    size_t o = df2.get_rows();
-    size_t p = df2.get_cols();
+std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, 
+    size_t m, size_t n, char op = '+') { 
 
     // After multiple tests a minimum was decided
     constexpr size_t THREADING_THRESHOLD = 512;
     if (m < THREADING_THRESHOLD) {
-        return AVX2::sum(df1, df2, op);
-    }
-
-    // Verify if we can sum them
-    if (m != o || n != p) throw std::runtime_error("Need two Matrix of equal dimensions");
-
-    // Condition to have better performances
-    if (df1.get_storage() != df2.get_storage()) {
-        throw std::runtime_error("Need two Matrix with the same storage Col-major or Row-major for performances purpose");
+        return AVX2::sum(v1, v2, m, n, op);
     }
 
     // New data
@@ -368,17 +356,17 @@ Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
         for (size_t nb = 0; nb < nb_threads; nb++) {
             if (nb+1 == nb_threads) end = vec_size;
 
-            auto fut = pool.enqueue([start, end, &df1, &df2, &new_data] {
+            auto fut = pool.enqueue([start, end, &v1, &v2, &new_data] {
                 for (size_t i = start; i < end; i += NB_DB) {
 
                     if (i + PREFETCH_DIST < end) {
                         // Pre-charged PREFETCH_DIST*8 bytes ahead
-                        _mm_prefetch((const char*)&df1.at(i+PREFETCH_DIST), _MM_HINT_T0);
-                        _mm_prefetch((const char*)&df2.at(i+PREFETCH_DIST), _MM_HINT_T0);
+                        _mm_prefetch((const char*)&v1[i+PREFETCH_DIST], _MM_HINT_T0);
+                        _mm_prefetch((const char*)&v2[i+PREFETCH_DIST], _MM_HINT_T0);
                     }
 
-                    __m256d vec1 = _mm256_loadu_pd(&df1.at(i));
-                    __m256d vec2 = _mm256_loadu_pd(&df2.at(i));
+                    __m256d vec1 = _mm256_loadu_pd(&v1[i]);
+                    __m256d vec2 = _mm256_loadu_pd(&v2[i]);
 
                     __m256d res = _mm256_add_pd(vec1, vec2);
 
@@ -394,24 +382,24 @@ Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
 
         // Scalar residual
         for (size_t i = end; i < m*n; i++) {
-            new_data[i] = df1.at(i) + df2.at(i);
+            new_data[i] = v1[i] + v2[i];
         }
     }
     else if (op == '-') {
         for (size_t nb = 0; nb < nb_threads; nb++) {
             if (nb+1 == nb_threads) end = vec_size;
 
-            auto fut = pool.enqueue([start, end, &df1, &df2, &new_data] {
+            auto fut = pool.enqueue([start, end, &v1, &v2, &new_data] {
                 for (size_t i = start; i < end; i += NB_DB) {
 
                     if (i + PREFETCH_DIST < end) {
                         // Pre-charged PREFETCH_DIST*8 bytes ahead
-                        _mm_prefetch((const char*)&df1.at(i+PREFETCH_DIST), _MM_HINT_T0);
-                        _mm_prefetch((const char*)&df2.at(i+PREFETCH_DIST), _MM_HINT_T0);
+                        _mm_prefetch((const char*)&v1[i+PREFETCH_DIST], _MM_HINT_T0);
+                        _mm_prefetch((const char*)&v2[i+PREFETCH_DIST], _MM_HINT_T0);
                     }
 
-                    __m256d vec1 = _mm256_loadu_pd(&df1.at(i));
-                    __m256d vec2 = _mm256_loadu_pd(&df2.at(i));
+                    __m256d vec1 = _mm256_loadu_pd(&v1[i]);
+                    __m256d vec2 = _mm256_loadu_pd(&v2[i]);
 
                     __m256d res = _mm256_sub_pd(vec1, vec2);
 
@@ -427,11 +415,11 @@ Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
 
         // Scalar residual
         for (size_t i = end; i < m*n; i++) {
-            new_data[i] = df1.at(i) + df2.at(i);
+            new_data[i] = v1[i] - v2[i];
         }
     }
 
-    return {m, n, false, std::move(new_data)};
+    return new_data;
 }
 
 Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {

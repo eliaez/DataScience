@@ -82,4 +82,4 @@ auto df_inv = Linalg::Operations::inverse(df);
 #### Note: 
 By default, the backend used will be the best performing one among the three customized implementations, excluding MKL and Eigen libraries. Moreover, to compile MKL, the MSVC option is available to avoid any issue with MinGW-GCC.
 
-To read the next part: [**III - Linear Algebra Benchmark**](docs/III_benchmark.md).
+To read the next part: [**III - Linear Algebra Benchmark**](/docs/III_benchmark.md).

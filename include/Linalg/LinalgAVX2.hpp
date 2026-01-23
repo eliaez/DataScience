@@ -10,7 +10,10 @@ namespace Linalg {
         constexpr size_t NB_DB = 4; // AVX2 (256 bits) so 4 doubles
         constexpr size_t PREFETCH_DIST = 16; // Pre-fetch 16*64 bytes ahead for contigue memory only
 
-        Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op = '+');
+        std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, // Data
+            size_t m, size_t n,     // Rows / Cols
+            char op = '+'           // Operator
+        );
 
         // Mult AVX2 row - col config only
         Dataframe multiply(const Dataframe& df1, const Dataframe& df2);

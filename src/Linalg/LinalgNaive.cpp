@@ -77,36 +77,24 @@ Dataframe transpose(Dataframe& df) {
         df.get_encoder(), df.get_encodedCols()};
 }
 
-Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
-
-    size_t m = df1.get_rows();
-    size_t n = df1.get_cols();
-    size_t o = df2.get_rows();
-    size_t p = df2.get_cols();
-
-    // Verify if we can sum them
-    if (m != o || n != p) throw std::runtime_error("Need two Matrix of equal dimensions");
-
-    // Condition to have better performances
-    if (df1.get_storage() != df2.get_storage()) {
-        throw std::runtime_error("Need two Matrix with the same storage Col-major or Row-major for performances purpose");
-    }
+std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, 
+    size_t m, size_t n, char op = '+') {           
 
     // New data
     std::vector<double> new_data(m * n);
 
     if (op == '+') {
         for (size_t i = 0; i < m*n; i++) {
-            new_data[i] = df1.at(i) + df2.at(i);
+            new_data[i] = v1[i] + v2[i];
         }
     }
     else if (op == '-') {
         for (size_t i = 0; i < m*n; i++) {
-            new_data[i] = df1.at(i) - df2.at(i);
+            new_data[i] = v1[i] - v2[i];
         }
     }
 
-    return {m, n, false, std::move(new_data)};
+    return new_data;
 }
 
 Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
