@@ -1,10 +1,6 @@
 #include "Linalg/LinalgAVX2_threaded.hpp"
-#include "Linalg/LinalgAVX2.hpp"
-#include "Linalg/Linalg.hpp"
-#include "Utils/ThreadPool.hpp"
 
-namespace Linalg {
-namespace AVX2_threaded {
+namespace Linalg::AVX2_threaded {
 #ifdef __AVX2__
 
 std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const Dataframe& df) {
@@ -541,20 +537,12 @@ std::vector<double> multiply(const std::vector<double>& v1, const std::vector<do
     return new_data;
 }
 
-Dataframe transpose(Dataframe& df) {
+std::vector<double> transpose(const std::vector<double>& v1,  
+    size_t v1_rows, size_t v1_cols) {
 
-    size_t rows = df.get_cols(), cols = df.get_rows();
-    size_t temp_row = df.get_rows(), temp_col = df.get_cols();
+    std::vector<double> new_data = Dataframe::transpose_avx2_th(v1_rows, v1_cols, v1);
 
-    // Changing layout for better performances later
-    if (df.get_storage()){
-        df.change_layout_inplace("AVX2_threaded");
-    }
-
-    std::vector<double> data = Dataframe::transpose_avx2_th(temp_row, temp_col, df.get_data());
-
-    return {rows, cols, false, std::move(data), df.get_headers(), 
-        df.get_encoder(), df.get_encodedCols()};
+    return new_data;
 }
 
 Dataframe inverse(Dataframe& df) {
@@ -721,5 +709,4 @@ Dataframe inverse(Dataframe& df) {
     }
 }
 #endif
-}
 }

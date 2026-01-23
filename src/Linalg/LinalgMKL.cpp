@@ -1,24 +1,14 @@
 #include "Linalg/LinalgMKL.hpp"
-#include "Linalg/Linalg.hpp"
 
-namespace Linalg {
-namespace MKL {
+namespace Linalg::MKL {
 #ifdef USE_MKL
 
-Dataframe transpose(Dataframe& df) {
+std::vector<double> transpose(const std::vector<double>& v1,  
+    size_t v1_rows, size_t v1_cols) {
 
-    size_t rows = df.get_cols(), cols = df.get_rows();
-    size_t temp_row = df.get_rows(), temp_col = df.get_cols();
+    std::vector<double> new_data = Dataframe::transpose_mkl(v1_rows, v1_cols, v1);
 
-    // Changing layout for better performances later
-    if (df.get_storage()){
-        df.change_layout_inplace("MKL");
-    }
-
-    std::vector<double> data = Dataframe::transpose_mkl(temp_row, temp_col, df.get_data());
-
-    return {rows, cols, false, std::move(data), df.get_headers(), 
-        df.get_encoder(), df.get_encodedCols()};
+    return new_data;
 }
 
 std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, 
@@ -48,7 +38,7 @@ std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>
             m, n,          
             1.0,           // Scalar alpha
             v1.data(), m,
-            -1.0,           // Scalar beta
+            -1.0,          // Scalar beta
             v2.data(), m,   
             new_data.data(), m    
         );
@@ -70,9 +60,9 @@ std::vector<double> multiply(const std::vector<double>& v1, const std::vector<do
         p,                
         n,                
         1.0,                // Scalar alpha : res = alpha × op(df1) × op(df2) + beta × res
-        v1.data(),       // Input df1
+        v1.data(),          // Input df1
         m,                  
-        v2.data(),       // Input df2
+        v2.data(),          // Input df2
         o,                  
         0.0,                // Scalar beta : res = alpha × op(df1) × op(df2) + beta × res
         new_data.data(),    // Output res
@@ -112,5 +102,4 @@ Dataframe inverse(Dataframe& df) {
 }
 
 #endif
-}
 }

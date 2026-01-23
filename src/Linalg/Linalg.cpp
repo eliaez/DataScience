@@ -1,168 +1,7 @@
 #include "Linalg/Linalg.hpp"
-#include "Linalg/detail/LinalgImpl.hpp"
 
 // ============================================
-// Macro Dispatch
-// ============================================
-
-#if defined(__AVX2__) && defined(USE_MKL)
-    #define DISPATCH_BACKEND(func, ...) \
-        switch(Operations::get_backend()) { \
-            case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
-            case Linalg::Backend::AVX2: return Linalg::AVX2::func(__VA_ARGS__); \
-            case Linalg::Backend::AVX2_THREADED: return Linalg::AVX2_threaded::func(__VA_ARGS__); \
-            case Linalg::Backend::EIGEN: return Linalg::EigenNP::func(__VA_ARGS__); \
-            case Linalg::Backend::MKL: return Linalg::MKL::func(__VA_ARGS__); \
-            default: return Linalg::AVX2_threaded::func(__VA_ARGS__); \
-        }
-
-    #define DISPATCH_BACKEND2(func, ...) \
-        switch(Operations::get_backend()) { \
-            case Linalg::Backend::NAIVE: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::Naive::func(__VA_ARGS__); \
-                break; \
-            } \
-            case Linalg::Backend::AVX2: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::AVX2::func(__VA_ARGS__); \
-                break; \
-            } \
-            case Linalg::Backend::AVX2_THREADED: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::AVX2_threaded::func(__VA_ARGS__); \
-                break; \
-            } \
-            default: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::AVX2_threaded::func(__VA_ARGS__); \
-                break; \
-            } \
-        } 
-#elif defined(__AVX2__)
-    #define DISPATCH_BACKEND(func, ...) \
-        switch(Operations::get_backend()) { \
-            case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
-            case Linalg::Backend::AVX2: return Linalg::AVX2::func(__VA_ARGS__); \
-            case Linalg::Backend::AVX2_THREADED: return Linalg::AVX2_threaded::func(__VA_ARGS__); \
-            case Linalg::Backend::EIGEN: return Linalg::EigenNP::func(__VA_ARGS__); \
-            default: return Linalg::AVX2_threaded::func(__VA_ARGS__); \
-        }
-
-    #define DISPATCH_BACKEND2(func, ...) \
-        switch(Operations::get_backend()) { \
-            case Linalg::Backend::NAIVE: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::Naive::func(__VA_ARGS__); \
-                break; \
-            } \
-            case Linalg::Backend::AVX2: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::AVX2::func(__VA_ARGS__); \
-                break; \
-            } \
-            case Linalg::Backend::AVX2_THREADED: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::AVX2_threaded::func(__VA_ARGS__); \
-                break; \
-            } \
-            default: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::AVX2_threaded::func(__VA_ARGS__); \
-                break; \
-            } \
-        } 
-#elif defined(USE_MKL)
-    #define DISPATCH_BACKEND(func, ...) \
-        switch(Operations::get_backend()) { \
-            case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
-            case Linalg::Backend::EIGEN: return Linalg::EigenNP::func(__VA_ARGS__); \
-            case Linalg::Backend::MKL: return Linalg::MKL::func(__VA_ARGS__); \
-            default: return Linalg::MKL::func(__VA_ARGS__); \
-        }
-
-    #define DISPATCH_BACKEND2(func, ...) \
-        switch(Operations::get_backend()) { \
-            case Linalg::Backend::NAIVE: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::Naive::func(__VA_ARGS__); \
-                break; \
-            } \
-            default: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::Naive::func(__VA_ARGS__); \
-                break; \
-            } \
-        } 
-#else
-    #define DISPATCH_BACKEND(func, ...) \
-        switch(Operations::get_backend()) { \
-            case Linalg::Backend::NAIVE: return Linalg::Naive::func(__VA_ARGS__); \
-            case Linalg::Backend::EIGEN: return Linalg::EigenNP::func(__VA_ARGS__); \
-            default: return Linalg::Naive::func(__VA_ARGS__); \
-        }
-
-    #define DISPATCH_BACKEND2(func, ...) \
-        switch(Operations::get_backend()) { \
-            case Linalg::Backend::NAIVE: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::Naive::func(__VA_ARGS__); \
-                break; \
-            } \
-            default: { \
-                std::tie(nb_swaps, swaps, LU) = Linalg::Naive::func(__VA_ARGS__); \
-                break; \
-            } \
-        } 
-#endif
-
-// ============================================
-// Internal Implementation 
-// ============================================
-
-namespace Linalg::detail {
-
-std::vector<double> sum_impl(
-    const std::vector<double>& v1, const std::vector<double>& v2,   // Data
-    size_t v1_rows, size_t v1_cols, size_t v2_rows, size_t v2_cols, // Size
-    bool v1_layout, bool v2_layout,                                 // Layouts
-    char op ) {                                                     // Operator
-    
-    // Verify if we can sum them
-    if (v1_rows != v2_rows || v1_cols != v2_cols) throw std::runtime_error("Need two Matrix of equal dimensions");
-    
-    // Condition to have better performance and match backend requirements
-    const std::string backend = get_backend();
-    if (backend == "MKL" || backend == "Eigen") {
-
-        if ((v1_layout != v2_layout) || v1_layout) {
-            throw std::runtime_error("Need two Matrix with the same storage and Col-major for performance and backend purpose");
-        }
-    }
-    else if (v1_layout != v2_layout) {
-        throw std::runtime_error("Need two Matrix with the same storage Col-major or Row-major for performance and backend purpose");
-    }
-
-    // Dispatch
-    DISPATCH_BACKEND(sum, v1, v2, v1_rows, v1_cols, op)
-}
-
-std::vector<double> mult_impl(
-    const std::vector<double>& v1, const std::vector<double>& v2,   // Data
-    size_t v1_rows, size_t v1_cols, size_t v2_rows, size_t v2_cols, // Size
-    bool v1_layout, bool v2_layout) {                               // Layouts
-        
-    // Verify if we can multiply them
-    if (v1_cols != v2_rows) throw std::runtime_error("Need df1 cols == df2 rows");
-
-    // Condition to have better performance and match backend requirements
-    const std::string backend = get_backend();
-    if (backend == "MKL" || backend == "Eigen") {
-
-        if ((v1_layout != v2_layout) || v1_layout) {
-            throw std::runtime_error("Need two Matrix with the same storage and Col-major for performance and backend purpose");
-        }
-    }
-    else if (!v1_layout || v2_layout) {
-        throw std::runtime_error("Need df1 row major and df2 col major");
-    }
-
-    // Dispatch
-    DISPATCH_BACKEND(multiply, v1, v2, v1_rows, v1_cols, v2_rows, v2_cols)
-}
-}
-
-// ============================================
-// Public API
+// Public Interface
 // ============================================
 
 namespace Linalg {
@@ -216,7 +55,7 @@ Dataframe Operations::sum(const Dataframe& df1, const Dataframe& df2, char op) {
     size_t n = df1.get_cols();
     bool is_row_major = df1.get_storage();
 
-    std::vector<double> res = detail::sum_impl(
+    std::vector<double> res = detail::OperationsImpl::sum_impl(
         df1.get_data(), df2.get_data(), 
         m, n,
         df2.get_rows(), df2.get_cols(),
@@ -232,7 +71,7 @@ Dataframe Operations::multiply(const Dataframe& df1, const Dataframe& df2) {
     size_t m = df1.get_rows();
     size_t p = df2.get_cols();
 
-    std::vector<double> res = detail::mult_impl(
+    std::vector<double> res = detail::OperationsImpl::multiply_impl(
         df1.get_data(), df2.get_data(), 
         m, df1.get_cols(),
         df2.get_rows(), p,
@@ -243,7 +82,19 @@ Dataframe Operations::multiply(const Dataframe& df1, const Dataframe& df2) {
 }
 
 Dataframe Operations::transpose(Dataframe& df) {
-    DISPATCH_BACKEND(transpose, df)
+
+    size_t rows = df.get_cols(), cols = df.get_rows();
+    size_t temp_row = df.get_rows(), temp_col = df.get_cols();
+    std::string backend = Linalg::get_backend();
+
+    // Changing layout for better performance later
+    if (df.get_storage()) df.change_layout_inplace(backend);
+
+    std::vector<double> res = detail::OperationsImpl::transpose_impl(
+        df.get_data(), temp_row, temp_col
+    );
+
+    return Dataframe(rows, cols, false, std::move(res));
 }
 
 Dataframe Operations::inverse(Dataframe& df) {

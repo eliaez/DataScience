@@ -1,10 +1,7 @@
 #pragma once
 
-#include "Linalg/LinalgNaive.hpp"
-#include "Linalg/LinalgAVX2.hpp"
-#include "Linalg/LinalgAVX2_threaded.hpp"
-#include "Linalg/LinalgEigen.hpp"
-#include "Linalg/LinalgMKL.hpp"
+#include "Data/Data.hpp"
+#include "Linalg/detail/LinalgImpl.hpp"
 #include <string>
 
 #ifdef __AVX2__
@@ -14,29 +11,11 @@
 namespace Linalg {
 
     #if defined(__AVX2__) && defined(USE_MKL)
-        enum class Backend {
-            NAIVE,
-            AVX2,
-            AVX2_THREADED,
-            EIGEN,
-            MKL,
-            AUTO
-        };
+        enum class Backend { NAIVE, AVX2, AVX2_THREADED, EIGEN, MKL, AUTO };
     #elif defined(__AVX2__)
-        enum class Backend {
-            NAIVE,
-            AVX2,
-            AVX2_THREADED,
-            EIGEN,
-            AUTO
-        };
+        enum class Backend { NAIVE, AVX2, AVX2_THREADED, EIGEN, AUTO };
     #elif defined(USE_MKL)
-        enum class Backend {
-            NAIVE,
-            EIGEN,
-            MKL,
-            AUTO
-        };
+        enum class Backend { NAIVE, EIGEN, MKL, AUTO };
     #else 
         enum class Backend {
             NAIVE, // Still col-major and cache friendly
@@ -70,6 +49,9 @@ namespace Linalg {
             // For Naive, AVX2, AVX2TH, layout need to be row - col
             // For Eigena and MKL, layout need to be col - col
             static Dataframe multiply(const Dataframe& df1, const Dataframe& df2);
+
+            // Transpose function, will choose the backend accordingly to your config.
+            // If your dataframe layout is row major then it will change it to col major by default.
             static Dataframe transpose(Dataframe& df);
             static Dataframe inverse(Dataframe& df);
 

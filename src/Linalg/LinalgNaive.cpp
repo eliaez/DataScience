@@ -1,8 +1,6 @@
 #include "Linalg/LinalgNaive.hpp"
-#include "Linalg/Linalg.hpp"
 
-namespace Linalg {
-namespace Naive {
+namespace Linalg::Naive {
 
 std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const Dataframe& df) {
 
@@ -61,20 +59,12 @@ std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const
     return std::make_tuple(nb_swaps, std::move(swaps), std::move(LU));
 }
 
-Dataframe transpose(Dataframe& df) {
+std::vector<double> transpose(const std::vector<double>& v1,  
+    size_t v1_rows, size_t v1_cols) {
 
-    size_t rows = df.get_cols(), cols = df.get_rows();
-    size_t temp_row = df.get_rows(), temp_col = df.get_cols();
+    std::vector<double> new_data = Dataframe::transpose_naive(v1_rows, v1_cols, v1);
 
-    // Changing layout for better performances later
-    if (df.get_storage()){
-        df.change_layout_inplace("Naive");
-    }
-
-    std::vector<double> data = Dataframe::transpose_naive(temp_row, temp_col, df.get_data());
-
-    return {rows, cols, false, std::move(data), df.get_headers(), 
-        df.get_encoder(), df.get_encodedCols()};
+    return new_data;
 }
 
 std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, 
@@ -234,7 +224,5 @@ Dataframe inverse(Dataframe& df) {
 
         return solveLU_inplace(perm.get_data(), LU, n);
     }
-}
-
 }
 }

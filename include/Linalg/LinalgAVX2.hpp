@@ -1,42 +1,42 @@
 #pragma once
 
 #include "Data/Data.hpp"
+#include <vector>
 #include <tuple>
 
-namespace Linalg {
-    namespace AVX2 {
-        
-        #ifdef __AVX2__
-        constexpr size_t NB_DB = 4; // AVX2 (256 bits) so 4 doubles
-        constexpr size_t PREFETCH_DIST = 16; // Pre-fetch 16*64 bytes ahead for contigue memory only
-        static constexpr size_t PREFETCH_DIST1 = 4; // Pre-fetch 4*64 bytes ahead for Blocks algo
-        
-        // Sum AVX2 col col or row row only
-        std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2,
-            size_t m, size_t n,     // Rows / Cols
-            char op = '+'           // Operator
-        );
+namespace Linalg::AVX2 {
+    #ifdef __AVX2__
+    constexpr size_t NB_DB = 4; // AVX2 (256 bits) so 4 doubles
+    constexpr size_t PREFETCH_DIST = 16; // Pre-fetch 16*64 bytes ahead for contigue memory only
+    static constexpr size_t PREFETCH_DIST1 = 4; // Pre-fetch 4*64 bytes ahead for Blocks algo
 
-        // Mult AVX2 row - col config only
-        std::vector<double> multiply(const std::vector<double>& v1, const std::vector<double>& v2,
-            size_t m, size_t n,     // Rows / Cols v1
-            size_t o, size_t p     // Rows / Cols v2
-        );
+    // Sum AVX2 col col or row row only
+    std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2,
+        size_t m, size_t n,     // Rows / Cols
+        char op = '+'           // Operator
+    );
 
-        // Transpose by blocks
-        Dataframe transpose(Dataframe& df);
+    // Mult AVX2 row - col config only
+    std::vector<double> multiply(const std::vector<double>& v1, const std::vector<double>& v2,
+        size_t m, size_t n,     // Rows / Cols v1
+        size_t o, size_t p     // Rows / Cols v2
+    );
 
-        // LU decomposition, returns nb_swaps, swap - permutation matrix and LU in the same matrix
-        std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const Dataframe& df);
+    // Transpose by blocks AVX2
+    std::vector<double> transpose(const std::vector<double>& v1,  
+        size_t v1_rows, size_t v1_cols
+    );
 
-        // Function to solve LU system with Forward substitution and Backward substitution
-        Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n);
+    // LU decomposition, returns nb_swaps, swap - permutation matrix and LU in the same matrix
+    std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const Dataframe& df);
 
-        // Function to inverse matrix by using LU decomposition 
-        Dataframe inverse(Dataframe& df);
+    // Function to solve LU system with Forward substitution and Backward substitution
+    Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n);
 
-        // Horizontal Reduction
-        double horizontal_red(__m256d& vec);
-        #endif
-    }
+    // Function to inverse matrix by using LU decomposition 
+    Dataframe inverse(Dataframe& df);
+
+    // Horizontal Reduction
+    double horizontal_red(__m256d& vec);
+    #endif
 }

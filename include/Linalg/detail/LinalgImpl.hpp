@@ -1,5 +1,11 @@
 #pragma once
 
+#include "Linalg/Linalg.hpp"
+#include "Linalg/LinalgNaive.hpp"
+#include "Linalg/LinalgAVX2.hpp"
+#include "Linalg/LinalgAVX2_threaded.hpp"
+#include "Linalg/LinalgEigen.hpp"
+#include "Linalg/LinalgMKL.hpp"
 #include <vector>
 
 namespace Linalg::detail {
@@ -30,11 +36,11 @@ namespace Linalg::detail {
                 bool v2_layout
             );
 
+            // Intermediary transpose function to check requirements and dispatch to backend
             static std::vector<double> transpose_impl(
                 const std::vector<double>& v1, 
                 size_t v1_rows,
-                size_t v1_cols,
-                bool v1_layout
+                size_t v1_cols
             );
 
             static std::vector<double> inverse_impl(
@@ -60,7 +66,7 @@ namespace Linalg::detail {
                 );
             #endif
 
-            static std::tuple<double, std::vector<double>, std::vector<double>> determinant(
+            static std::tuple<double, std::vector<double>, std::vector<double>> determinant_impl(
                 const std::vector<double>& v1, 
                 size_t v1_rows,
                 size_t v1_cols,

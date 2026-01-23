@@ -1,5 +1,4 @@
 #include "Data/Data.hpp"
-#include "Linalg/Linalg.hpp"
 #include "Utils/ThreadPool.hpp"
 #include <iomanip>
 #include <system_error>
