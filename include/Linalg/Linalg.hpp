@@ -57,10 +57,18 @@ namespace Linalg {
             static void set_backend(Backend b);
             static void set_backend(const std::string& b);
             
-            // Will select the best one if AUTO
+            // Will select the best one (implemented) if AUTO
             static Backend get_backend();
 
+            // Sum function between two dataframes, will choose the backend accordingly to your config.
+            // op stands for operator (+ or -), by default '+' 
+            // For Naive, AVX2, AVX2TH, layout need to be row - row or col - col 
+            // For Eigena and MKL, layout need to be col - col
             static Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op = '+');
+
+            // Mult function between two dataframes, will choose the backend accordingly to your config.
+            // For Naive, AVX2, AVX2TH, layout need to be row - col
+            // For Eigena and MKL, layout need to be col - col
             static Dataframe multiply(const Dataframe& df1, const Dataframe& df2);
             static Dataframe transpose(Dataframe& df);
             static Dataframe inverse(Dataframe& df);

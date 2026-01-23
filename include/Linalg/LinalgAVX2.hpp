@@ -9,14 +9,19 @@ namespace Linalg {
         #ifdef __AVX2__
         constexpr size_t NB_DB = 4; // AVX2 (256 bits) so 4 doubles
         constexpr size_t PREFETCH_DIST = 16; // Pre-fetch 16*64 bytes ahead for contigue memory only
-
-        std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, // Data
+        static constexpr size_t PREFETCH_DIST1 = 4; // Pre-fetch 4*64 bytes ahead for Blocks algo
+        
+        // Sum AVX2 col col or row row only
+        std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2,
             size_t m, size_t n,     // Rows / Cols
             char op = '+'           // Operator
         );
 
         // Mult AVX2 row - col config only
-        Dataframe multiply(const Dataframe& df1, const Dataframe& df2);
+        std::vector<double> multiply(const std::vector<double>& v1, const std::vector<double>& v2,
+            size_t m, size_t n,     // Rows / Cols v1
+            size_t o, size_t p     // Rows / Cols v2
+        );
 
         // Transpose by blocks
         Dataframe transpose(Dataframe& df);

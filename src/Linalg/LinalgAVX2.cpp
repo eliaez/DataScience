@@ -299,20 +299,11 @@ std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>
     return new_data;
 }
 
-Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
-
-    size_t m = df1.get_rows();
-    size_t n = df1.get_cols();
-    size_t o = df2.get_rows();
-    size_t p = df2.get_cols();
+std::vector<double> multiply(const std::vector<double>& v1, const std::vector<double>& v2,
+    size_t m, size_t n, size_t o, size_t p ) {
     
-    // Verify if we can multiply them
-    if (n != o) throw std::runtime_error("Need df1 cols == df2 rows");
-
-    // To optimize we want only row - col config (see explication at end of function)
-    if (!(df1.get_storage() && !df2.get_storage())) throw std::runtime_error("Need df1 row major and df2 col major");
-
-    std::vector<double> data(m * p);
+    // New data
+    std::vector<double> new_data(m * p);
     
     // row - col
     size_t i = 0;
@@ -332,25 +323,25 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
                 
                 if (k + PREFETCH_DIST < vec_size) {
                     // Pre-charged PREFETCH_DIST*8 bytes ahead
-                    if (i + df1.PREFETCH_DIST1 < vec_sizei) {
+                    if (i + PREFETCH_DIST1 < vec_sizei) {
                         for (size_t l = 0; l < NB_DB; l++) {
-                            _mm_prefetch((const char*)&df1.at((i+l+df1.PREFETCH_DIST1) * n + k + PREFETCH_DIST), _MM_HINT_T0);
+                            _mm_prefetch((const char*)&v1[(i+l+PREFETCH_DIST1) * n + k + PREFETCH_DIST], _MM_HINT_T0);
                         }
                     }
                     else {
-                        _mm_prefetch((const char*)&df1.at(i * n + k + PREFETCH_DIST), _MM_HINT_T0);
+                        _mm_prefetch((const char*)&v1[i * n + k + PREFETCH_DIST], _MM_HINT_T0);
                     }
-                    _mm_prefetch((const char*)&df2.at(j * o + k + PREFETCH_DIST), _MM_HINT_T0);
+                    _mm_prefetch((const char*)&v2[j * o + k + PREFETCH_DIST], _MM_HINT_T0);
                 }
 
-                // df1 row major
-                // df2 col major
-                __m256d vec1_0 = _mm256_loadu_pd(&df1.at(i * n + k));
-                __m256d vec1_1 = _mm256_loadu_pd(&df1.at((i+1) * n + k));
-                __m256d vec1_2 = _mm256_loadu_pd(&df1.at((i+2) * n + k));
-                __m256d vec1_3 = _mm256_loadu_pd(&df1.at((i+3) * n + k));
+                // v1 row major
+                // v2 col major
+                __m256d vec1_0 = _mm256_loadu_pd(&v1[i * n + k]);
+                __m256d vec1_1 = _mm256_loadu_pd(&v1[(i+1) * n + k]);
+                __m256d vec1_2 = _mm256_loadu_pd(&v1[(i+2) * n + k]);
+                __m256d vec1_3 = _mm256_loadu_pd(&v1[(i+3) * n + k]);
 
-                __m256d vec2 = _mm256_loadu_pd(&df2.at(j * o + k)); 
+                __m256d vec2 = _mm256_loadu_pd(&v2[j * o + k]); 
                 
                 sum_vec0 = _mm256_fmadd_pd(vec1_0, vec2, sum_vec0);
                 sum_vec1 = _mm256_fmadd_pd(vec1_1, vec2, sum_vec1);
@@ -366,16 +357,16 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
             
             // Scalar residual
             for (; k < n; k++) {
-                sum0 += df1.at(i * n + k) * df2.at(j * o + k);
-                sum1 += df1.at((i+1) * n + k) * df2.at(j * o + k);
-                sum2 += df1.at((i+2) * n + k) * df2.at(j * o + k);
-                sum3 += df1.at((i+3) * n + k) * df2.at(j * o + k);
+                sum0 += v1[i * n + k] * v2[j * o + k];
+                sum1 += v1[(i+1) * n + k] * v2[j * o + k];
+                sum2 += v1[(i+2) * n + k] * v2[j * o + k];
+                sum3 += v1[(i+3) * n + k] * v2[j * o + k];
             }
             // Write it directly in col major
-            data[j * m + i] = sum0;
-            data[j * m + i+1] = sum1;
-            data[j * m + i+2] = sum2;
-            data[j * m + i+3] = sum3;
+            new_data[j * m + i] = sum0;
+            new_data[j * m + i+1] = sum1;
+            new_data[j * m + i+2] = sum2;
+            new_data[j * m + i+3] = sum3;
         }
     }
 
@@ -385,22 +376,21 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
 
             double sum = 0.0;
             for (size_t k = 0; k < n; k++) {
-                // df1 row major
-                // df2 col major
-                sum += df1.at(i * n + k) * df2.at(j * o + k);
+                // v1 row major
+                // v2 col major
+                sum += v1[i * n + k] * v2[j * o + k];
             }
             // Write it directly in col major
-            data[j * m + i] = sum;
+            new_data[j * m + i] = sum;
         }
     }
     // col - row
     // Non-optimized for AVX2 
-    // ie need to access data[j*m + i], data[(j+1)*m + i], ...
+    // ie need to access new_data[j*m + i], new_data[(j+1)*m + i], ...
     // Loss of our advantage
     
     // Return column - major
-    return Dataframe(m, p, false, std::move(data), 
-                     df1.get_headers(), df1.get_encoder(), df1.get_encodedCols());
+    return new_data;
 }
 
 Dataframe transpose(Dataframe& df) {

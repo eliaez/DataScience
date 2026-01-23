@@ -57,20 +57,8 @@ std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>
     return new_data;
 }
 
-Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
-
-    size_t m = df1.get_rows();
-    size_t n = df1.get_cols();
-    size_t o = df2.get_rows();
-    size_t p = df2.get_cols();
-    
-    // Verify if we can multiply them
-    if (n != o) throw std::runtime_error("Need df1 cols == df2 rows");
-
-    // Condition to have better performances
-    if ((df1.get_storage() != df2.get_storage()) && df1.get_storage()) {
-        throw std::runtime_error("Need two Matrix with the same storage and Col-major for performances purpose");
-    }
+std::vector<double> multiply(const std::vector<double>& v1, const std::vector<double>& v2,
+    size_t m, size_t n, size_t o, size_t p ) {
 
     std::vector<double> new_data(m * p);
 
@@ -82,9 +70,9 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
         p,                
         n,                
         1.0,                // Scalar alpha : res = alpha × op(df1) × op(df2) + beta × res
-        df1.get_db(),       // Input df1
+        v1.data(),       // Input df1
         m,                  
-        df2.get_db(),       // Input df2
+        v2.data(),       // Input df2
         o,                  
         0.0,                // Scalar beta : res = alpha × op(df1) × op(df2) + beta × res
         new_data.data(),    // Output res
@@ -92,8 +80,7 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
     );
 
     // Return column - major
-    return Dataframe(m, p, false, std::move(new_data), 
-                     df1.get_headers(), df1.get_encoder(), df1.get_encodedCols());
+    return new_data;
 }
 
 Dataframe inverse(Dataframe& df) {

@@ -39,29 +39,18 @@ std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>
     return new_data;
 }
 
-Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
-
-    size_t m = df1.get_rows();
-    size_t n = df1.get_cols();
-    size_t o = df2.get_rows();
-    size_t p = df2.get_cols();
-    
-    // Verify if we can multiply them
-    if (n != o) throw std::runtime_error("Need df1 cols == df2 rows");
-
-    // Condition to have better performances
-    if ((df1.get_storage() != df2.get_storage()) && df1.get_storage()) {
-        throw std::runtime_error("Need two Matrix with the same storage and Col-major for performances purpose");
-    }
+std::vector<double> multiply(const std::vector<double>& v1, const std::vector<double>& v2,
+    size_t m, size_t n, size_t o, size_t p ) {
 
     std::vector<double> new_data(m * p);
     Eigen::Map<Eigen::MatrixXd> res(new_data.data(), m, p);
+    Eigen::Map<const Eigen::MatrixXd> mat1(v1.data(), m, n);
+    Eigen::Map<const Eigen::MatrixXd> mat2(v2.data(), o, p);
 
-    res = df1.asEigen() * df2.asEigen();
+    res = mat1 * mat2;
 
     // Return column - major
-    return Dataframe(m, p, false, std::move(new_data), 
-                     df1.get_headers(), df1.get_encoder(), df1.get_encodedCols());
+    return new_data;
 }
 
 Dataframe inverse(Dataframe& df) {

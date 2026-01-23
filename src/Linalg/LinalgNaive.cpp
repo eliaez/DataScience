@@ -97,58 +97,29 @@ std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>
     return new_data;
 }
 
-Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
-
-    size_t m = df1.get_rows();
-    size_t n = df1.get_cols();
-    size_t o = df2.get_rows();
-    size_t p = df2.get_cols();
+std::vector<double> multiply(const std::vector<double>& v1, const std::vector<double>& v2,
+    size_t m, size_t n, size_t o, size_t p ) {
     
-    // Verify if we can multiply them
-    if (n != o) throw std::runtime_error("Need df1 cols == df2 rows");
-
-    // To optimize we want only row - col or col - row config
-    if (df1.get_storage() == df2.get_storage()) {
-        throw std::runtime_error("Need df1 row major and df2 col major or df1 col major and df2 row major");
-    }
-
-    std::vector<double> data(m * p);
+    // New data
+    std::vector<double> new_data(m * p);
     
     // row - col
-    if (df1.get_storage()) {
-        for (size_t i = 0; i < m; i++) {
-            for (size_t j = 0; j < p; j++) {
+    for (size_t i = 0; i < m; i++) {
+        for (size_t j = 0; j < p; j++) {
 
-                double sum = 0.0;
-                for (size_t k = 0; k < n; k++) {
-                    // df1 row major
-                    // df2 col major
-                    sum += df1.at(i * n + k) * df2.at(j * o + k);
-                }
-                // Write it directly in col major
-                data[j * m + i] = sum;
-            }
-        }
-    }
-    // col - row
-    else {
-        for (size_t i = 0; i < m; i++) {
+            double sum = 0.0;
             for (size_t k = 0; k < n; k++) {
-                
-                double val1 = df1.at(k*m + i); 
-                for (size_t j = 0; j < p; j++) {
-                    // df1 row major
-                    // df2 col major
-                    // Write it directly in col major
-                    data[j*m + i] += val1 * df2.at(k*p + j); // Sequential read for performances
-                }
+                // df1 row major
+                // df2 col major
+                sum += v1[i * n + k] * v2[j * o + k];
             }
+            // Write it directly in col major
+            new_data[j * m + i] = sum;
         }
     }
     
     // Return column - major
-    return Dataframe(m, p, false, std::move(data), 
-                     df1.get_headers(), df1.get_encoder(), df1.get_encodedCols());
+    return new_data;
 }
 
 Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n) {

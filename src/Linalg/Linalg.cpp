@@ -124,18 +124,41 @@ std::vector<double> sum_impl(
     const std::string backend = get_backend();
     if (backend == "MKL" || backend == "Eigen") {
 
-        if ((v1_layout != v2_layout) && v1_layout) {
-            throw std::runtime_error("Need two Matrix with the same storage and Col-major for performances purpose");
+        if ((v1_layout != v2_layout) || v1_layout) {
+            throw std::runtime_error("Need two Matrix with the same storage and Col-major for performance and backend purpose");
         }
     }
-    else {
-        throw std::runtime_error("Need two Matrix with the same storage Col-major or Row-major for performances purpose");
+    else if (v1_layout != v2_layout) {
+        throw std::runtime_error("Need two Matrix with the same storage Col-major or Row-major for performance and backend purpose");
     }
 
     // Dispatch
     DISPATCH_BACKEND(sum, v1, v2, v1_rows, v1_cols, op)
 }
 
+std::vector<double> mult_impl(
+    const std::vector<double>& v1, const std::vector<double>& v2,   // Data
+    size_t v1_rows, size_t v1_cols, size_t v2_rows, size_t v2_cols, // Size
+    bool v1_layout, bool v2_layout) {                               // Layouts
+        
+    // Verify if we can multiply them
+    if (v1_cols != v2_rows) throw std::runtime_error("Need df1 cols == df2 rows");
+
+    // Condition to have better performance and match backend requirements
+    const std::string backend = get_backend();
+    if (backend == "MKL" || backend == "Eigen") {
+
+        if ((v1_layout != v2_layout) || v1_layout) {
+            throw std::runtime_error("Need two Matrix with the same storage and Col-major for performance and backend purpose");
+        }
+    }
+    else if (!v1_layout || v2_layout) {
+        throw std::runtime_error("Need df1 row major and df2 col major");
+    }
+
+    // Dispatch
+    DISPATCH_BACKEND(multiply, v1, v2, v1_rows, v1_cols, v2_rows, v2_cols)
+}
 }
 
 // ============================================
@@ -205,7 +228,18 @@ Dataframe Operations::sum(const Dataframe& df1, const Dataframe& df2, char op) {
 }
 
 Dataframe Operations::multiply(const Dataframe& df1, const Dataframe& df2) {
-    DISPATCH_BACKEND(multiply, df1, df2)
+    
+    size_t m = df1.get_rows();
+    size_t p = df2.get_cols();
+
+    std::vector<double> res = detail::mult_impl(
+        df1.get_data(), df2.get_data(), 
+        m, df1.get_cols(),
+        df2.get_rows(), p,
+        df1.get_storage(), df2.get_storage()
+    );
+
+    return Dataframe(m, p, false, std::move(res));
 }
 
 Dataframe Operations::transpose(Dataframe& df) {

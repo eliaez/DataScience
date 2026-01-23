@@ -5,6 +5,7 @@
 namespace Linalg::detail {
     class OperationsImpl {
         public:
+            // Intermediary sum function to check requirements and dispatch to backend
             static std::vector<double> sum_impl(
                 const std::vector<double>& v1,
                 const std::vector<double>& v2, 
@@ -16,7 +17,8 @@ namespace Linalg::detail {
                 bool v2_layout,
                 char op = '+'
             );
-        
+            
+            // Intermediary multiply function to check requirements and dispatch to backend
             static std::vector<double> multiply_impl(
                 const std::vector<double>& v1,
                 const std::vector<double>& v2, 

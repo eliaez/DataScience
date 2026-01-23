@@ -6,12 +6,17 @@
 namespace Linalg {
     namespace Naive {
 
-        std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, // Data
+        // Sum Naive col col or row row only
+        std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2,
             size_t m, size_t n,     // Rows / Cols
             char op = '+'           // Operator
         );
         
-        Dataframe multiply(const Dataframe& df1, const Dataframe& df2);
+        // Mult Naive row - col config only
+        std::vector<double> multiply(const std::vector<double>& v1, const std::vector<double>& v2,
+            size_t m, size_t n,     // Rows / Cols v1
+            size_t o, size_t p     // Rows / Cols v2
+        );
         
         Dataframe transpose(Dataframe& df);
 
