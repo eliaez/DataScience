@@ -1,4 +1,4 @@
-#include "Linalg/LinalgEigen.hpp"
+#include "LinalgEigen.hpp"
 
 namespace Linalg::EigenNP {
 
@@ -11,7 +11,7 @@ std::vector<double> transpose(const std::vector<double>& v1,
 }
 
 std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, 
-    size_t m, size_t n, char op = '+') { 
+    size_t m, size_t n, char op) { 
 
     // New data
     std::vector<double> new_data(m * n);
@@ -43,14 +43,15 @@ std::vector<double> multiply(const std::vector<double>& v1, const std::vector<do
     return new_data;
 }
 
-Dataframe inverse(Dataframe& df) {
-    size_t n = df.get_cols();
+std::vector<double> inverse(const std::vector<double>& v1, size_t n,
+    std::vector<double>, std::vector<double>) {
 
     std::vector<double> new_data(n * n);
     Eigen::Map<Eigen::MatrixXd> res(new_data.data(), n, n);
+    Eigen::Map<const Eigen::MatrixXd> mat1(v1.data(), n, n);
 
-    res = df.asEigen().inverse();
+    res = mat1.inverse();
 
-    return Dataframe(n, n, false, std::move(new_data));
+    return new_data;
 }
 }

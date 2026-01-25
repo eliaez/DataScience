@@ -1,4 +1,4 @@
-#include "Linalg/LinalgNaive.hpp"
+#include "LinalgNaive.hpp"
 
 namespace Linalg::Naive {
 
@@ -67,7 +67,7 @@ std::vector<double> transpose(const std::vector<double>& v1,
 }
 
 std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, 
-    size_t m, size_t n, char op = '+') {           
+    size_t m, size_t n, char op) {           
 
     // New data
     std::vector<double> new_data(m * n);

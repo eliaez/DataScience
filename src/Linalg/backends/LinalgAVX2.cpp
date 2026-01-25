@@ -1,4 +1,4 @@
-#include "Linalg/LinalgAVX2.hpp"
+#include "LinalgAVX2.hpp"
 
 
 namespace Linalg::AVX2 {
@@ -240,7 +240,7 @@ double horizontal_red(__m256d& vec) {
 }
 
 std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, 
-    size_t m, size_t n, char op = '+') { 
+    size_t m, size_t n, char op) { 
 
     // New data
     std::vector<double> new_data(m * n);
@@ -549,9 +549,9 @@ std::vector<double> inverse(const std::vector<double>& v1, size_t n,
         swaps = transpose(swaps, n, n);
 
         // Row - Col to use multiply from AVX2
-        std::vector<double> perm = multiply(df_swaps.get_data(), id, n, n, n, n); 
+        std::vector<double> perm = multiply(swaps, id, n, n, n, n); 
 
-        Dataframe res = solveLU_inplace(perm, LU, n);
+        std::vector<double> res = solveLU_inplace(perm, LU, n);
         return res;
     }
 }

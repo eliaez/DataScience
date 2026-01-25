@@ -111,9 +111,9 @@
 // Internal Implementation 
 // ============================================
 
-namespace Linalg::detail {
+namespace Linalg {
 
-std::vector<double> OperationsImpl::sum_impl(
+std::vector<double> Operations::Impl::sum_impl(
     const std::vector<double>& v1, const std::vector<double>& v2,   // Data
     size_t v1_rows, size_t v1_cols, size_t v2_rows, size_t v2_cols, // Size
     bool v1_layout, bool v2_layout,                                 // Layouts
@@ -123,7 +123,7 @@ std::vector<double> OperationsImpl::sum_impl(
     if (v1_rows != v2_rows || v1_cols != v2_cols) throw std::runtime_error("Need two Matrix of equal dimensions");
     
     // Condition to have better performance and match backend requirements
-    const std::string backend_str = get_backend();
+    const std::string backend_str = Linalg::get_backend();
     if (backend_str == "MKL" || backend_str == "Eigen") {
 
         if ((v1_layout != v2_layout) || v1_layout) {
@@ -138,7 +138,7 @@ std::vector<double> OperationsImpl::sum_impl(
     DISPATCH_BACKEND(sum, v1, v2, v1_rows, v1_cols, op)
 }
 
-std::vector<double> OperationsImpl::multiply_impl(
+std::vector<double> Operations::Impl::multiply_impl(
     const std::vector<double>& v1, const std::vector<double>& v2,   // Data
     size_t v1_rows, size_t v1_cols, size_t v2_rows, size_t v2_cols, // Size
     bool v1_layout, bool v2_layout) {                               // Layouts
@@ -147,7 +147,7 @@ std::vector<double> OperationsImpl::multiply_impl(
     if (v1_cols != v2_rows) throw std::runtime_error("Need df1 cols == df2 rows");
 
     // Condition to have better performance and match backend requirements
-    const std::string backend_str = get_backend();
+    const std::string backend_str = Linalg::get_backend();
     if (backend_str == "MKL" || backend_str == "Eigen") {
 
         if ((v1_layout != v2_layout) || v1_layout) {
@@ -162,7 +162,7 @@ std::vector<double> OperationsImpl::multiply_impl(
     DISPATCH_BACKEND(multiply, v1, v2, v1_rows, v1_cols, v2_rows, v2_cols)
 }
 
-std::vector<double> OperationsImpl::transpose_impl(
+std::vector<double> Operations::Impl::transpose_impl(
     const std::vector<double>& v1,                          // Data
     size_t v1_rows, size_t v1_cols, bool v1_layout) {     // Size and layout
 
@@ -174,7 +174,7 @@ std::vector<double> OperationsImpl::transpose_impl(
     DISPATCH_BACKEND(transpose, v1, v1_rows, v1_cols)
 }
 
-std::vector<double> OperationsImpl::inverse_impl(
+std::vector<double> Operations::Impl::inverse_impl(
     const std::vector<double>& v1,      // Data
     size_t v1_rows, bool v1_layout) {   // Size and layout 
 
@@ -183,9 +183,9 @@ std::vector<double> OperationsImpl::inverse_impl(
     std::vector<double> LU;
     
     // MKL and Eigen are external libraries
-    const std::string backend_str = get_backend();
+    const std::string backend_str = Linalg::get_backend();
     if (backend_str != "MKL" && backend_str != "Eigen") {
-        std::tie(det, swaps, LU) = OperationsImpl::determinant_impl(v1, v1_rows, v1_layout);
+        std::tie(det, swaps, LU) = determinant_impl(v1, v1_rows, v1_layout);
     } 
     else {
         det = 0.0;
@@ -197,7 +197,7 @@ std::vector<double> OperationsImpl::inverse_impl(
     DISPATCH_BACKEND(inverse, v1, v1_rows, swaps, LU)
 }
 
-std::tuple<double, std::vector<double>, std::vector<double>> OperationsImpl::determinant_impl(
+std::tuple<double, std::vector<double>, std::vector<double>> Operations::Impl::determinant_impl(
     const std::vector<double>& v1,      // Data
     size_t v1_rows, bool v1_layout) {   // Size and layout 
 
@@ -207,19 +207,19 @@ std::tuple<double, std::vector<double>, std::vector<double>> OperationsImpl::det
     
     // Variables
     const size_t n = v1_rows;  
-    const std::string backend_str = get_backend();
+    const std::string backend_str = Linalg::get_backend();
     
     // LU decomposition
     std::vector<double> LU;
 
     // Let's see if the matrix is diagonal or triangular 
     int test_v;
-    if (backend_str == "Naive") test_v = OperationsImpl::triangular_impl(v1, n, v1_layout);
+    if (backend_str == "Naive") test_v = triangular_impl(v1, n, n, v1_layout);
     #ifdef __AVX2__
-        else if (backend_str == "AVX2") test_v = OperationsImpl::triangular_avx2_impl(v1, n, v1_layout);
-        else test_v = OperationsImpl::triangular_avx2_impl(v1, n, v1_layout);
+        else if (backend_str == "AVX2") test_v = triangular_avx2_impl(v1, n, n, v1_layout);
+        else test_v = triangular_avx2_impl(v1, n, n, v1_layout);
     #else
-        else test_v = OperationsImpl::triangular_impl(v1, n, v1_layout);
+        else test_v = triangular_impl(v1, n, n, v1_layout);
     #endif
 
     if (test_v != 0) {
@@ -249,9 +249,12 @@ std::tuple<double, std::vector<double>, std::vector<double>> OperationsImpl::det
     }
 }
 
-int OperationsImpl::triangular_impl(
+int Operations::Impl::triangular_impl(
     const std::vector<double>& v1,      // Data
-    size_t v1_rows, bool v1_layout) {   // Size and layout
+    size_t v1_rows, size_t v1_cols, bool v1_layout) {   // Size and layout
+
+    // Verify if we have a square matrix
+    if (v1_rows != v1_cols) throw std::runtime_error("Need Matrix(n,n)");
 
     size_t n = v1_rows; 
     bool is_trig_up = true;
@@ -284,9 +287,12 @@ int OperationsImpl::triangular_impl(
 }
 
 #ifdef __AVX2__
-int OperationsImpl::triangular_avx2_impl(
+int Operations::Impl::triangular_avx2_impl(
     const std::vector<double>& v1,      // Data
-    size_t v1_rows, bool v1_layout) {   // Size and layout
+    size_t v1_rows, size_t v1_cols, bool v1_layout) {   // Size and layout
+    
+    // Verify if we have a square matrix
+    if (v1_rows != v1_cols) throw std::runtime_error("Need Matrix(n,n)");
     
     size_t n = v1_rows; 
     bool is_trig_up = true;
@@ -307,9 +313,9 @@ int OperationsImpl::triangular_avx2_impl(
         for(; i < vec_sizei && is_trig_down; i+=NB_DB) {
 
             if (i + PREFETCH_DIST < vec_sizei) {
-                _mm_prefetch((const char*)&df.at(j*n + i + PREFETCH_DIST), _MM_HINT_T0);
+                _mm_prefetch((const char*)&v1[j*n + i + PREFETCH_DIST], _MM_HINT_T0);
             }
-            __m256d vec = _mm256_loadu_pd(&df.at(j*n + i));
+            __m256d vec = _mm256_loadu_pd(&v1[j*n + i]);
             __m256d cmp = _mm256_cmp_pd(vec, zero_vec, _CMP_EQ_OQ);
             int mask = _mm256_movemask_pd(cmp);
             
@@ -320,7 +326,7 @@ int OperationsImpl::triangular_avx2_impl(
 
         // Scalar residual for i
         for(; i < j && is_trig_down; i++) {
-            if (df.at(j*n + i) != 0) is_trig_down = false;
+            if (v1[j*n + i] != 0) is_trig_down = false;
         }
     }
 
@@ -328,7 +334,7 @@ int OperationsImpl::triangular_avx2_impl(
     for (; j < n && is_trig_down; j++) {
         for(size_t i = 0; i < j && is_trig_down; i++) {
             
-            if (df.at(j*n + i) != 0) is_trig_down = false;
+            if (v1[j*n + i] != 0) is_trig_down = false;
         }
     }
 
@@ -341,9 +347,9 @@ int OperationsImpl::triangular_avx2_impl(
         for(; i < vec_sizei && is_trig_up; i+=NB_DB) {
 
             if (i + PREFETCH_DIST < vec_sizei) {
-                _mm_prefetch((const char*)&df.at(j*n + i + PREFETCH_DIST), _MM_HINT_T0);
+                _mm_prefetch((const char*)&v1[j*n + i + PREFETCH_DIST], _MM_HINT_T0);
             }
-            __m256d vec = _mm256_loadu_pd(&df.at(j*n + i));
+            __m256d vec = _mm256_loadu_pd(&v1[j*n + i]);
             __m256d cmp = _mm256_cmp_pd(vec, zero_vec, _CMP_EQ_OQ);
             int mask = _mm256_movemask_pd(cmp);
             
@@ -354,7 +360,7 @@ int OperationsImpl::triangular_avx2_impl(
 
         // Scalar residual for i
         for(;i < n && is_trig_up; i++) {
-            if (df.at(j*n + i) != 0) is_trig_up = false;
+            if (v1[j*n + i] != 0) is_trig_up = false;
         }
     }
 
@@ -362,7 +368,7 @@ int OperationsImpl::triangular_avx2_impl(
     for (; j < n && is_trig_up; j++) {
         for(size_t i = j+1; i < n && is_trig_up; i++) {
             
-            if (df.at(j*n + i) != 0) is_trig_up = false;
+            if (v1[j*n + i] != 0) is_trig_up = false;
         }
     }
 

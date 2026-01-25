@@ -1,4 +1,4 @@
-#include "Utils/TestSuite.hpp"
+#include "TestSuite.hpp"
 #include "Data/Data.hpp"
 
 using namespace std;

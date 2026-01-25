@@ -1,15 +1,15 @@
 #pragma once
 
 #include "Linalg/Linalg.hpp"
-#include "Linalg/LinalgNaive.hpp"
-#include "Linalg/LinalgAVX2.hpp"
-#include "Linalg/LinalgAVX2_threaded.hpp"
-#include "Linalg/LinalgEigen.hpp"
-#include "Linalg/LinalgMKL.hpp"
+#include "Linalg/backends/LinalgNaive.hpp"
+#include "Linalg/backends/LinalgAVX2.hpp"
+#include "Linalg/backends/LinalgAVX2_threaded.hpp"
+#include "Linalg/backends/LinalgEigen.hpp"
+#include "Linalg/backends/LinalgMKL.hpp"
 #include <vector>
 
-namespace Linalg::detail {
-    class OperationsImpl {
+namespace Linalg {
+    class Operations::Impl {
         public:
             // Intermediary sum function to check requirements and dispatch to backend
             static std::vector<double> sum_impl(
@@ -61,6 +61,7 @@ namespace Linalg::detail {
             static int triangular_impl(
                 const std::vector<double>& v1, 
                 size_t v1_rows,
+                size_t v1_cols,
                 bool v1_layout
             );
 
@@ -68,6 +69,7 @@ namespace Linalg::detail {
             static int triangular_avx2_impl(
                 const std::vector<double>& v1, 
                 size_t v1_rows,
+                size_t v1_cols,
                 bool v1_layout
             );
             #endif

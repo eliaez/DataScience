@@ -23,12 +23,6 @@ namespace Linalg::MKL {
         size_t v1_rows, size_t v1_cols
     );
 
-    // LU decomposition, returns nb_swaps, swap - permutation matrix and LU in the same matrix
-    std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const Dataframe& df);
-
-    // Function to solve LU system with Forward substitution and Backward substitution
-    Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n);
-
     // Function to inverse matrix MKL
     std::vector<double> inverse(
         const std::vector<double>& v1, 

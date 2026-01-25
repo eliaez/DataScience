@@ -1,4 +1,4 @@
-#include "Linalg/LinalgAVX2_threaded.hpp"
+#include "LinalgAVX2_threaded.hpp"
 
 namespace Linalg::AVX2_threaded {
 #ifdef __AVX2__
@@ -184,6 +184,7 @@ std::vector<double> solveLU_inplace(const std::vector<double>& perm, const std::
 
     std::vector<std::future<void>> futures;
     futures.reserve(nb_threads);
+    const size_t prefetch_dist1 = PREFETCH_DIST1;
 
     size_t chunk = (int)(vec_size / nb_threads);
     size_t start = 0, end = chunk;
@@ -191,7 +192,7 @@ std::vector<double> solveLU_inplace(const std::vector<double>& perm, const std::
     for (size_t nb = 0; nb < nb_threads; nb++) {
         if (nb+1 == nb_threads) end = vec_size;
 
-        auto fut = pool.enqueue([start, end, n, PREFETCH_DIST1, &perm, &y, &diag_U, &LU] {
+        auto fut = pool.enqueue([start, end, n, prefetch_dist1, &perm, &y, &diag_U, &LU] {
             
             // By Blocks with AVX2
             for (size_t k = start; k < end; k+=NB_DB) {
@@ -200,9 +201,9 @@ std::vector<double> solveLU_inplace(const std::vector<double>& perm, const std::
                 // Forward substitution 
                 for (size_t i = 0; i < n; i++) {
 
-                    if (k + PREFETCH_DIST1 < end) {
+                    if (k + prefetch_dist1 < end) {
                         for (size_t p = 0; p < NB_DB; p++) {
-                            _mm_prefetch((const char*)&perm[(k+p+PREFETCH_DIST1)*n + i], _MM_HINT_T0);
+                            _mm_prefetch((const char*)&perm[(k+p+prefetch_dist1)*n + i], _MM_HINT_T0);
                         }        
                     }
 
@@ -215,9 +216,9 @@ std::vector<double> solveLU_inplace(const std::vector<double>& perm, const std::
                     
                     for (size_t j = 0; j < i; j++) {
 
-                        if (j + PREFETCH_DIST1 < i) {
+                        if (j + prefetch_dist1 < i) {
                             for (size_t p = 0; p < NB_DB; p++) {
-                                _mm_prefetch((const char*)&y[(k+p)*n + j + PREFETCH_DIST1], _MM_HINT_T0);
+                                _mm_prefetch((const char*)&y[(k+p)*n + j + prefetch_dist1], _MM_HINT_T0);
                             }
                         }
 
@@ -324,7 +325,7 @@ double horizontal_red(__m256d& vec) {
 }
 
 std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, 
-    size_t m, size_t n, char op = '+') { 
+    size_t m, size_t n, char op) { 
 
     // After multiple tests a minimum was decided
     constexpr size_t THREADING_THRESHOLD = 512;
@@ -694,9 +695,9 @@ std::vector<double> inverse(const std::vector<double>& v1, size_t n,
         swaps = transpose(swaps, n, n);
 
         // Row - Col to use multiply from AVX2
-        std::vector<double> perm = multiply(df_swaps.get_data(), id, n, n, n, n); 
+        std::vector<double> perm = multiply(swaps, id, n, n, n, n); 
 
-        Dataframe res = solveLU_inplace(perm, LU, n);
+        std::vector<double> res = solveLU_inplace(perm, LU, n);
         return res;
     }
 }

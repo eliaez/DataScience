@@ -1,4 +1,5 @@
 #include "Linalg/Linalg.hpp"
+#include "Linalg/detail/LinalgImpl.hpp"
 
 // ============================================
 // Public Interface
@@ -55,7 +56,7 @@ Dataframe Operations::sum(const Dataframe& df1, const Dataframe& df2, char op) {
     size_t n = df1.get_cols();
     bool is_row_major = df1.get_storage();
 
-    std::vector<double> res = detail::OperationsImpl::sum_impl(
+    std::vector<double> res = Impl::sum_impl(
         df1.get_data(), df2.get_data(), 
         m, n,
         df2.get_rows(), df2.get_cols(),
@@ -71,7 +72,7 @@ Dataframe Operations::multiply(const Dataframe& df1, const Dataframe& df2) {
     size_t m = df1.get_rows();
     size_t p = df2.get_cols();
 
-    std::vector<double> res = detail::OperationsImpl::multiply_impl(
+    std::vector<double> res = Impl::multiply_impl(
         df1.get_data(), df2.get_data(), 
         m, df1.get_cols(),
         df2.get_rows(), p,
@@ -90,7 +91,7 @@ Dataframe Operations::transpose(Dataframe& df) {
     // Changing layout for better performance later
     if (df.get_storage()) df.change_layout_inplace(backend);
 
-    std::vector<double> res = detail::OperationsImpl::transpose_impl(
+    std::vector<double> res = Impl::transpose_impl(
         df.get_data(), temp_row, temp_col, df.get_storage()
     );
 
@@ -109,7 +110,7 @@ Dataframe Operations::inverse(Dataframe& df) {
     // Changing layout for better performance later
     if (df.get_storage()) df.change_layout_inplace(backend);
 
-    std::vector<double> res = detail::OperationsImpl::inverse_impl(
+    std::vector<double> res = Impl::inverse_impl(
         df.get_data(), n, df.get_storage()
     );
 
@@ -128,35 +129,23 @@ std::tuple<double, std::vector<double>, std::vector<double>> Operations::determi
     // Changing layout for better performance later
     if (df.get_storage()) df.change_layout_inplace(backend);
 
-    return detail::OperationsImpl::determinant_impl(
+    return Impl::determinant_impl(
         df.get_data(), n, df.get_storage()
     );
 }
 
 int Operations::triangular_matrix(const Dataframe& df) {
 
-    size_t m = df.get_rows();
-    size_t n = df.get_cols();
-
-    // Verify if we have a square matrix
-    if (m != n) throw std::runtime_error("Need Matrix(n,n)");
-
-    return detail::OperationsImpl::triangular_impl(
-        df.get_data(), n, df.get_storage()
+    return Impl::triangular_impl(
+        df.get_data(), df.get_rows(), df.get_cols(), df.get_storage()
     );
 }
 
 #ifdef __AVX2__
 int Operations::triangular_matrix_avx2(const Dataframe& df) {
 
-    size_t m = df.get_rows();
-    size_t n = df.get_cols();
-
-    // Verify if we have a square matrix
-    if (m != n) throw std::runtime_error("Need Matrix(n,n)");
-
-    return detail::OperationsImpl::triangular_avx2_impl(
-        df.get_data(), n, df.get_storage()
+    return Impl::triangular_avx2_impl(
+        df.get_data(), df.get_rows(), df.get_cols(), df.get_storage()
     );
 }
 #endif

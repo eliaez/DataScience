@@ -1,4 +1,4 @@
-#include "Utils/TestSuite.hpp"
+#include "TestSuite.hpp"
 #include "Linalg/Linalg.hpp"
 
 using namespace std;

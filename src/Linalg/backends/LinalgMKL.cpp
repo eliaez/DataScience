@@ -1,4 +1,4 @@
-#include "Linalg/LinalgMKL.hpp"
+#include "LinalgMKL.hpp"
 
 namespace Linalg::MKL {
 #ifdef USE_MKL
@@ -12,7 +12,7 @@ std::vector<double> transpose(const std::vector<double>& v1,
 }
 
 std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, 
-    size_t m, size_t n, char op = '+') { 
+    size_t m, size_t n, char op) { 
 
     // New data
     std::vector<double> new_data(m * n);
@@ -73,11 +73,11 @@ std::vector<double> multiply(const std::vector<double>& v1, const std::vector<do
     return new_data;
 }
 
-Dataframe inverse(Dataframe& df) {
+std::vector<double> inverse(const std::vector<double>& v1, size_t n,
+    std::vector<double>, std::vector<double>) {
 
-    size_t n = df.get_cols();
-    std::vector<double> new_data = df.get_data();
-    std::vector<lapack_int> swaps(n);
+    std::vector<double> new_data = v1;
+    std::vector<lapack_int> pivots(n);
 
     lapack_int msg = LAPACKE_dgetrf(
         LAPACK_COL_MAJOR,   // LAPACK_ROW_MAJOR or LAPACK_COL_MAJOR
@@ -85,7 +85,7 @@ Dataframe inverse(Dataframe& df) {
         n,         
         new_data.data(),    // Matrix (input: data, output: LU)
         n,      
-        swaps.data()        // Pivots
+        pivots.data()        // Pivots
     );
     if(msg != 0) throw std::runtime_error("LU factorization failed");
 
@@ -94,11 +94,11 @@ Dataframe inverse(Dataframe& df) {
         n,       
         new_data.data(),    // Matrix (input: LU, output: inverse)
         n,      
-        swaps.data()        // Pivots
+        pivots.data()        // Pivots
     );
     if(msg1 != 0) throw std::runtime_error("Matrix inversion failed");
 
-    return Dataframe(n, n, false, std::move(new_data));
+    return new_data;
 }
 
 #endif

@@ -1,4 +1,4 @@
-#include "Utils/TestSuite.hpp"
+#include "TestSuite.hpp"
 #include <iostream>
 
 namespace TestSuite {

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Data/Data.hpp"
-#include "Linalg/detail/LinalgImpl.hpp"
 #include <string>
 
 #ifdef __AVX2__
