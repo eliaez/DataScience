@@ -23,6 +23,9 @@ Before implementing any ML and regression algorithms, we need fundamental linear
 
 ## Architecture of `Linalg`
 
+**Implementation note**: `Operations` provides a validated `Dataframe` interface wrapping performance-optimized backends that operate on raw data. Backend headers are kept internal (`src/Linalg/backends/`) for encapsulation while remaining accessible for testing.
+
+
 #### Backend System
 The `Operations` class manages backend selection through compile-time feature detection and runtime dispatch:
 
@@ -40,14 +43,21 @@ enum class Backend {
 Backend availability is determined at compile-time via preprocessor guards, ensuring only supported implementations are included. The `AUTO` mode defaults to `AVX2_THREADED` (if available) or `NAIVE` otherwise.
 
 #### Dispatch Mechanism
-Operations are routed through macro-based dispatch (`DISPATCH_BACKEND`) that expands to switch statements, eliminating virtual function overhead:
+Operations are routed through a two-layer architecture: first through the Linalg PIMPL-like interface, then to the corresponding backend using a macro-based dispatch (`DISPATCH_BACKEND`) that expands to switch statements, eliminating virtual function overhead:
 
 ```cpp
-// User calls
+// User calls (high-level)
 auto result = Linalg::Operations::multiply(df1, df2);
 
-// Internally dispatches to selected backend
-// e.g., Linalg::AVX2_threaded::multiply(df1, df2)
+// Internally dispatches to (low-level)
+Linalg::Operations::Impl::multiply_impl(
+    raw_data1, raw_data2, rows1, cols1, rows2, cols2, layout1, layout2
+);
+
+// Then dispatches to AVX2 threaded backend (default)
+Linalg::AVX2_threaded::multiply(
+    raw_data1, raw_data2, rows1, cols1, rows2, cols2
+);
 ```
 
 ## Core Operations
