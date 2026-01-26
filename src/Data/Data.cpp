@@ -4,6 +4,15 @@
 #include <system_error>
 
 /*----------------------------------------Dataframe-----------------------------------*/
+// ---------------------------------Operators or Equivalents---------------------------
+
+const double& Dataframe::at(size_t idx) const {
+    return data[idx];
+}
+
+double& Dataframe::at(size_t idx) {
+    return data[idx];
+}
 
 const double& Dataframe::operator()(size_t i, size_t j) const {
     if (i >= rows || j >= cols) {
@@ -19,13 +28,62 @@ double& Dataframe::operator()(size_t i, size_t j) {
     return is_row_major ? data[i*cols+j] : data[j*rows+i];
 }
 
-const double& Dataframe::at(size_t idx) const {
-    return data[idx];
+std::vector<double> Dataframe::operator[](const std::vector<size_t>& cols_idx) const {
+
+    // Test
+    for (const size_t& idx : cols_idx) {
+        if (idx >= cols) {
+            throw std::out_of_range("One of yours indexes is > of Dataframe dimensions");
+        }    
+    }
+
+    // Output
+    std::vector<double> choosen_data;
+    choosen_data.reserve(rows * cols_idx.size());
+
+    // Extract data
+    if (is_row_major) {
+        for (const size_t& idx : cols_idx) {
+            for (size_t i = 0; i < rows; i++) {
+                choosen_data.push_back(data[i*cols+idx]);
+            }
+        }
+    }
+    else {
+        for (const size_t& idx : cols_idx) {
+            for (size_t i = 0; i < rows; i++) {
+                choosen_data.push_back(data[idx*rows+i]);
+            }
+        }
+    }
+    return choosen_data;
 }
 
-double& Dataframe::at(size_t idx) {
-    return data[idx];
+std::vector<double> Dataframe::operator[](const std::vector<std::string>& cols_name) const {
+    
+    // Find cols idx
+    std::vector<size_t> cols_idx;
+    cols_idx.reserve(cols_name.size());
+    for (const std::string& name : cols_name) {
+
+        auto idx = std::find(headers.begin(), headers.end(), name);
+        if (idx != headers.end()) cols_idx.push_back(static_cast<size_t>(idx - headers.begin()));
+        else throw std::invalid_argument("Column not found");
+    }
+    return operator[](cols_idx);
 }
+
+std::vector<double> Dataframe::operator[](size_t j) const {
+    std::vector<size_t> cols_idx = {j};
+    return operator[](cols_idx);
+}
+
+std::vector<double> Dataframe::operator[](const std::string& col_name) const {
+    std::vector<std::string> cols_name = {col_name};
+    return operator[](cols_name);
+}
+
+// ---------------------------------------Methods---------------------------------------
 
 std::string Dataframe::decode_label(int value, int col) const {
 
@@ -134,10 +192,11 @@ Dataframe Dataframe::transfer_col(const std::string& col_name) {
 
     if (idx != headers.end()) return transfer_col(static_cast<size_t>(idx - headers.begin()));
     else {
-        std::cout << "Column not found - try again" << std::endl;
-        return {};
+        throw std::invalid_argument("Column not found");
     }
 }
+
+// -------------------------Methods change_layout and transpose----------------------------------
 
 Dataframe Dataframe::change_layout(const std::string& choice) const {
     

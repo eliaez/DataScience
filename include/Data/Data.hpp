@@ -79,11 +79,17 @@ class Dataframe
         const double& operator()(size_t i, size_t j) const;
         double& operator()(size_t i, size_t j);
 
+        // Getting a copy of col's data from your df
+        std::vector<double> operator[](const std::vector<size_t>& cols_idx) const;
+        std::vector<double> operator[](const std::vector<std::string>& cols_name) const;
+        std::vector<double> operator[](size_t j) const;
+        std::vector<double> operator[](const std::string& col_name) const;
+
         Dataframe operator+(const Dataframe& other) const { return Linalg::Operations::sum(*this, other); }
         Dataframe operator-(const Dataframe& other) const { return Linalg::Operations::sum(*this, other, '-'); }
-        
         Dataframe operator*(const Dataframe& other) const { return Linalg::Operations::multiply(*this, other); }
-        
+        Dataframe operator~() { return Linalg::Operations::transpose(*this);}
+
         // See Linalg.hpp for more details
         Dataframe inv() { return Linalg::Operations::inverse(*this); }
         
@@ -108,9 +114,25 @@ class Dataframe
         void display_decoded(size_t nb_rows, int space = 15) const;
         void display_decoded() const {display_decoded(rows, 15);}
 
-        // Transfer a column from a Dataframe to a new one 
+        // Transfer columns from a Dataframe to a new one 
+        Dataframe transfer_col(const std::vector<size_t>& cols_idx);
+        Dataframe transfer_col(const std::vector<std::string>& cols_name);
         Dataframe transfer_col(size_t j);  
         Dataframe transfer_col(const std::string& col_name);
+
+        // Delete cols from a Dataframe
+        void pop_col(const std::vector<size_t>& cols_idx);
+        void pop_col(const std::vector<std::string>& cols_name);
+        void pop_col(size_t j);  
+        void pop_col(const std::string& col_name);
+
+        // Delete rows from a Dataframe
+        void pop_row(const std::vector<size_t>& rows_idx);
+        void pop_row(const std::vector<std::string>& rowss_name);
+        void pop_row(size_t i);  
+        void pop_row(const std::string& row_name);
+
+        // -------------------------Methods change_layout and transpose----------------------------------
 
         // Change from row - major to col - major inplace, choose between Naive, AVX2...
         Dataframe change_layout(const std::string& choice = "AVX2") const;
