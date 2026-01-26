@@ -1,11 +1,14 @@
 #pragma once
 
-#include "Data/Data.hpp"
 #include <string>
+#include <vector>
+#include <tuple>
 
 #ifdef __AVX2__
     #include <immintrin.h>
 #endif
+
+class Dataframe;
 
 namespace Linalg {
 
@@ -65,12 +68,6 @@ namespace Linalg {
             // Function to test if the data from df is a triangular matrix, 
             // 3 for diagonal, 2 for Up, 1 for Down and 0 if not.
             static int triangular_matrix(const Dataframe& df);
-
-            #ifdef __AVX2__
-                // Function to test if the data from df is a triangular matrix, 
-                // 3 for diagonal, 2 for Up, 1 for Down and 0 if not.
-                static int triangular_matrix_avx2(const Dataframe& df);
-            #endif
     };
 
     // Function to get Backend in string

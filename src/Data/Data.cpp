@@ -5,8 +5,17 @@
 
 /*----------------------------------------Dataframe-----------------------------------*/
 
-double Dataframe::operator()(size_t i, size_t j) const {
-    //assert(i < rows && j < cols);
+const double& Dataframe::operator()(size_t i, size_t j) const {
+    if (i >= rows || j >= cols) {
+        throw std::out_of_range("i or j > of your Dataframe dimensions");
+    }
+    return is_row_major ? data[i*cols+j] : data[j*rows+i];
+}
+
+double& Dataframe::operator()(size_t i, size_t j) {
+    if (i >= rows || j >= cols) {
+        throw std::out_of_range("i or j > of your Dataframe dimensions");
+    }
     return is_row_major ? data[i*cols+j] : data[j*rows+i];
 }
 
@@ -16,22 +25,6 @@ const double& Dataframe::at(size_t idx) const {
 
 double& Dataframe::at(size_t idx) {
     return data[idx];
-}
-
-Eigen::Map<Eigen::MatrixXd> Dataframe::asEigen() {
-    return Eigen::Map<Eigen::MatrixXd>(data.data(), rows, cols);
-}
-
-Eigen::Map<const Eigen::MatrixXd> Dataframe::asEigen() const {
-    return Eigen::Map<const Eigen::MatrixXd>(data.data(), rows, cols);
-}
-
-Eigen::Map<Eigen::MatrixXd> Dataframe::asEigen(std::vector<double>& d, size_t r, size_t c) {
-    return Eigen::Map<Eigen::MatrixXd>(d.data(), r, c);
-}
-
-Eigen::Map<const Eigen::MatrixXd> Dataframe::asEigen(const std::vector<double>& d, size_t r, size_t c) {
-    return Eigen::Map<const Eigen::MatrixXd>(d.data(), r, c);
 }
 
 std::string Dataframe::decode_label(int value, int col) const {
@@ -259,14 +252,14 @@ std::vector<double> Dataframe::transpose_eigen(size_t rows_, size_t cols_,
     std::vector<double> new_data(rows_*cols_);
     Eigen::Map<Eigen::MatrixXd> res(new_data.data(), cols_, rows_);
     
-    auto eigen_mat = asEigen(df, rows_, cols_);
+    auto eigen_mat = Eigen::Map<const Eigen::MatrixXd>(df.data(), rows_, cols_);
     res = eigen_mat.transpose();
     
     return new_data;
 }
 
 void Dataframe::transpose_eigen_inplace(size_t n, std::vector<double>& df) {
-    auto eigen_mat = asEigen(df, n, n);
+    auto eigen_mat = Eigen::Map<Eigen::MatrixXd>(df.data(), n, n);
     eigen_mat.transposeInPlace();
 }
 

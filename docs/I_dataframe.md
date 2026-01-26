@@ -23,7 +23,6 @@ Three access patterns accommodate different use cases:
 
 - `operator()(i, j)`: provides an indexed access and abstracts layout complexity
 - `at(idx)`: provides direct access for raw vector manipulation
-- `asEigen()`: provides zero-copy Eigen matrix views (to enable the Eigen backend use case)
 
 #### Column Operations
 The `transfer_col()` method extracts columns using move semantics, transferring both numerical data and metadata (headers, encodings), while automatically updating indices to match the new configuration.

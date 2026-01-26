@@ -23,7 +23,7 @@ Before implementing any ML and regression algorithms, we need fundamental linear
 
 ## Architecture of `Linalg`
 
-**Implementation note**: `Operations` provides a validated `Dataframe` interface wrapping performance-optimized backends that operate on raw data. Backend headers are kept internal (`src/Linalg/backends/`) for encapsulation while remaining accessible for testing.
+**Implementation note**: `Operations` provides a validated `Dataframe` interface wrapping performance-optimized backends that operate on raw data. Backend headers are kept internal (`src/Linalg/backends/`) for encapsulation purpose.
 
 
 #### Backend System

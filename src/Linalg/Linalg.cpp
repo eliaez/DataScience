@@ -1,4 +1,5 @@
 #include "Linalg/Linalg.hpp"
+#include "Data/Data.hpp"
 #include "Linalg/detail/LinalgImpl.hpp"
 
 // ============================================
@@ -140,16 +141,6 @@ int Operations::triangular_matrix(const Dataframe& df) {
         df.get_data(), df.get_rows(), df.get_cols(), df.get_storage()
     );
 }
-
-#ifdef __AVX2__
-int Operations::triangular_matrix_avx2(const Dataframe& df) {
-
-    return Impl::triangular_avx2_impl(
-        df.get_data(), df.get_rows(), df.get_cols(), df.get_storage()
-    );
-}
-#endif
-
 std::string get_backend() {
     switch (Operations::get_backend())
     {

@@ -1,5 +1,6 @@
 #include "TestSuite.hpp"
 #include "Linalg/Linalg.hpp"
+#include "Data/Data.hpp"
 
 using namespace std;
 using namespace Linalg;

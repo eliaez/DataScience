@@ -64,14 +64,5 @@ namespace Linalg {
                 size_t v1_cols,
                 bool v1_layout
             );
-
-            #ifdef __AVX2__
-            static int triangular_avx2_impl(
-                const std::vector<double>& v1, 
-                size_t v1_rows,
-                size_t v1_cols,
-                bool v1_layout
-            );
-            #endif
     };
 }

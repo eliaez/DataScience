@@ -2,10 +2,7 @@
 
 #include <vector>
 
-/* Regression Linéaire utilise la méthode des moindres carrés ordinaire et est simplement 
-le fait de minimiser la somme des carrés des écarts entre les valeurs prédites et les 
-valeurs observées par rapport à nos deux paramètres qui sont l'origine et 
-la pente (Cov(X, Y)/Var(X)) dans le cas d'une régression simple */
+
 
 namespace Reg {
     class LinearRegression {
@@ -18,7 +15,7 @@ namespace Reg {
 
         public:
             // Constructor 
-            LinearRegression() : is_fitted(false) {};    
+            LinearRegression() : is_fitted(false) {}; // Init to get col major or warn user 
 
             // Training
             void fit(const std::vector<double>& x, const std::vector<double>& y);
