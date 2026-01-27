@@ -196,7 +196,7 @@ class CsvHandler {
     public:
         // Returns a column-major Dataframe from Csv path
         static Dataframe loadCsv(const std::string& filepath, 
-            char sep = ',', bool is_header = true, const std::string& method = "AVX2_threaded");
+            char delimiter = ',', bool has_header = true, const std::string& transpose_method = "AVX2_threaded");
 
 
     private:

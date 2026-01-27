@@ -942,7 +942,7 @@ int CsvHandler::encode_label(std::string& label, int col,
     return it->second;
 }
 
-Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep, bool is_header, const std::string& method) {
+Dataframe CsvHandler::loadCsv(const std::string& filepath, char delimiter, bool has_header, const std::string& transpose_method) {
 
     // Class Dataframe variables
     size_t rows = 0, cols = 0;
@@ -967,10 +967,10 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep, bool is_hea
         std::string cell;
         size_t current_cols = 0;
 
-        while (std::getline(ss, cell, sep)) {
+        while (std::getline(ss, cell, delimiter)) {
 
             // For the header
-            if (rows == 0 && is_header) {
+            if (rows == 0 && has_header) {
                 headers.push_back(cell);
             }
             else {
@@ -994,12 +994,12 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep, bool is_hea
         rows++;
     }
 
-    if (is_header) rows--;
+    if (has_header) rows--;
 
     Dataframe csv = {rows, cols, true, std::move(data), std::move(headers), 
         std::move(label_encoder), std::move(encoded_cols)};
     
-        csv.change_layout_inplace(method);
     // return column-major dataframe
+    csv.change_layout_inplace(transpose_method);
     return csv;
 }

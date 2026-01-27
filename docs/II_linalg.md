@@ -66,6 +66,9 @@ Linalg::AVX2_threaded::multiply(
 - **Transformations**: `transpose()`, `inverse()`
 - **Utilities**: `determinant()` with triangular matrix detection (scalar or AVX2-optimized) with a LU decomposition fallback
 
+**Note**: Basic operations (`sum`, `multiply`, `transpose`, `inverse`, `determinant`) are also accessible via Dataframe operators (`+`, `-`, `*`, `~`, `.inv()`, `.det()`, `.is_tri()`) for convenience.
+
+
 #### Layout Optimization
 Operations automatically handle layout conversions when needed. For instance, `determinant()` converts to row-major if the input is column-major to optimize cache access patterns during triangular checks.
 
