@@ -68,9 +68,17 @@ std::vector<double> Dataframe::operator[](const std::vector<std::string>& cols_n
 
         auto idx = std::find(headers.begin(), headers.end(), name);
         if (idx != headers.end()) cols_idx.push_back(static_cast<size_t>(idx - headers.begin()));
-        else throw std::invalid_argument("Column not found");
+        else throw std::invalid_argument(std::format("Column {} not found", name));
     }
     return operator[](cols_idx);
+}
+
+std::vector<double> Dataframe::operator[](std::initializer_list<int> cols_idx) const {
+    return operator[](std::vector<size_t>(cols_idx.begin(), cols_idx.end()));
+}
+
+std::vector<double> Dataframe::operator[](std::initializer_list<std::string> cols_name) const {
+    return operator[](std::vector<std::string>(cols_name));
 }
 
 std::vector<double> Dataframe::operator[](size_t j) const {
@@ -192,10 +200,162 @@ Dataframe Dataframe::transfer_col(const std::string& col_name) {
 
     if (idx != headers.end()) return transfer_col(static_cast<size_t>(idx - headers.begin()));
     else {
-        throw std::invalid_argument("Column not found");
+        throw std::invalid_argument(std::format("Column {} not found", col_name));
     }
 }
 
+Dataframe Dataframe::transfer_col(const std::vector<size_t>& cols_idx) {
+
+    // Output
+    std::vector<double> col_y; 
+    std::vector<std::string> headers_y;
+    std::unordered_set<int> encoded_cols_y;
+    std::unordered_map<int, std::unordered_map<std::string, int>> label_encoder_y;
+
+    // Sort our vector
+    std::vector<size_t> idx_sorted = cols_idx;
+    std::sort(idx_sorted.begin(), idx_sorted.end());
+
+    // Get data for each idx
+    int i = 0;
+    Dataframe df_idx;
+    for (const size_t& idx : idx_sorted){
+        df_idx = transfer_col(idx-i);
+
+        // Update our output
+        col_y.insert(df_idx.get_data().end(), col_y.begin(), col_y.end());
+        headers_y.insert(df_idx.get_headers().end(), headers_y.begin(), headers_y.end());
+
+        if (!df_idx.get_encodedCols().empty()) encoded_cols_y.insert(i);
+
+        auto lab_enc = df_idx.get_encoder();
+        if (!lab_enc.empty()) label_encoder_y.insert(lab_enc.begin(), lab_enc.end());
+
+        i++;
+    }
+
+    return {rows, cols_idx.size(), false, std::move(col_y), std::move(headers_y), 
+        std::move(label_encoder_y), std::move(encoded_cols_y)};
+}
+
+Dataframe Dataframe::transfer_col(const std::vector<std::string>& cols_name) {
+
+    // Find cols idx
+    std::vector<size_t> cols_idx;
+    cols_idx.reserve(cols_name.size());
+    for (const std::string& name : cols_name) {
+
+        auto idx = std::find(headers.begin(), headers.end(), name);
+        if (idx != headers.end()) cols_idx.push_back(static_cast<size_t>(idx - headers.begin()));
+        else throw std::invalid_argument(std::format("Column {} not found", name));
+    }
+    return transfer_col(cols_idx);
+}
+
+Dataframe Dataframe::transfer_col(std::initializer_list<int> cols_idx) {
+    return transfer_col(std::vector<size_t>(cols_idx.begin(), cols_idx.end()));
+}
+
+Dataframe Dataframe::transfer_col(std::initializer_list<std::string> cols_name) {
+    return transfer_col(std::vector<std::string>(cols_name));
+}
+
+std::vector<double> Dataframe::popup(const std::vector<size_t>& v_idx, bool is_row) {
+
+    // Delete and return rows
+    if (is_row) {
+        if (is_row_major) this->change_layout_inplace();
+
+        // Sort our vector
+        size_t nb = v_idx.size();
+        std::vector<size_t> idx_sorted = v_idx;
+        std::sort(idx_sorted.begin(), idx_sorted.end());
+
+        // Tp know which rows will be kept
+        std::vector<bool> keep(rows, true);
+        for (size_t idx : idx_sorted) keep[idx] = false;
+        
+        std::vector<double> res;
+        res.reserve(cols * nb);
+        std::vector<double> new_data;
+        new_data.reserve(cols * (rows - nb));
+        
+        for (size_t c = 0; c < cols; c++) {
+            size_t offset = c * rows;
+            for (size_t r = 0; r < rows; r++) {
+                if (!keep[r]) {
+                    res.push_back(data[offset + r]);
+                } else {
+                    new_data.push_back(data[offset + r]);
+                }
+            }
+        }
+
+        rows -= nb;
+        data = std::move(new_data);
+        return res;
+    }
+    // Delete and return cols
+    else {
+        return transfer_col(v_idx).get_data();
+    }
+}
+
+std::vector<double> Dataframe::popup(const std::vector<std::string>& cols_name) {
+    // Find cols idx
+    std::vector<size_t> cols_idx;
+    cols_idx.reserve(cols_name.size());
+    for (const std::string& name : cols_name) {
+
+        auto idx = std::find(headers.begin(), headers.end(), name);
+        if (idx != headers.end()) cols_idx.push_back(static_cast<size_t>(idx - headers.begin()));
+        else throw std::invalid_argument(std::format("Column {} not found", name));
+    }
+    return popup(cols_idx);
+}
+
+std::vector<double> Dataframe::popup(std::initializer_list<int> v_idx, bool is_row) {
+    return popup(std::vector<size_t>(v_idx.begin(), v_idx.end()), is_row);
+}
+
+std::vector<double> Dataframe::popup(std::initializer_list<std::string> cols_name) {
+    return popup(std::vector<std::string>(cols_name));
+}
+
+std::vector<double> Dataframe::popup(size_t j, bool is_row) {
+    std::vector<size_t> v_idx = {j};
+    return popup(v_idx, is_row);
+}
+
+std::vector<double> Dataframe::popup(const std::string& col_name) {
+    std::vector<std::string> cols_name = {col_name};
+    return popup(cols_name);
+}
+
+void Dataframe::pop(const std::vector<size_t>& v_idx, bool is_row) {
+    auto res = popup(v_idx, is_row);
+}
+
+void Dataframe::pop(const std::vector<std::string>& cols_name) {
+    auto res = popup(cols_name);
+}
+
+void Dataframe::pop(std::initializer_list<int> v_idx, bool is_row) {
+    auto res = popup(std::vector<size_t>(v_idx.begin(), v_idx.end()), is_row);
+}
+
+void Dataframe::pop(std::initializer_list<std::string> cols_name) {
+    auto res = popup(std::vector<std::string>(cols_name));
+}
+
+void Dataframe::pop(size_t j, bool is_row) {
+    auto res = popup(j, is_row);
+}
+
+void Dataframe::pop(const std::string& col_name) {
+    auto res = popup(col_name);
+}
+    
 // -------------------------Methods change_layout and transpose----------------------------------
 
 Dataframe Dataframe::change_layout(const std::string& choice) const {

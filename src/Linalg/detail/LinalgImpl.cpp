@@ -214,14 +214,7 @@ std::tuple<double, std::vector<double>, std::vector<double>> Operations::Impl::d
 
     // Let's see if the matrix is diagonal or triangular 
     int test_v;
-    if (backend_str == "Naive") test_v = triangular_impl(v1, n, n, v1_layout);
-    #ifdef __AVX2__
-        else if (backend_str == "AVX2") test_v = triangular_avx2_impl(v1, n, n, v1_layout);
-        else test_v = triangular_avx2_impl(v1, n, n, v1_layout);
-    #else
-        else test_v = triangular_impl(v1, n, n, v1_layout);
-    #endif
-
+    test_v = triangular_impl(v1, n, n, v1_layout);
     if (test_v != 0) {
         
         double det = 1;
@@ -267,71 +260,56 @@ int Operations::Impl::triangular_impl(
         __m256d zero_vec = _mm256_set1_pd(0.0);
 
         // Triangular inf in row major
-        size_t j = 0;
-        size_t vec_sizej = n - (n % NB_DB);
-        for (; j < vec_sizej && is_trig_down; j+=NB_DB) {
-
-            size_t i = 0;
-            size_t vec_sizei = j - (j % NB_DB);
-            for(; i < vec_sizei && is_trig_down; i+=NB_DB) {
-
-                if (i + PREFETCH_DIST < vec_sizei) {
-                    _mm_prefetch((const char*)&v1[j*n + i + PREFETCH_DIST], _MM_HINT_T0);
+        for (size_t i = 1; i < n && is_trig_down; i++) {
+            
+            size_t j = 0;
+            size_t vec_end = (i / NB_DB) * NB_DB;  // Blocs complets
+            
+            for (; j < vec_end; j += NB_DB) {
+                if (j + PREFETCH_DIST < vec_end) {
+                    _mm_prefetch((const char*)&v1[i*n + j + PREFETCH_DIST], _MM_HINT_T0);
                 }
-                __m256d vec = _mm256_loadu_pd(&v1[j*n + i]);
+                
+                __m256d vec = _mm256_loadu_pd(&v1[i*n + j]);
                 __m256d cmp = _mm256_cmp_pd(vec, zero_vec, _CMP_EQ_OQ);
                 int mask = _mm256_movemask_pd(cmp);
                 
                 if (mask != 0xF) {
                     is_trig_down = false;
+                    break;
                 }
             }
 
             // Scalar residual for i
-            for(; i < j && is_trig_down; i++) {
-                if (v1[j*n + i] != 0) is_trig_down = false;
-            }
-        }
-
-        // Scalar residual for j
-        for (; j < n && is_trig_down; j++) {
-            for(size_t i = 0; i < j && is_trig_down; i++) {
-                
-                if (v1[j*n + i] != 0) is_trig_down = false;
+            for (; j < i && is_trig_down; j++) {
+                if (v1[i*n + j] != 0.0) is_trig_down = false;
             }
         }
 
         // Triangular sup in row major 
-        j = 0;
-        for (; j < vec_sizej && is_trig_up; j+=NB_DB) {
-
-            size_t i = j+1;
-            size_t vec_sizei = n - ((n - j - 1) % NB_DB);
-            for(; i < vec_sizei && is_trig_up; i+=NB_DB) {
-
-                if (i + PREFETCH_DIST < vec_sizei) {
-                    _mm_prefetch((const char*)&v1[j*n + i + PREFETCH_DIST], _MM_HINT_T0);
+        for (size_t i = 0; i < n-1 && is_trig_up; i++) {
+            
+            size_t j = i + 1;
+            size_t vec_end = n - ((n - i - 1) % NB_DB);
+            
+            for (; j < vec_end; j += NB_DB) {
+                if (j + PREFETCH_DIST < vec_end) {
+                    _mm_prefetch((const char*)&v1[i*n + j + PREFETCH_DIST], _MM_HINT_T0);
                 }
-                __m256d vec = _mm256_loadu_pd(&v1[j*n + i]);
+                
+                __m256d vec = _mm256_loadu_pd(&v1[i*n + j]);
                 __m256d cmp = _mm256_cmp_pd(vec, zero_vec, _CMP_EQ_OQ);
                 int mask = _mm256_movemask_pd(cmp);
                 
                 if (mask != 0xF) {
                     is_trig_up = false;
+                    break;
                 }
             }
 
-            // Scalar residual for i
-            for(;i < n && is_trig_up; i++) {
-                if (v1[j*n + i] != 0) is_trig_up = false;
-            }
-        }
-
-        // Scalar residual for j
-        for (; j < n && is_trig_up; j++) {
-            for(size_t i = j+1; i < n && is_trig_up; i++) {
-                
-                if (v1[j*n + i] != 0) is_trig_up = false;
+            // Scalar residual
+            for (; j < n && is_trig_up; j++) {
+                if (v1[i*n + j] != 0.0) is_trig_up = false;
             }
         }
     #else
@@ -355,7 +333,7 @@ int Operations::Impl::triangular_impl(
     // We detected in row major config
     if (v1_layout) std::swap(is_trig_up, is_trig_down);
 
-    if (is_trig_up && (is_trig_up && is_trig_down)) return 3; // Diag
+    if (is_trig_up && is_trig_down) return 3; // Diag
     else if (is_trig_up) return 2; // Up
     else if (is_trig_down) return 1; // Down
 

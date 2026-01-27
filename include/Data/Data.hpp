@@ -1,6 +1,7 @@
 #include <tuple>
 #include <string>
 #include <vector>
+#include <format>
 #include <fstream>
 #include <sstream>
 #include <cstring>
@@ -11,6 +12,7 @@
 #include <cassert>
 #include <iostream>
 #include <Eigen/Dense>
+#include "Linalg/Linalg.hpp"
 
 #ifdef __AVX2__
     #include <immintrin.h>
@@ -82,6 +84,8 @@ class Dataframe
         // Getting a copy of col's data from your df
         std::vector<double> operator[](const std::vector<size_t>& cols_idx) const;
         std::vector<double> operator[](const std::vector<std::string>& cols_name) const;
+        std::vector<double> operator[](std::initializer_list<int> cols_idx) const;
+        std::vector<double> operator[](std::initializer_list<std::string> cols_name) const;
         std::vector<double> operator[](size_t j) const;
         std::vector<double> operator[](const std::string& col_name) const;
 
@@ -114,23 +118,34 @@ class Dataframe
         void display_decoded(size_t nb_rows, int space = 15) const;
         void display_decoded() const {display_decoded(rows, 15);}
 
-        // Transfer columns from a Dataframe to a new one 
+        // Transfer columns from a Dataframe to a new one (col - major)
+        // Change your layout to col - major
         Dataframe transfer_col(const std::vector<size_t>& cols_idx);
         Dataframe transfer_col(const std::vector<std::string>& cols_name);
+        Dataframe transfer_col(std::initializer_list<int> cols_idx);
+        Dataframe transfer_col(std::initializer_list<std::string> cols_name);
         Dataframe transfer_col(size_t j);  
         Dataframe transfer_col(const std::string& col_name);
 
-        // Delete cols from a Dataframe
-        void pop_col(const std::vector<size_t>& cols_idx);
-        void pop_col(const std::vector<std::string>& cols_name);
-        void pop_col(size_t j);  
-        void pop_col(const std::string& col_name);
+        // Delete rows/cols from a Dataframe and return them in col-major
+        // Parameter is_row to know if parameters targets cols or rows (cols by default)
+        // Change your layout to col - major
+        std::vector<double> popup(const std::vector<size_t>& v_idx, bool is_row = false);
+        std::vector<double> popup(const std::vector<std::string>& cols_name);
+        std::vector<double> popup(std::initializer_list<int> v_idx, bool is_row = false);
+        std::vector<double> popup(std::initializer_list<std::string> cols_name);
+        std::vector<double> popup(size_t j, bool is_row = false);  
+        std::vector<double> popup(const std::string& col_name);
 
-        // Delete rows from a Dataframe
-        void pop_row(const std::vector<size_t>& rows_idx);
-        void pop_row(const std::vector<std::string>& rowss_name);
-        void pop_row(size_t i);  
-        void pop_row(const std::string& row_name);
+        // Delete rows/cols from a Dataframe
+        // Parameter is_row to know if parameters targets cols or rows (cols by default)
+        // Change your layout to col - major
+        void pop(const std::vector<size_t>& v_idx, bool is_row = false);
+        void pop(const std::vector<std::string>& cols_name);
+        void pop(std::initializer_list<int> v_idx, bool is_row = false);
+        void pop(std::initializer_list<std::string> cols_name);
+        void pop(size_t j, bool is_row = false);  
+        void pop(const std::string& col_name);
 
         // -------------------------Methods change_layout and transpose----------------------------------
 
