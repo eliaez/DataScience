@@ -32,8 +32,8 @@ double mean(const std::vector<double>& x) {
 
         for (; i < vec_size; i+=NB_DB) {
             // Pre-charged PREFETCH_DIST*8 bytes ahead
-            if ( i + PREFETECH_DIST < vec_size) {
-                _mm_prefetch((const char*)&x[i + PREFETECH_DIST], _MM_HINT_T0);
+            if ( i + PREFETCH_DIST < vec_size) {
+                _mm_prefetch((const char*)&x[i + PREFETCH_DIST], _MM_HINT_T0);
             }
 
             __m256d vec = _mm256_loadu_pd(&x[i]); 
@@ -73,8 +73,8 @@ double var(const std::vector<double>& x) {
 
         for (; i < vec_size; i+=NB_DB) {
             // Pre-charged PREFETCH_DIST*8 bytes ahead
-            if ( i + PREFETECH_DIST < vec_size) {
-                _mm_prefetch((const char*)&x[i + PREFETECH_DIST], _MM_HINT_T0);
+            if ( i + PREFETCH_DIST < vec_size) {
+                _mm_prefetch((const char*)&x[i + PREFETCH_DIST], _MM_HINT_T0);
             }
 
             __m256d vec = _mm256_loadu_pd(&x[i]); 
@@ -117,9 +117,9 @@ double cov(const std::vector<double>& x, const std::vector<double>& y) {
 
         for (; i < vec_size; i+=NB_DB) {
             // Pre-charged PREFETCH_DIST*8 bytes ahead
-            if ( i + PREFETECH_DIST < vec_size) {
-                _mm_prefetch((const char*)&x[i + PREFETECH_DIST], _MM_HINT_T0);
-                _mm_prefetch((const char*)&y[i + PREFETECH_DIST], _MM_HINT_T0);
+            if ( i + PREFETCH_DIST < vec_size) {
+                _mm_prefetch((const char*)&x[i + PREFETCH_DIST], _MM_HINT_T0);
+                _mm_prefetch((const char*)&y[i + PREFETCH_DIST], _MM_HINT_T0);
             }
 
             __m256d x_vec = _mm256_loadu_pd(&x[i]); 

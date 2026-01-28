@@ -71,7 +71,7 @@ As a first step, we need a class to handle and manipulate our data. Thus, our [*
 
   - `operator()(i, j)`: provides an indexed access and abstracts layout complexity
   - `at(idx)`: provides direct access for raw vector manipulation
-  - `operator[]`: Column extraction returning `std::vector<double>` <br> <br>
+  - `operator[]`: Column extraction returning `Dataframe` <br> <br>
 
   ```cpp 
   // Get i, j value (be careful of your layout and your indices)
@@ -79,10 +79,10 @@ As a first step, we need a class to handle and manipulate our data. Thus, our [*
   auto val = df.at(i*n + j);
 
   // Column extraction
-  auto col = df[0];                           // By index
-  auto col = df["target"];                    // By name
-  auto cols = df[{0, 2, 4}];                  // Multiple indices
-  auto cols = df[{"feature1", "feature2"}];   // Multiple names
+  auto df_col = df[0];                           // By index
+  auto df_col = df["target"];                    // By name
+  auto df_cols = df[{0, 2, 4}];                  // Multiple indices
+  auto df_cols = df[{"feature1", "feature2"}];   // Multiple names
   ```
 
 - #### Column Manipulation

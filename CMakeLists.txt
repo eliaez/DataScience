@@ -123,6 +123,12 @@ set(LIB_SOURCES
     src/Linalg/backends/LinalgEigen.cpp
     src/Linalg/backends/LinalgMKL.cpp
 
+    # Models
+    src/Models/Regressions.cpp
+
+    # Stats
+    src/Stats/stats.cpp
+
     # Utils
     src/Utils/TestSuite.cpp
     src/Utils/ThreadPool.cpp

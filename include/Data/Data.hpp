@@ -81,13 +81,13 @@ class Dataframe
         const double& operator()(size_t i, size_t j) const;
         double& operator()(size_t i, size_t j);
 
-        // Getting a copy of col's data from your df
-        std::vector<double> operator[](const std::vector<size_t>& cols_idx) const;
-        std::vector<double> operator[](const std::vector<std::string>& cols_name) const;
-        std::vector<double> operator[](std::initializer_list<int> cols_idx) const;
-        std::vector<double> operator[](std::initializer_list<std::string> cols_name) const;
-        std::vector<double> operator[](size_t j) const;
-        std::vector<double> operator[](const std::string& col_name) const;
+        // Getting a copy of col's data and metadata from your df
+        Dataframe operator[](const std::vector<size_t>& cols_idx) const;
+        Dataframe operator[](const std::vector<std::string>& cols_name) const;
+        Dataframe operator[](std::initializer_list<int> cols_idx) const;
+        Dataframe operator[](std::initializer_list<std::string> cols_name) const;
+        Dataframe operator[](size_t j) const;
+        Dataframe operator[](const std::string& col_name) const;
 
         Dataframe operator+(const Dataframe& other) const { return Linalg::Operations::sum(*this, other); }
         Dataframe operator-(const Dataframe& other) const { return Linalg::Operations::sum(*this, other, '-'); }

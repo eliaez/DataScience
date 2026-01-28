@@ -28,7 +28,7 @@ double& Dataframe::operator()(size_t i, size_t j) {
     return is_row_major ? data[i*cols+j] : data[j*rows+i];
 }
 
-std::vector<double> Dataframe::operator[](const std::vector<size_t>& cols_idx) const {
+Dataframe Dataframe::operator[](const std::vector<size_t>& cols_idx) const {
 
     // Test
     for (const size_t& idx : cols_idx) {
@@ -38,28 +38,62 @@ std::vector<double> Dataframe::operator[](const std::vector<size_t>& cols_idx) c
     }
 
     // Output
-    std::vector<double> choosen_data;
-    choosen_data.reserve(rows * cols_idx.size());
+    size_t nb = cols_idx.size();
+    std::vector<double> y_data;
+    y_data.reserve(rows * cols_idx.size());
+    std::vector<std::string> headers_y;
+    std::unordered_set<int> encoded_cols_y;
+    std::unordered_map<int, std::unordered_map<std::string, int>> label_encoder_y;
+
+    // Sort our vector
+    std::vector<size_t> idx_sorted = cols_idx;
+    std::sort(idx_sorted.begin(), idx_sorted.end());
 
     // Extract data
+    int i = 0;
     if (is_row_major) {
         for (const size_t& idx : cols_idx) {
-            for (size_t i = 0; i < rows; i++) {
-                choosen_data.push_back(data[i*cols+idx]);
+
+            // Get data
+            for (size_t j = 0; j < rows; j++) {
+                y_data.push_back(data[j*cols+idx]);
             }
+
+            // Get header
+            headers_y.push_back(headers[idx]);
+
+            // Get encoded cols idx
+            if (encoded_cols.find(static_cast<int>(idx)) != encoded_cols.end()) encoded_cols_y.insert(i);
+
+            // Get mapping
+            if (label_encoder.contains(static_cast<int>(idx))) label_encoder_y.insert({i, label_encoder.at(static_cast<int>(idx))});
+            i++;
         }
     }
     else {
         for (const size_t& idx : cols_idx) {
-            for (size_t i = 0; i < rows; i++) {
-                choosen_data.push_back(data[idx*rows+i]);
+
+            // Get data
+            for (size_t j = 0; j < rows; j++) {
+                y_data.push_back(data[idx*rows+j]);
             }
+
+            // Get header
+            headers_y.push_back(headers[idx]);
+
+            // Get encoded cols idx
+            if (encoded_cols.find(static_cast<int>(idx)) != encoded_cols.end()) encoded_cols_y.insert(i);
+
+            // Get mapping
+            if (label_encoder.contains(static_cast<int>(idx))) label_encoder_y.insert({i, label_encoder.at(static_cast<int>(idx))});
+            i++;
         }
     }
-    return choosen_data;
+    return {rows, nb, false, std::move(y_data), std::move(headers_y), 
+        std::move(label_encoder_y), std::move(encoded_cols_y)};
 }
 
-std::vector<double> Dataframe::operator[](const std::vector<std::string>& cols_name) const {
+Dataframe Dataframe::operator[](const std::vector<std::string>& cols_name) const {
     
     // Find cols idx
     std::vector<size_t> cols_idx;
@@ -73,20 +107,20 @@ std::vector<double> Dataframe::operator[](const std::vector<std::string>& cols_n
     return operator[](cols_idx);
 }
 
-std::vector<double> Dataframe::operator[](std::initializer_list<int> cols_idx) const {
+Dataframe Dataframe::operator[](std::initializer_list<int> cols_idx) const {
     return operator[](std::vector<size_t>(cols_idx.begin(), cols_idx.end()));
 }
 
-std::vector<double> Dataframe::operator[](std::initializer_list<std::string> cols_name) const {
+Dataframe Dataframe::operator[](std::initializer_list<std::string> cols_name) const {
     return operator[](std::vector<std::string>(cols_name));
 }
 
-std::vector<double> Dataframe::operator[](size_t j) const {
+Dataframe Dataframe::operator[](size_t j) const {
     std::vector<size_t> cols_idx = {j};
     return operator[](cols_idx);
 }
 
-std::vector<double> Dataframe::operator[](const std::string& col_name) const {
+Dataframe Dataframe::operator[](const std::string& col_name) const {
     std::vector<std::string> cols_name = {col_name};
     return operator[](cols_name);
 }
@@ -229,7 +263,7 @@ Dataframe Dataframe::transfer_col(const std::vector<size_t>& cols_idx) {
         if (!df_idx.get_encodedCols().empty()) encoded_cols_y.insert(i);
 
         auto lab_enc = df_idx.get_encoder();
-        if (!lab_enc.empty()) label_encoder_y.insert(lab_enc.begin(), lab_enc.end());
+        if (!lab_enc.empty()) label_encoder_y.insert({i, lab_enc[0]});
 
         i++;
     }
