@@ -10,7 +10,7 @@ namespace Reg {
         private:
             double intercept;
             double slope;
-            std::vector<double> stats; // May change
+            std::vector<double> v_stats; // May change
             bool is_fitted;
         
             // Function to verify if x non-empty,...
@@ -29,7 +29,7 @@ namespace Reg {
             // Getters
             double get_intercept() const { return intercept; }
             double get_slope() const { return slope; }
-            const std::vector<double>& get_stats() const { return stats; }
+            const std::vector<double>& get_stats() const { return v_stats; }
             bool is_model_fitted() { return is_fitted; }
     };
 }

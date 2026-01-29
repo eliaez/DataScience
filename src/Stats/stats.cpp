@@ -17,6 +17,18 @@ namespace Stats {
     }
 #endif
 
+double dot(const std::vector<double>& x, const std::vector<double>& y) {
+    if (x.size() != y.size()) {
+        throw std::invalid_argument("Need input of same length");
+    }
+
+    double res = 0.0;
+    for (size_t i = 0; i < x.size(); ++i) {
+        res += x[i] * y[i];
+    }
+    return res;
+}
+
 double mean(const std::vector<double>& x) {
     if (x.empty()) {
         throw std::invalid_argument("Cannot calculate mean of empty vector");
@@ -145,6 +157,59 @@ double cov(const std::vector<double>& x, const std::vector<double>& y) {
     #endif
 
     return sum / (n-1);
+}
+
+double rsquared(const std::vector<double>& y, const std::vector<double>& y_pred) {
+    if (y.empty() || y_pred.empty()) {
+        throw std::invalid_argument("Cannot calculate rsquared with empty vector");
+    }
+
+    double SSres = 0.0;         // SSres - Sum of Squares of Residuals
+    double SStot = 0.0;         // SStot - Total Sum of Squares
+    double mean_y = mean(y);
+    const size_t n = y.size(); 
+    for (size_t i = 0; i < n; i++) {
+        SSres += (y[i] - y_pred[i]) * (y[i] - y_pred[i]);
+        SStot += (y[i] - mean_y) * (y[i] - mean_y);
+    }
+
+    return 1 - SSres/SStot;
+}
+
+double radjusted(double r2, int n, int p) {
+    if ((n - p - 1) != 0) {
+        throw std::invalid_argument("Need more observations to avoid (n - p - 1) == 0");
+    }
+    
+    return 1 - (1 - r2)*(n - 1)/(n - p - 1);
+}
+
+double mae(const std::vector<double>& y, const std::vector<double>& y_pred) {
+    if (y.empty() || y_pred.empty()) {
+        throw std::invalid_argument("Cannot calculate mae with empty vector");
+    }
+
+    double sum = 0.0;
+    const size_t n = y.size();
+    for (size_t i = 0; i < n; i++) {
+        sum += std::abs(y[i] - y_pred[i]);
+    }
+    
+    return sum / n;
+}
+
+double mse(const std::vector<double>& y, const std::vector<double>& y_pred) {
+    if (y.empty() || y_pred.empty()) {
+        throw std::invalid_argument("Cannot calculate mse with empty vector");
+    }
+
+    double sum = 0.0;
+    const size_t n = y.size();
+    for (size_t i = 0; i < n; i++) {
+        sum += (y[i] - y_pred[i]) * (y[i] - y_pred[i]);
+    }
+    
+    return sum / n; 
 }
 
 }

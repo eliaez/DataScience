@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <cmath>
 
 #ifdef __AVX2__
     #include <immintrin.h>
@@ -17,12 +18,30 @@ namespace Stats {
         double horizontal_red(__m256d& vec);
     #endif
 
-    // Classical mean on a vector with Naive or AVX2
+    // Dot product 
+    double dot(const std::vector<double>& x, const std::vector<double>& y);
+
+    // Mean on a vector with Naive or AVX2
     double mean(const std::vector<double>& x);
 
-    // Classical variance on a vector with Naive or AVX2
+    // Variance on a vector with Naive or AVX2
     double var(const std::vector<double>& x);
 
-    // Classical covariance on a vector with Naive or AVX2
+    // Covariance on vectors with Naive or AVX2
     double cov(const std::vector<double>& x, const std::vector<double>& y);
+
+    // R2
+    double rsquared(const std::vector<double>& y, const std::vector<double>& y_pred);
+
+    // R2_adjusted for Polynomial Regression (n = nb of observations and p = nb of features)
+    double radjusted(double r2, int n, int p);
+
+    // MAE with n = nb of obsvervations
+    double mae(const std::vector<double>& y, const std::vector<double>& y_pred);
+
+    // MSE with n = nb of obsvervations
+    double mse(const std::vector<double>& y, const std::vector<double>& y_pred);
+
+    // RMSE with n = nb of obsvervations
+    double rmse(double mse) { return std::sqrt(mse); };
 }

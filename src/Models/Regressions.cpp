@@ -41,10 +41,30 @@ void LinearRegression::fit(const Dataframe& x, const Dataframe& y) {
     intercept = beta_est.get_data()[0];
     slope = beta_est.get_data()[1];
     is_fitted = true;
+
+    // Calculate Stats
+    std::vector<double> y_pred = predict(x);
+    double mse = Stats::mse(y.get_data(), y_pred);
+    std::vector<double> stderr_beta = {std::sqrt(mse * inter.get_data()[0]), std::sqrt(mse * inter.get_data()[3])};
+    std::vector<double> beta = {intercept, slope};
+    
+    if (n > 30) {
+        std::vector<double> t_stat = {beta[0] / stderr_beta[0], beta[1] / stderr_beta[1]};
+    }
+    
+    v_stats.push_back(Stats::rsquared(y.get_data(), y_pred));
+    v_stats.push_back(mse);
+    v_stats.push_back(Stats::rmse(mse));
+    v_stats.push_back(Stats::mae(y.get_data(), y_pred));
+
 }
 
 std::vector<double> LinearRegression::predict(const Dataframe& x) const {
     basic_verif(x);
+
+    if (!is_fitted) {
+        throw std::runtime_error("Need to have trained your model");
+    }
 
     std::vector<double> y_pred;
     y_pred.reserve(x.get_rows());
