@@ -35,11 +35,11 @@ double mean(const std::vector<double>& x) {
     }
 
     double sum;
-    const size_t n = x.size();
+    size_t n = x.size();
 
     #ifdef __AVX2__
         size_t i = 0;
-        const size_t vec_size = n - (n % NB_DB);
+        size_t vec_size = n - (n % NB_DB);
         __m256d sum_vec = _mm256_set1_pd(0.0);
 
         for (; i < vec_size; i+=NB_DB) {
@@ -74,12 +74,12 @@ double var(const std::vector<double>& x) {
     }
 
     double sum;
-    const size_t n = x.size();
-    const double x_mean = mean(x);
+    size_t n = x.size();
+    double x_mean = mean(x);
 
     #ifdef __AVX2__
         size_t i = 0;
-        const size_t vec_size = n - (n % NB_DB);
+        size_t vec_size = n - (n % NB_DB);
         __m256d sum_vec = _mm256_set1_pd(0.0);
         __m256d mean_vec = _mm256_set1_pd(x_mean);
 
@@ -116,13 +116,13 @@ double cov(const std::vector<double>& x, const std::vector<double>& y) {
     }
 
     double sum;
-    const size_t n = x.size();
-    const double x_mean = mean(x);
-    const double y_mean = mean(y);
+    size_t n = x.size();
+    double x_mean = mean(x);
+    double y_mean = mean(y);
 
     #ifdef __AVX2__
         size_t i = 0;
-        const size_t vec_size = n - (n % NB_DB);
+        size_t vec_size = n - (n % NB_DB);
         __m256d sum_vec = _mm256_set1_pd(0.0);
         __m256d x_mean_vec = _mm256_set1_pd(x_mean);
         __m256d y_mean_vec = _mm256_set1_pd(y_mean);
@@ -167,7 +167,7 @@ double rsquared(const std::vector<double>& y, const std::vector<double>& y_pred)
     double SSres = 0.0;         // SSres - Sum of Squares of Residuals
     double SStot = 0.0;         // SStot - Total Sum of Squares
     double mean_y = mean(y);
-    const size_t n = y.size(); 
+    size_t n = y.size(); 
     for (size_t i = 0; i < n; i++) {
         SSres += (y[i] - y_pred[i]) * (y[i] - y_pred[i]);
         SStot += (y[i] - mean_y) * (y[i] - mean_y);
@@ -190,7 +190,7 @@ double mae(const std::vector<double>& y, const std::vector<double>& y_pred) {
     }
 
     double sum = 0.0;
-    const size_t n = y.size();
+    size_t n = y.size();
     for (size_t i = 0; i < n; i++) {
         sum += std::abs(y[i] - y_pred[i]);
     }
@@ -204,7 +204,7 @@ double mse(const std::vector<double>& y, const std::vector<double>& y_pred) {
     }
 
     double sum = 0.0;
-    const size_t n = y.size();
+    size_t n = y.size();
     for (size_t i = 0; i < n; i++) {
         sum += (y[i] - y_pred[i]) * (y[i] - y_pred[i]);
     }
@@ -231,7 +231,7 @@ double normal_cdf(double x) {
 
 std::vector<double> student_pvalue(const std::vector<double>& t_stats) {
 
-    const size_t nb = t_stats.size();
+    size_t nb = t_stats.size();
     std::vector<double> pvalue;
     pvalue.reserve(nb);
     for (const double& t : t_stats) {

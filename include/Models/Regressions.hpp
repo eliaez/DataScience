@@ -1,9 +1,10 @@
 #pragma once
 
 #include <vector>
-#include "Stats/stats.hpp"
 #include "Data/Data.hpp"
+#include "Stats/stats.hpp"
 #include "Linalg/Linalg.hpp"
+#include "Utils/ThreadPool.hpp"
 
 namespace Reg {
     struct CoeffStats {
@@ -26,6 +27,14 @@ namespace Reg {
         
             // Function to verify if x non-empty,...
             void basic_verif(const Dataframe& x) const;
+
+            // Predict function with avx2 if enabled, naive if not
+            std::vector<double> predict_avx2(const Dataframe& x) const;
+
+            #ifdef __AVX2__
+                // Predict function with avx2th
+                std::vector<double> predict_avx2th(const Dataframe& x) const;
+            #endif
 
         public:
             // Constructor 

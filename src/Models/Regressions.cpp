@@ -60,28 +60,145 @@ void LinearRegression::fit(const Dataframe& x, const Dataframe& y) {
 }
 
 std::vector<double> LinearRegression::predict(const Dataframe& x) const {
-    basic_verif(x);
 
-    if (!is_fitted) {
-        throw std::runtime_error("Need to have trained your model");
-    }
-
-    const size_t n = x.get_rows();
-    const size_t p = x.get_cols();
+    size_t n = x.get_rows();
+    size_t p = x.get_cols();
     std::vector<double> y_pred(n, 0.0);
 
     if (x.get_storage()) {
-        for (size_t i = 0; i < n; i++) {
-            for (size_t j = 0; i < p; j++) {
-                
+        #ifdef __AVX2__
+            const size_t NB_DB = Stats::NB_DB;
+            const size_t PREFETCH_DIST = Stats::PREFETCH_DIST;
+            const size_t PREFETCH_DIST1 = Stats::PREFETCH_DIST1;
+
+            size_t vec_sizei = n - (n % NB_DB);
+            size_t vec_sizej = p - (p % NB_DB);
+
+            size_t i = 0;
+            for (; i < vec_sizei; i+=NB_DB) {
+                if (i + PREFETCH_DIST1 < vec_sizei) {
+                    _mm_prefetch((const char*)&x.at((i+PREFETCH_DIST1)*p), _MM_HINT_T0);
+                }
+                __m256d sum0 = _mm256_setzero_pd();
+                __m256d sum1 = _mm256_setzero_pd();
+                __m256d sum2 = _mm256_setzero_pd();
+                __m256d sum3 = _mm256_setzero_pd();
+
+                size_t j = 0;
+                for (; j < vec_sizej; j+=NB_DB) {
+                    if (j + PREFETCH_DIST < vec_sizej) {
+                        _mm_prefetch((const char*)&x.at(i*p + j + PREFETCH_DIST), _MM_HINT_T0);
+                    }
+
+                    __m256d vec_coeff = _mm256_loadu_pd(&coeffs[1 + j]);
+
+                    __m256d vec0 = _mm256_loadu_pd(&x.at((i+0)*p+j));
+                    __m256d vec1 = _mm256_loadu_pd(&x.at((i+1)*p+j));
+                    __m256d vec2 = _mm256_loadu_pd(&x.at((i+2)*p+j));
+                    __m256d vec3 = _mm256_loadu_pd(&x.at((i+3)*p+j));
+
+                    sum0 = _mm256_fmadd_pd(vec_coeff, vec0, sum0);
+                    sum1 = _mm256_fmadd_pd(vec_coeff, vec1, sum1);
+                    sum2 = _mm256_fmadd_pd(vec_coeff, vec2, sum2);
+                    sum3 = _mm256_fmadd_pd(vec_coeff, vec3, sum3);
+                }
+
+                // Horizontal reduction and add intercept
+                y_pred[i+0] = coeffs[0] + Stats::horizontal_red(sum0);
+                y_pred[i+1] = coeffs[0] + Stats::horizontal_red(sum1);
+                y_pred[i+2] = coeffs[0] + Stats::horizontal_red(sum2);
+                y_pred[i+3] = coeffs[0] + Stats::horizontal_red(sum3);
+
+                // Scalar residual for j
+                for (; j < p; j++) {
+                    double c = coeffs[1 + j];
+                    y_pred[i+0] += c * x.at((i+0)*p + j);
+                    y_pred[i+1] += c * x.at((i+1)*p + j);
+                    y_pred[i+2] += c * x.at((i+2)*p + j);
+                    y_pred[i+3] += c * x.at((i+3)*p + j);
+                }
             }
-        }
-        for (auto val : x.get_data()) {
-            y_pred.push_back(val * slope + intercept);
-        }
+
+            // Scalar residual for i
+            for (; i < n; i++) {
+                
+                double sum = 0.0;
+                for (size_t j = 0; j < p; j++) {
+                    sum += coeffs[1 + j] * x.at(i*p + j);
+                }
+                y_pred[i] += coeffs[0] + sum; // Add intercept
+            }
+        #else
+            for (size_t i = 0; i < n; i++) {
+                
+                double sum = 0.0;
+                for (size_t j = 0; j < p; j++) {
+                    sum += coeffs[1 + j] * x.at(i*p + j);
+                }
+                y_pred[i] += coeffs[0] + sum; // Add intercept
+            }
+        #endif
     }
     else {
+        #ifdef __AVX2__
+            const size_t NB_DB = Stats::NB_DB;
+            const size_t PREFETCH_DIST = Stats::PREFETCH_DIST;
+            const size_t PREFETCH_DIST1 = Stats::PREFETCH_DIST1;
 
+            size_t i = 0;
+            size_t vec_size = n - (n % NB_DB);
+
+            for (size_t j = 0; j < p; j++) {
+
+                i = 0;
+                __m256d v_coeff = _mm256_set1_pd(coeffs[1 + j]);
+                for (; i < vec_size; i+=NB_DB) {
+                    if (i + PREFETCH_DIST < vec_size) {
+                        _mm_prefetch((const char*)&x.at(j*n + i + PREFETCH_DIST), _MM_HINT_T0);
+                    }
+
+                    __m256d vec = _mm256_loadu_pd(&x.at(j*n + i));
+                    __m256d vec_y = _mm256_loadu_pd(&y_pred[i]);
+                    vec_y = _mm256_fmadd_pd(v_coeff, vec, vec_y);
+
+                    _mm256_storeu_pd(&y_pred[i], vec_y);
+                }
+
+                // Scalar residual for i 
+                double coeff = coeffs[1 + j];
+                for (; i < n; i++) {
+                    y_pred[i] += coeff * x.at(j*n + i);
+                }
+            }
+
+            // Add intercept
+            i = 0;
+            __m256d v_intercept = _mm256_set1_pd(coeffs[0]);
+            for (; i < vec_size; i+=NB_DB) {
+                __m256d vec_y = _mm256_loadu_pd(&y_pred[i]);
+                vec_y = _mm256_add_pd(vec_y, v_intercept);
+                _mm256_storeu_pd(&y_pred[i], vec_y);
+            }
+
+            // Scalar residual for i
+            for (; i < n; i++) {
+                y_pred[i] += coeffs[0];
+            }
+        #else
+            for (size_t j = 0; j < p; j++) {
+                
+                double coeff = coeffs[1 + j];
+                for (size_t i = 0; i < n; i++) {
+                    y_pred[i] += coeff * x.at(j*n + i);
+                }
+            }
+
+            // Add intercept
+            double intercept = coeffs[0];
+            for (size_t i = 0; i < n; i++) {
+                y_pred[i] += intercept;
+            }
+        #endif
     }
 
     return y_pred;
@@ -90,12 +207,12 @@ std::vector<double> LinearRegression::predict(const Dataframe& x) const {
 void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv, const Dataframe& y) {
     
     std::vector<double> beta = {intercept, slope};
-    const size_t n = x.get_rows();
-    const size_t p = beta.size() - 1;
+    size_t n = x.get_rows();
+    size_t p = beta.size() - 1;
     
     // Degree of liberty
-    const int df1 = p;
-    const int df2 = n - df1 - 1;
+    int df1 = p;
+    int df2 = n - df1 - 1;
 
     // Predict 
     std::vector<double> y_pred = predict(x);
