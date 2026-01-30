@@ -3,6 +3,20 @@
 
 namespace Reg {
 
+std::string CoeffStats::significance() const {
+    if (p_value < 0.001) return "***";
+    if (p_value < 0.01)  return "**";
+    if (p_value < 0.05)  return "*";
+    if (p_value < 0.10)  return ".";
+    return "";
+}
+
+void LinearRegression::basic_verif(const Dataframe& x) const {
+    if (x.get_rows() == 0 || x.get_cols() == 0 || x.get_cols() > 1) {
+        throw std::invalid_argument("Need non-empty input");
+    }
+}
+
 void LinearRegression::fit(const Dataframe& x, const Dataframe& y) {
     basic_verif(x);
     basic_verif(y);
@@ -42,21 +56,7 @@ void LinearRegression::fit(const Dataframe& x, const Dataframe& y) {
     slope = beta_est.get_data()[1];
     is_fitted = true;
 
-    // Calculate Stats
-    std::vector<double> y_pred = predict(x);
-    double mse = Stats::mse(y.get_data(), y_pred);
-    std::vector<double> stderr_beta = {std::sqrt(mse * inter.get_data()[0]), std::sqrt(mse * inter.get_data()[3])};
-    std::vector<double> beta = {intercept, slope};
-    
-    if (n > 30) {
-        std::vector<double> t_stat = {beta[0] / stderr_beta[0], beta[1] / stderr_beta[1]};
-    }
-    
-    v_stats.push_back(Stats::rsquared(y.get_data(), y_pred));
-    v_stats.push_back(mse);
-    v_stats.push_back(Stats::rmse(mse));
-    v_stats.push_back(Stats::mae(y.get_data(), y_pred));
-
+    compute_stats(x, inter, y);
 }
 
 std::vector<double> LinearRegression::predict(const Dataframe& x) const {
@@ -66,17 +66,58 @@ std::vector<double> LinearRegression::predict(const Dataframe& x) const {
         throw std::runtime_error("Need to have trained your model");
     }
 
-    std::vector<double> y_pred;
-    y_pred.reserve(x.get_rows());
-    for (auto val : x.get_data()) {
-        y_pred.push_back(val * slope + intercept);
+    const size_t n = x.get_rows();
+    const size_t p = x.get_cols();
+    std::vector<double> y_pred(n, 0.0);
+
+    if (x.get_storage()) {
+        for (size_t i = 0; i < n; i++) {
+            for (size_t j = 0; i < p; j++) {
+                
+            }
+        }
+        for (auto val : x.get_data()) {
+            y_pred.push_back(val * slope + intercept);
+        }
     }
+    else {
+
+    }
+
     return y_pred;
 }
 
-void LinearRegression::basic_verif(const Dataframe& x) const {
-    if (x.get_rows() == 0 || x.get_cols() == 0 || x.get_cols() > 1) {
-        throw std::invalid_argument("Need non-empty input");
+void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv, const Dataframe& y) {
+    
+    std::vector<double> beta = {intercept, slope};
+    const size_t n = x.get_rows();
+    const size_t p = beta.size() - 1;
+    
+    // Degree of liberty
+    const int df1 = p;
+    const int df2 = n - df1 - 1;
+
+    // Predict 
+    std::vector<double> y_pred = predict(x);
+
+    // Calculate stats
+    double r2 = Stats::rsquared(y.get_data(), y_pred);
+    double mse = Stats::mse(y.get_data(), y_pred);
+    double f_stat = Stats::fisher_test(r2, df1, df2);
+    std::vector<double> stderr_beta = {std::sqrt(mse * XtXinv.get_data()[0]), std::sqrt(mse * XtXinv.get_data()[3])};
+        
+    // Add them to our vector of stats
+    gen_stats.push_back(r2);
+    gen_stats.push_back(mse);
+    gen_stats.push_back(Stats::rmse(mse));
+    gen_stats.push_back(Stats::mae(y.get_data(), y_pred));
+    gen_stats.push_back(f_stat);
+    gen_stats.push_back(Stats::fisher_pvalue(f_stat, df1, df2));
+
+    // The t-distribution approaches the standard normal distribution for n > 30 
+    if (n > 30) {
+        std::vector<double> t_stats = {beta[0] / stderr_beta[0], beta[1] / stderr_beta[1]};
+        std::vector<double> p_value = Stats::student_pvalue(t_stats);
     }
 }
 

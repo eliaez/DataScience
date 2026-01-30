@@ -142,6 +142,7 @@ add_library(linalg_full STATIC ${LIB_SOURCES})
 target_include_directories(linalg_full 
     PUBLIC 
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        "C:/Program Files (x86)/Boost/boost_1_90_0" # May need to be modified
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src  # Pour accéder à detail/ et backends/
 )

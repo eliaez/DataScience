@@ -212,4 +212,35 @@ double mse(const std::vector<double>& y, const std::vector<double>& y_pred) {
     return sum / n; 
 }
 
+double fisher_test(double r2, int df1, int df2) {
+    return (r2 * df2) / (df1 * (1 - r2));
+}
+
+double fisher_pvalue(double f, int df1, int df2) {
+    
+    // F dist with its degree of liberty
+    boost::math::fisher_f dist(df1, df2);
+    
+    // P(F > f_obs) = 1 - CDF(f_obs)
+    return 1.0 - boost::math::cdf(dist, f);
+}
+
+double normal_cdf(double x) {
+    return 0.5 * (1.0 + std::erf(x / std::sqrt(2.0)));
+}
+
+std::vector<double> student_pvalue(const std::vector<double>& t_stats) {
+
+    const size_t nb = t_stats.size();
+    std::vector<double> pvalue;
+    pvalue.reserve(nb);
+    for (const double& t : t_stats) {
+        pvalue.push_back(
+            2 * (1 - normal_cdf(std::abs(t)))
+        );
+    }
+
+    return pvalue;
+}
+
 }

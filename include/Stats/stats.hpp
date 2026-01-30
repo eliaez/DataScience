@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <cmath>
+#include <boost/math/distributions/fisher_f.hpp>
 
 #ifdef __AVX2__
     #include <immintrin.h>
@@ -44,4 +45,16 @@ namespace Stats {
 
     // RMSE with n = nb of obsvervations
     double rmse(double mse) { return std::sqrt(mse); };
+
+    // Fisher test with R2, df1 = p and df2 = n - p - 1
+    double fisher_test(double r2, int df1, int df2);
+
+    // P Value for Fisher test with F value, df1 = p and df2 = n - p - 1
+    double fisher_pvalue(double f, int df1, int df2);
+
+    // Cumulative distribution function of standard normal distribution
+    double normal_cdf(double x);
+
+    // Student p-value
+    std::vector<double> student_pvalue(const std::vector<double>& t_stats);
 }
