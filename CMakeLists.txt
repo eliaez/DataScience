@@ -13,6 +13,7 @@ if(MSVC)
         /wd4127     # Constant conditionnal expression
         /wd4267     # size_t to int
         /wd4244     # double to int
+        /wd4714     # Warning boost
         /wd5054)    # operator& between enums (Eigen) 
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 else()

@@ -578,7 +578,7 @@ std::vector<double> Dataframe::transpose_blocks_avx2(size_t rows_, size_t cols_,
 
     // Scalar residual 
     for (; i < rows_; i++) {
-        for(size_t j = 0; j < cols_; j++) {
+        for(j = 0; j < cols_; j++) {
             new_data[i*cols_ + j] = df[j*rows_ + i];
         }
     }   

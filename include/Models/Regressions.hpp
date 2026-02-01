@@ -28,14 +28,6 @@ namespace Reg {
             // Function to verify if x non-empty,...
             void basic_verif(const Dataframe& x) const;
 
-            // Predict function with avx2 if enabled, naive if not
-            std::vector<double> predict_avx2(const Dataframe& x) const;
-
-            #ifdef __AVX2__
-                // Predict function with avx2th
-                std::vector<double> predict_avx2th(const Dataframe& x) const;
-            #endif
-
         public:
             // Constructor 
             LinearRegression() : is_fitted(false) {}; // Init to get col major or warn user 
@@ -48,6 +40,9 @@ namespace Reg {
 
             // Calculate Stats after fit function
             void compute_stats(const Dataframe& x, const Dataframe& XtXinv, const Dataframe& y);
+
+            // Display stats after training
+            void summary() const;
 
             // Getters
             double get_intercept() const { return coeffs[0]; }

@@ -177,7 +177,7 @@ double rsquared(const std::vector<double>& y, const std::vector<double>& y_pred)
 }
 
 double radjusted(double r2, int n, int p) {
-    if ((n - p - 1) != 0) {
+    if ((n - p - 1) == 0) {
         throw std::invalid_argument("Need more observations to avoid (n - p - 1) == 0");
     }
     
@@ -212,6 +212,8 @@ double mse(const std::vector<double>& y, const std::vector<double>& y_pred) {
     return sum / n; 
 }
 
+double rmse(double mse) { return std::sqrt(mse); }
+
 double fisher_test(double r2, int df1, int df2) {
     return (r2 * df2) / (df1 * (1 - r2));
 }
@@ -223,6 +225,19 @@ double fisher_pvalue(double f, int df1, int df2) {
     
     // P(F > f_obs) = 1 - CDF(f_obs)
     return 1.0 - boost::math::cdf(dist, f);
+}
+
+std::vector<double> stderr_b(double mse, const std::vector<double>&XtXinv) {
+    
+    size_t p = std::sqrt(XtXinv.size());
+    std::vector<double> res;
+    res.reserve(p);
+    for (size_t i = 0; i < p; i ++) {
+        res.push_back(
+            std::sqrt(mse * XtXinv[i*p+i])
+        );
+    }
+    return res;
 }
 
 double normal_cdf(double x) {

@@ -25,11 +25,12 @@ void LinearRegression::fit(const Dataframe& x, const Dataframe& y) {
     std::vector<double> x_v = x.get_data();
     
     // Insert an unit col to get intercept value
-    size_t n = x_v.size();
+    size_t n = x.get_rows();
+    size_t p = x.get_cols();
     bool is_row_major = x.get_storage();
     if (is_row_major) {
         for (size_t i = 0; i < n; i++) {
-            x_v.insert(x_v.begin() + i*2, 1.0);
+            x_v.insert(x_v.begin() + i*(p+1), 1.0);
         }
     }
     else {
@@ -39,7 +40,7 @@ void LinearRegression::fit(const Dataframe& x, const Dataframe& y) {
     }
 
     // Need X col-major (for mult ops)
-    Dataframe X = {n, 2, is_row_major, std::move(x_v)};
+    Dataframe X = {n, p+1, is_row_major, std::move(x_v)};
     if (is_row_major) X.change_layout_inplace();
 
     // Need X_t row-major (for mult ops)
@@ -52,14 +53,18 @@ void LinearRegression::fit(const Dataframe& x, const Dataframe& y) {
     Dataframe beta_est =  inter * (X_t * y);  
 
     // Results
-    intercept = beta_est.get_data()[0];
-    slope = beta_est.get_data()[1];
+    coeffs = beta_est.get_data();
     is_fitted = true;
 
     compute_stats(x, inter, y);
 }
 
 std::vector<double> LinearRegression::predict(const Dataframe& x) const {
+    basic_verif(x);
+
+    if (!is_fitted) {
+        throw std::runtime_error("Need to have trained your model");
+    }
 
     size_t n = x.get_rows();
     size_t p = x.get_cols();
@@ -143,7 +148,6 @@ std::vector<double> LinearRegression::predict(const Dataframe& x) const {
         #ifdef __AVX2__
             const size_t NB_DB = Stats::NB_DB;
             const size_t PREFETCH_DIST = Stats::PREFETCH_DIST;
-            const size_t PREFETCH_DIST1 = Stats::PREFETCH_DIST1;
 
             size_t i = 0;
             size_t vec_size = n - (n % NB_DB);
@@ -206,9 +210,8 @@ std::vector<double> LinearRegression::predict(const Dataframe& x) const {
 
 void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv, const Dataframe& y) {
     
-    std::vector<double> beta = {intercept, slope};
     size_t n = x.get_rows();
-    size_t p = beta.size() - 1;
+    size_t p = x.get_cols();
     
     // Degree of liberty
     int df1 = p;
@@ -221,10 +224,14 @@ void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv
     double r2 = Stats::rsquared(y.get_data(), y_pred);
     double mse = Stats::mse(y.get_data(), y_pred);
     double f_stat = Stats::fisher_test(r2, df1, df2);
-    std::vector<double> stderr_beta = {std::sqrt(mse * XtXinv.get_data()[0]), std::sqrt(mse * XtXinv.get_data()[3])};
+    std::vector<double> stderr_beta = Stats::stderr_b(mse, XtXinv.get_data());
         
     // Add them to our vector of stats
     gen_stats.push_back(r2);
+
+    if (p > 1) gen_stats.push_back(Stats::radjusted(r2, n, p));
+    else gen_stats.push_back(-1.0);
+
     gen_stats.push_back(mse);
     gen_stats.push_back(Stats::rmse(mse));
     gen_stats.push_back(Stats::mae(y.get_data(), y_pred));
@@ -232,11 +239,78 @@ void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv
     gen_stats.push_back(Stats::fisher_pvalue(f_stat, df1, df2));
 
     // The t-distribution approaches the standard normal distribution for n > 30 
+    std::vector<double> p_value;
+    std::vector<double> t_stats(p+1, 0.0);
     if (n > 30) {
-        std::vector<double> t_stats = {beta[0] / stderr_beta[0], beta[1] / stderr_beta[1]};
-        std::vector<double> p_value = Stats::student_pvalue(t_stats);
+        for (size_t i = 0; i < p+1; i++) t_stats[i] = coeffs[i] / stderr_beta[i];
+        p_value = Stats::student_pvalue(t_stats);
+    }
+
+    // If we have not the cols name
+    std::vector<std::string> headers(p+1, "");
+    headers[0] = "Intercept";
+    if (x.get_headers().empty()) {
+        for (size_t i = 1; i < p+1; i++) headers[i] = "c" + std::to_string(i);
+    }
+    else {
+        headers = {"Intercept"};
+        headers.insert(headers.end(), x.get_headers().begin(), x.get_headers().end());
+    }
+
+    // Save our stats
+    CoeffStats c;
+    for (size_t i = 0; i < p+1; i++) {
+        if (n > 30) {
+            c = {
+                headers[i],
+                coeffs[i],
+                stderr_beta[i],
+                t_stats[i],
+                p_value[i]
+            };
+        }
+        else {
+            c = {
+                headers[i],
+                coeffs[i],
+                stderr_beta[i],
+                0.0,
+                0.0
+            };
+        }
+        coeff_stats.push_back(c);
     }
 }
 
-
+void LinearRegression::summary() const {
+    std::cout << "\n=== REGRESSION SUMMARY ===\n\n";
+    
+    std::cout << "R² = " << gen_stats[0] << "\n";
+    if (gen_stats[1] != -1.0) std::cout << "Adjusted R² = " << gen_stats[1] << "\n";
+    std::cout << "MSE = " << gen_stats[2] << "\n";
+    std::cout << "RMSE = " << gen_stats[3] << "\n";
+    std::cout << "MAE = " << gen_stats[4] << "\n";
+    std::cout << "Fisher - F = " << gen_stats[5] << "\n";
+    std::cout << "Fisher - p-value = " << gen_stats[6] << "\n\n";
+    
+    std::cout << std::left << std::setw(15) << "Coefficient"
+              << std::right << std::setw(12) << "Beta"
+              << std::setw(12) << "Stderr"
+              << std::setw(10) << "t-stat"
+              << std::setw(10) << "p-value"
+              << "  \n";
+    std::cout << std::string(60, '-') << "\n";
+    
+    for (const auto& stat : coeff_stats) {
+        std::cout << std::left << std::setw(15) << stat.name
+                  << std::right << std::fixed << std::setprecision(4)
+                  << std::setw(12) << stat.beta
+                  << std::setw(12) << stat.stderr_beta
+                  << std::setw(10) << stat.t_stat
+                  << std::setw(10) << stat.p_value
+                  << "  " << stat.significance() << "\n";
+    }
+    
+    std::cout << "\nSignif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1\n";
+}
 }
