@@ -4,13 +4,12 @@
 #include "Data/Data.hpp"
 #include "Stats/stats.hpp"
 #include "Linalg/Linalg.hpp"
-#include "Utils/ThreadPool.hpp"
 
 namespace Reg {
     struct CoeffStats {
         std::string name;        
         double beta;             
-        double stderr_beta;        
+        double stdderr_beta;        
         double t_stat;           
         double p_value;          
 
@@ -34,6 +33,7 @@ namespace Reg {
 
             // Training
             void fit(const Dataframe& x, const Dataframe& y);
+            Dataframe fit_without_stats(const Dataframe& x, const Dataframe& y);
             
             // Prediction
             std::vector<double> predict(const Dataframe& x) const;
@@ -42,7 +42,7 @@ namespace Reg {
             void compute_stats(const Dataframe& x, const Dataframe& XtXinv, const Dataframe& y);
 
             // Display stats after training
-            void summary() const;
+            void summary(bool detailled = false) const;
 
             // Getters
             double get_intercept() const { return coeffs[0]; }

@@ -18,6 +18,12 @@ void LinearRegression::basic_verif(const Dataframe& x) const {
 }
 
 void LinearRegression::fit(const Dataframe& x, const Dataframe& y) {
+    
+    Dataframe XtXInv = fit_without_stats(x, y);
+    compute_stats(x, XtXInv, y);
+}
+
+Dataframe LinearRegression::fit_without_stats(const Dataframe& x, const Dataframe& y) {
     basic_verif(x);
     basic_verif(y);
 
@@ -48,15 +54,15 @@ void LinearRegression::fit(const Dataframe& x, const Dataframe& y) {
     X_t.change_layout_inplace();
     
     // Calculate Beta (our estimator)
-    Dataframe inter = (X_t*X).inv();
-    inter.change_layout_inplace();    
-    Dataframe beta_est =  inter * (X_t * y);  
+    Dataframe XtXInv = (X_t*X).inv();
+    XtXInv.change_layout_inplace();    
+    Dataframe beta_est =  XtXInv * (X_t * y);  
 
     // Results
     coeffs = beta_est.get_data();
     is_fitted = true;
 
-    compute_stats(x, inter, y);
+    return XtXInv;
 }
 
 std::vector<double> LinearRegression::predict(const Dataframe& x) const {
@@ -224,7 +230,8 @@ void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv
     double r2 = Stats::rsquared(y.get_data(), y_pred);
     double mse = Stats::mse(y.get_data(), y_pred);
     double f_stat = Stats::fisher_test(r2, df1, df2);
-    std::vector<double> stderr_beta = Stats::stderr_b(mse, XtXinv.get_data());
+    std::vector<double> residuals = Stats::get_residuals(y.get_data(), y_pred);
+    std::vector<double> stdderr_b = Stats::stdderr_b(mse, XtXinv.get_data());
         
     // Add them to our vector of stats
     gen_stats.push_back(r2);
@@ -237,12 +244,22 @@ void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv
     gen_stats.push_back(Stats::mae(y.get_data(), y_pred));
     gen_stats.push_back(f_stat);
     gen_stats.push_back(Stats::fisher_pvalue(f_stat, df1, df2));
+    gen_stats.push_back(Stats::durbin_watson_test(residuals));
+    gen_stats.push_back(Stats::breusch_pagan_test(x, residuals));
+
+    std::vector<double> resid_stats = Stats::residuals_stats(residuals);
+    for (size_t i = 0; i < resid_stats.size(); i++) gen_stats.push_back(resid_stats[i]); 
+
+    if (p > 1) {
+        std::vector<double> vif = Stats::VIF(x);
+        for (size_t i = 0; i < vif.size(); i++) gen_stats.push_back(vif[i]); 
+    }
 
     // The t-distribution approaches the standard normal distribution for n > 30 
     std::vector<double> p_value;
     std::vector<double> t_stats(p+1, 0.0);
     if (n > 30) {
-        for (size_t i = 0; i < p+1; i++) t_stats[i] = coeffs[i] / stderr_beta[i];
+        for (size_t i = 0; i < p+1; i++) t_stats[i] = coeffs[i] / stdderr_b[i];
         p_value = Stats::student_pvalue(t_stats);
     }
 
@@ -264,7 +281,7 @@ void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv
             c = {
                 headers[i],
                 coeffs[i],
-                stderr_beta[i],
+                stdderr_b[i],
                 t_stats[i],
                 p_value[i]
             };
@@ -273,7 +290,7 @@ void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv
             c = {
                 headers[i],
                 coeffs[i],
-                stderr_beta[i],
+                stdderr_b[i],
                 0.0,
                 0.0
             };
@@ -282,35 +299,76 @@ void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv
     }
 }
 
-void LinearRegression::summary() const {
+void LinearRegression::summary(bool detailled) const {
     std::cout << "\n=== REGRESSION SUMMARY ===\n\n";
     
     std::cout << "R² = " << gen_stats[0] << "\n";
     if (gen_stats[1] != -1.0) std::cout << "Adjusted R² = " << gen_stats[1] << "\n";
     std::cout << "MSE = " << gen_stats[2] << "\n";
     std::cout << "RMSE = " << gen_stats[3] << "\n";
-    std::cout << "MAE = " << gen_stats[4] << "\n";
-    std::cout << "Fisher - F = " << gen_stats[5] << "\n";
-    std::cout << "Fisher - p-value = " << gen_stats[6] << "\n\n";
+    std::cout << "MAE = " << gen_stats[4] << "\n\n";
     
     std::cout << std::left << std::setw(15) << "Coefficient"
               << std::right << std::setw(12) << "Beta"
-              << std::setw(12) << "Stderr"
+              << std::setw(12) << "Stdderr"
               << std::setw(10) << "t-stat"
-              << std::setw(10) << "p-value"
-              << "  \n";
-    std::cout << std::string(60, '-') << "\n";
+              << std::setw(10) << "p-value";
     
+    if (coeff_stats.size() > 2 && detailled) {
+        std::cout << std::setw(10) << "VIF" << "  \n";
+        std::cout << std::string(70, '-') << "\n";
+    }
+    else {
+        std::cout << "  \n";
+        std::cout << std::string(60, '-') << "\n";
+    }
+
+    size_t i = 0;
     for (const auto& stat : coeff_stats) {
         std::cout << std::left << std::setw(15) << stat.name
                   << std::right << std::fixed << std::setprecision(4)
                   << std::setw(12) << stat.beta
-                  << std::setw(12) << stat.stderr_beta
+                  << std::setw(12) << stat.stdderr_beta
                   << std::setw(10) << stat.t_stat
                   << std::setw(10) << stat.p_value
-                  << "  " << stat.significance() << "\n";
+                  << "  " << stat.significance();
+        
+        if (coeff_stats.size() > 2 && detailled) {
+            std::cout << std::setw(10) << gen_stats[16 + i] << "\n";
+        }
+        else {
+            std::cout << "\n";
+        }
+        i++;
     }
     
-    std::cout << "\nSignif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1\n";
+    std::cout << "\nSignif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1\n\n";
+
+    if (detailled) {
+        std::cout << "Additional stats:\n";
+        std::cout << "Fisher - F = " << gen_stats[5] << "\n";
+        std::cout << "Fisher - p-value = " << gen_stats[6] << "\n";
+        std::cout << "Durbin-Watson - p-value = " << gen_stats[7] << "\n";
+        std::cout << "Breusch-Pagan - p-value = " << gen_stats[8] << "\n\n";
+
+        std::cout << "Residuals:\n";
+        std::cout << std::left << std::setw(15) << "Mean"
+                << std::right << std::setw(12) << "Stdd"
+                << std::setw(12) << "Abs Min"
+                << std::setw(10) << "Abs Max"
+                << std::setw(10) << "Q1"
+                << std::setw(10) << "Q3"
+                << std::setw(10) << "Q2" << "  \n";
+
+        std::cout << std::string(80, '-') << "\n";
+        std::cout << std::left << std::setw(15) << gen_stats[8]
+                  << std::right << std::fixed << std::setprecision(4)
+                  << std::setw(12) << gen_stats[10]
+                  << std::setw(12) << gen_stats[11]
+                  << std::setw(10) << gen_stats[12]
+                  << std::setw(10) << gen_stats[13]
+                  << std::setw(10) << gen_stats[14]
+                  << std::setw(10) << gen_stats[15] << "\n\n";
+    }
 }
 }

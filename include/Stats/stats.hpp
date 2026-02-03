@@ -2,11 +2,19 @@
 
 #include <vector>
 #include <cmath>
+#include "Utils/ThreadPool.hpp"
 #include <boost/math/distributions/fisher_f.hpp>
+#include <boost/math/distributions/chi_squared.hpp>
 
 #ifdef __AVX2__
     #include <immintrin.h>
 #endif
+
+class Dataframe;
+
+namespace Reg {
+    class LinearRegression;
+}
 
 namespace Stats {
     
@@ -18,6 +26,9 @@ namespace Stats {
         // Horizontal Reduction
         double horizontal_red(__m256d& vec);
     #endif
+
+    // Utils
+    std::vector<size_t> rangeExcept(size_t max, size_t exclude);
 
     // Dot product 
     double dot(const std::vector<double>& x, const std::vector<double>& y);
@@ -56,8 +67,23 @@ namespace Stats {
     double normal_cdf(double x);
 
     // Stderr of beta
-    std::vector<double> stderr_b(double mse, const std::vector<double>& XtXinv);
+    std::vector<double> stdderr_b(double mse, const std::vector<double>& XtXinv);
 
     // Student p-value
     std::vector<double> student_pvalue(const std::vector<double>& t_stats);
+
+    // Residuals
+    std::vector<double> get_residuals(const std::vector<double>& y, const std::vector<double>& y_pred);
+
+    // Stats on residuals, mean, stdd, min, max, Q1, Q2, Q3
+    std::vector<double> residuals_stats(const std::vector<double>& residuals);
+
+    // Durbin-Watson test return autocorrelation coefficient
+    double durbin_watson_test(const std::vector<double>& residuals);
+
+    // Breusch-Pagan test return p-value (for heteroscedasticity)
+    double breusch_pagan_test(const Dataframe& x, const std::vector<double>& residuals);
+
+    // VIF (Variance Inflation Factor)
+    std::vector<double> VIF(const Dataframe& x);
 }
