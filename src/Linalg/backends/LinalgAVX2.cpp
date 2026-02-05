@@ -1,5 +1,8 @@
+#include "Data/Data.hpp"
 #include "LinalgAVX2.hpp"
+#include "Utils/Utils.hpp"
 
+using namespace Utils;
 
 namespace Linalg::AVX2 {
 #ifdef __AVX2__
@@ -225,18 +228,6 @@ std::vector<double> solveLU_inplace(const std::vector<double>& perm, const std::
         }
     }
     return y;
-}
-
-double horizontal_red(__m256d& vec) {
-    // hadd1 = [a+b, a+b, c+d, c+d] 
-    __m256d hadd1 = _mm256_hadd_pd(vec, vec); 
-
-    // sum128 = [a+b+c+d, ...]
-    __m128d sum128 = _mm_add_pd(_mm256_castpd256_pd128(hadd1),  // [a+b, a+b]
-                                _mm256_extractf128_pd(hadd1, 1));  // [c+d, c+d]
-    
-    // Extract result
-    return _mm_cvtsd_f64(sum128);
 }
 
 std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, 

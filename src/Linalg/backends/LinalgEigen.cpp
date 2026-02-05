@@ -1,4 +1,7 @@
+#include <Eigen/Dense>
+#include "Data/Data.hpp"
 #include "LinalgEigen.hpp"
+
 
 namespace Linalg::EigenNP {
 

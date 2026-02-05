@@ -1,5 +1,5 @@
-#include "Linalg/Linalg.hpp"
 #include "Data/Data.hpp"
+#include "Linalg/Linalg.hpp"
 #include "Linalg/detail/LinalgImpl.hpp"
 
 // ============================================

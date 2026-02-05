@@ -1,6 +1,12 @@
-#include "Linalg/detail/LinalgImpl.hpp"
 #include <string>
 #include <stdexcept>
+#include "Linalg/Linalg.hpp"
+#include "Linalg/detail/LinalgImpl.hpp"
+#include "Linalg/backends/LinalgMKL.hpp"
+#include "Linalg/backends/LinalgAVX2.hpp"
+#include "Linalg/backends/LinalgNaive.hpp"
+#include "Linalg/backends/LinalgEigen.hpp"
+#include "Linalg/backends/LinalgAVX2_threaded.hpp"
 
 
 // ============================================

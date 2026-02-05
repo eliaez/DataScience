@@ -1,45 +1,15 @@
-#include "Stats/stats.hpp"
-#include "Models/Regressions.hpp"
-#include "Data/Data.hpp"
+#include <cmath>
 #include <stdexcept>
+#include "Data/Data.hpp"
+#include "Utils/Utils.hpp"
+#include "Stats/stats.hpp"
+#include "Utils/ThreadPool.hpp"
+#include <boost/math/distributions/fisher_f.hpp>
+#include <boost/math/distributions/chi_squared.hpp>
+
+using namespace Utils;
 
 namespace Stats {
-
-#ifdef __AVX2__
-    double horizontal_red(__m256d& vec) {
-        // hadd1 = [a+b, a+b, c+d, c+d] 
-        __m256d hadd1 = _mm256_hadd_pd(vec, vec); 
-
-        // sum128 = [a+b+c+d, ...]
-        __m128d sum128 = _mm_add_pd(_mm256_castpd256_pd128(hadd1),  // [a+b, a+b]
-                                    _mm256_extractf128_pd(hadd1, 1));  // [c+d, c+d]
-        
-        // Extract result
-        return _mm_cvtsd_f64(sum128);
-    }
-#endif
-
-std::vector<size_t> rangeExcept(size_t max, size_t exclude) {
-    std::vector<size_t> result;
-    for (size_t i = 0; i <= max; ++i) {
-        if (i != exclude) {
-            result.push_back(i);
-        }
-    }
-    return result;
-}
-
-double dot(const std::vector<double>& x, const std::vector<double>& y) {
-    if (x.size() != y.size()) {
-        throw std::invalid_argument("Need input of same length");
-    }
-
-    double res = 0.0;
-    for (size_t i = 0; i < x.size(); ++i) {
-        res += x[i] * y[i];
-    }
-    return res;
-}
 
 double mean(const std::vector<double>& x) {
     if (x.empty()) {
@@ -171,6 +141,145 @@ double cov(const std::vector<double>& x, const std::vector<double>& y) {
     return sum / (n-1);
 }
 
+Dataframe cov_beta_OLS(const Dataframe& x, const Dataframe& XtXinv, 
+    const std::vector<double>& residuals, const std::string & cov_type,
+    const std::vector<int>& cluster_ids) {
+
+    size_t n = x.get_rows();
+    size_t p = x.get_cols() + 1;
+    std::vector<double> Meat(p*p, 0.0);
+
+    if (cov_type == "HC3") {
+        
+        // Calculate leverage vector
+        std::vector<double> leverages(n);
+        for (size_t i = 0; i < n; i++) {
+            
+            double h = 0.0;
+            for (size_t j = 0; j < p; j++) {
+                
+                double temp = x.at(j*n + i);
+                for (size_t k = 0; k < p; k++) {
+                    h += temp * XtXinv.at(j*p + k) * x.at(k*n + i); // XtXinv row major
+                }
+            }
+            leverages[i] = h;
+        }
+
+        // Meat = X' diag(weights) X
+        for (size_t i = 0; i < n; i++) {
+
+            double w = residuals[i] * residuals[i] / ((1 - leverages[i])*(1 - leverages[i]));
+            for (size_t j = 0; j < p; j++) {
+
+                double temp = x.at(j*n + i);
+                for (size_t k = 0; k < p; k++) {
+                    Meat[j*p + k] += temp * w * x.at(k*n + i);
+                }
+            }
+        }
+    }
+    else if (cov_type == "HAC") {
+
+        // Newey-West lag
+        size_t L = std::floor(4.0 * std::pow(n/100.0, 2.0/9.0));
+
+        // Gamma_0
+        for (size_t i = 0; i < n; i++) {
+
+            double residual = residuals[i];
+            for (size_t j = 0; j < p; j++) {
+
+                double temp = x.at(j*n + i);
+                for (size_t k = 0; k < p; k++) {
+                    Meat[j*p + k] += residual * temp * residual * x.at(k*n + i);
+                }
+            }
+        }
+        
+        // Autocovariances
+        for (size_t lag = 1; lag <= L; lag++) {
+            
+            double weight = 1.0 - static_cast<double>(lag) / (L + 1);
+            std::vector<double> Gamma_lag(p*p, 0.0);
+            for (size_t i = lag; i < n; i++) {
+
+                double res = residuals[i];
+                double res_lag = residuals[i-lag];
+                for (size_t j = 0; j < p; j++) {
+
+                    double temp = x.at(j*n + i);
+                    for (size_t k = 0; k < p; k++) {
+                        Gamma_lag[j*p + k] +=  res * temp * res_lag * x.at(k*n + i - lag);
+                    }
+                }
+            }
+            
+            for (size_t j = 0; j < p; j++) {
+                for (size_t k = 0; k < p; k++) {
+                    Meat[j*p + k] += weight * (Gamma_lag[j*p + k] + Gamma_lag[k*p + j]);
+                }
+            }
+        }
+    }
+    else if (cov_type == "cluster") {
+        
+        size_t min_val = *std::min_element(cluster_ids.begin(), cluster_ids.end());
+        if (min_val != 0) {
+            throw std::invalid_argument("Ids in cluster have to start from 0");
+        }
+
+        // Nb of clusters
+        size_t G = *std::max_element(cluster_ids.begin(), cluster_ids.end()) + 1;
+
+        // Group by Cluster
+        std::vector<std::vector<size_t>> clusters(G);
+        for (size_t i = 0; i < n; i++) {
+            clusters[cluster_ids[i]].push_back(i);
+        }
+
+        for (size_t c = 0; c < G; c++) {
+
+            // Cluster score c : u_c = sum_{i in c} e_i * x_i
+            std::vector<double> u_c(p, 0.0);
+            for (size_t i : clusters[c]) {
+                for (size_t j = 0; j < p; j++) {
+                    u_c[j] += residuals[i] * x.at(j*n + i);
+                }
+            }
+            
+            // Outer product u_c * u_c'
+            for (size_t j = 0; j < p; j++) {
+
+                double temp = u_c[j];
+                for (size_t k = 0; k < p; k++) {
+                    Meat[j*p + k] += temp * u_c[k];
+                }
+            }
+        }
+        
+        // Adjustement
+        double adj = static_cast<double>(G) / (G - 1) * (n - 1) / (n - p);
+        Meat = mult(Meat, adj);
+    }
+    // By default classical
+    else {
+        // Var(Beta) = sigma2 * XtXinv
+        std::vector<double> sigma2(n*n, 0.0);
+        for (size_t i = 0; i < p; i++) {
+            sigma2[i*p + i] = residuals[i] * residuals[i];
+        }
+        Dataframe df_sigma2 = {p, p, true, sigma2};
+        return df_sigma2 * XtXinv;
+    }
+
+    // Sandwich
+    Dataframe df_Meat = {p, p, false, Meat};
+    Dataframe part1 = XtXinv * df_Meat;
+    part1.change_layout_inplace();
+    return  part1 * XtXinv;
+}
+
 double rsquared(const std::vector<double>& y, const std::vector<double>& y_pred) {
     if (y.empty() || y_pred.empty()) {
         throw std::invalid_argument("Cannot calculate rsquared with empty vector");
@@ -210,6 +319,20 @@ double mae(const std::vector<double>& y, const std::vector<double>& y_pred) {
     return sum / n;
 }
 
+double mae(const std::vector<double>& residuals) {
+    if (residuals.empty()) {
+        throw std::invalid_argument("Cannot calculate mae with empty vector");
+    }
+
+    double sum = 0.0;
+    size_t n = residuals.size();
+    for (size_t i = 0; i < n; i++) {
+        sum += std::abs(residuals[i]);
+    }
+    
+    return sum / n;
+}
+
 double mse(const std::vector<double>& y, const std::vector<double>& y_pred) {
     if (y.empty() || y_pred.empty()) {
         throw std::invalid_argument("Cannot calculate mse with empty vector");
@@ -224,10 +347,47 @@ double mse(const std::vector<double>& y, const std::vector<double>& y_pred) {
     return sum / n; 
 }
 
+double mse(const std::vector<double>& residuals) {
+    if (residuals.empty()) {
+        throw std::invalid_argument("Cannot calculate mse with empty vector");
+    }
+
+    double sum = 0.0;
+    size_t n = residuals.size();
+    for (size_t i = 0; i < n; i++) {
+        sum += (residuals[i]) * (residuals[i]);
+    }
+    
+    return sum / n; 
+}
+
 double rmse(double mse) { return std::sqrt(mse); }
 
-double fisher_test(double r2, int df1, int df2) {
-    return (r2 * df2) / (df1 * (1 - r2));
+double fisher_test(double r2, int df1, int df2, const std::vector<double>& beta_est,
+    const Dataframe& cov_beta, const std::string& cov_type) {
+    
+    double f_stat;
+    if (cov_type == "HC3" || cov_type == "HAC" || cov_type == "cluster" || cov_type == "GLS") {
+        
+        // Erase row and col 0
+        Dataframe var_robust = cov_beta;
+        var_robust.pop(0);
+        var_robust.pop(0, true);
+        var_robust = var_robust.inv();
+
+        // Erase intercept
+        std::vector<double> beta_no_const(beta_est.begin()+1, beta_est.end()); 
+        Dataframe df_beta_no_const = {beta_no_const.size(), 1, true, beta_no_const};
+
+        double wald = dot((df_beta_no_const * var_robust).get_data(), beta_no_const);
+        f_stat = wald / df1;
+    }
+    // By default classical
+    else {
+        f_stat = (r2 * df2) / (df1 * (1 - r2));
+    }
+    
+    return f_stat;
 }
 
 double fisher_pvalue(double f, int df1, int df2) {
@@ -239,15 +399,14 @@ double fisher_pvalue(double f, int df1, int df2) {
     return 1.0 - boost::math::cdf(dist, f);
 }
 
-std::vector<double> stdderr_b(double mse, const std::vector<double>&XtXinv) {
+std::vector<double> stderr_b(const Dataframe& cov_beta) {
     
-    size_t p = std::sqrt(XtXinv.size());
-    std::vector<double> res;
-    res.reserve(p);
+    size_t p = cov_beta.get_cols();
+    std::vector<double> res(p);
+
+    // Get diagonal of cov_beta
     for (size_t i = 0; i < p; i ++) {
-        res.push_back(
-            std::sqrt(mse * XtXinv[i*p+i])
-        );
+        res[i] = cov_beta.at(i*p + i);
     }
     return res;
 }
@@ -353,7 +512,7 @@ double breusch_pagan_test(const Dataframe& x, const std::vector<double>& residua
     return p_value;
 }
 
-std::vector<double> VIF(const Dataframe& x) {
+std::vector<double> VIF(const Dataframe& x, const Dataframe& Omega) {
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();
@@ -370,7 +529,7 @@ std::vector<double> VIF(const Dataframe& x) {
         futures.reserve(nb_threads);
 
          for (size_t i = 0; i < p; i++) {
-            auto fut = pool.enqueue([i, n, p, &vif, &x] {
+            auto fut = pool.enqueue([i, n, p, &vif, &x, &Omega] {
                 
                 // Target and X for this reg 
                 Dataframe target = x[i];
@@ -378,8 +537,21 @@ std::vector<double> VIF(const Dataframe& x) {
 
                 // Use our functions in Reg
                 Reg::LinearRegression New_reg;
-                New_reg.fit_without_stats(x_bis, target);
-                auto y_pred = New_reg.predict(x_bis);
+
+                // In the case of GLS LinearRegression
+                std::vector<double> y_pred;
+                if (!Omega.get_data().empty()) {
+                    Dataframe Om = Omega;
+                    Om.pop(i);
+                    Om.pop(i, true);
+                    New_reg.fit_gls_without_stats(x_bis, target, Om);
+                    y_pred = New_reg.predict(x_bis);
+                }
+                // In the case of OLS LinearRegression
+                else {
+                    New_reg.fit_without_stats(x_bis, target);
+                    y_pred = New_reg.predict(x_bis);
+                }
 
                 // VIF
                 double r2 = rsquared(target.get_data(), y_pred);
@@ -402,8 +574,21 @@ std::vector<double> VIF(const Dataframe& x) {
 
             // Use our functions in Reg
             Reg::LinearRegression New_reg;
-            New_reg.fit_without_stats(x_bis, target);
-            auto y_pred = New_reg.predict(x_bis);
+
+            // In the case of GLS LinearRegression
+            std::vector<double> y_pred;
+            if (!Omega.get_data().empty()) {
+                Dataframe Om = Omega;
+                Om.pop(i);
+                Om.pop(i, true);
+                New_reg.fit_gls_without_stats(x_bis, target, Om);
+                y_pred = New_reg.predict(x_bis);
+            }
+            // In the case of OLS LinearRegression
+            else {
+                New_reg.fit_without_stats(x_bis, target);
+                y_pred = New_reg.predict(x_bis);
+            }
 
             // VIF
             double r2 = rsquared(target.get_data(), y_pred);

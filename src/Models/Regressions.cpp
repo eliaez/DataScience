@@ -1,5 +1,13 @@
-#include "Models/Regressions.hpp"
+#include <iomanip>
+#include <iostream>
 #include <stdexcept>
+#include "Data/Data.hpp"
+#include "Utils/Utils.hpp"
+#include "Stats/stats.hpp"
+#include "Linalg/Linalg.hpp"
+#include "Models/Regressions.hpp"
+
+using namespace Utils;
 
 namespace Reg {
 
@@ -17,15 +25,19 @@ void LinearRegression::basic_verif(const Dataframe& x) const {
     }
 }
 
-void LinearRegression::fit(const Dataframe& x, const Dataframe& y) {
+void LinearRegression::fit(const Dataframe& x, const Dataframe& y, 
+    const std::string& cov_type, const std::vector<int>& cluster_ids) {
     
     Dataframe XtXInv = fit_without_stats(x, y);
-    compute_stats(x, XtXInv, y);
+    compute_stats(x, XtXInv, y, cov_type, cluster_ids);
 }
 
 Dataframe LinearRegression::fit_without_stats(const Dataframe& x, const Dataframe& y) {
     basic_verif(x);
     basic_verif(y);
+    if (x.get_storage()) {
+        throw std::invalid_argument("Need x col-major");
+    }
 
     // Copy our data 
     std::vector<double> x_v = x.get_data();
@@ -33,21 +45,12 @@ Dataframe LinearRegression::fit_without_stats(const Dataframe& x, const Datafram
     // Insert an unit col to get intercept value
     size_t n = x.get_rows();
     size_t p = x.get_cols();
-    bool is_row_major = x.get_storage();
-    if (is_row_major) {
-        for (size_t i = 0; i < n; i++) {
-            x_v.insert(x_v.begin() + i*(p+1), 1.0);
-        }
-    }
-    else {
-        for (size_t i = 0; i < n; i++) {
-            x_v.insert(x_v.begin(), 1.0);
-        }
+    for (size_t i = 0; i < n; i++) {
+        x_v.insert(x_v.begin(), 1.0);
     }
 
     // Need X col-major (for mult ops)
-    Dataframe X = {n, p+1, is_row_major, std::move(x_v)};
-    if (is_row_major) X.change_layout_inplace();
+    Dataframe X = {n, p+1, false, std::move(x_v)};
 
     // Need X_t row-major (for mult ops)
     Dataframe X_t = ~X;  // Transpose change it to col-major
@@ -63,6 +66,56 @@ Dataframe LinearRegression::fit_without_stats(const Dataframe& x, const Datafram
     is_fitted = true;
 
     return XtXInv;
+}
+
+void LinearRegression::fit_gls(const Dataframe& x, const Dataframe& y, Dataframe& Omega) {
+    
+    Dataframe XtOmegaXInv = fit_gls_without_stats(x, y, Omega);
+    compute_stats(x, XtOmegaXInv, y, "classical", {}, Omega);
+}
+
+Dataframe LinearRegression::fit_gls_without_stats(const Dataframe& x, const Dataframe& y, Dataframe& Omega) {
+    basic_verif(x);
+    basic_verif(y);
+    basic_verif(Omega);
+    if (x.get_storage()) {
+        throw std::invalid_argument("Need x col-major");
+    }
+
+    size_t n = x.get_rows();
+    size_t p = x.get_cols();
+    if (Omega.get_cols() != n) {
+        throw std::invalid_argument("Omega need to have n rows and cols with n = x.rows");
+    }
+    Dataframe Om = Omega.inv();
+
+    // Copy our data 
+    std::vector<double> x_v = x.get_data();
+    
+    // Insert an unit col to get intercept value
+    for (size_t i = 0; i < n; i++) {
+        x_v.insert(x_v.begin(), 1.0);
+    }
+
+    // Need X col-major (for mult ops)
+    Dataframe X = {n, p+1, false, std::move(x_v)};
+
+    // Need X_t row-major (for mult ops)
+    Dataframe X_t = ~X;  // Transpose change it to col-major
+    X_t.change_layout_inplace();
+    
+    // Calculate Beta (our estimator)
+    Dataframe XtOmega = X_t * Om;
+    XtOmega.change_layout_inplace();
+    Dataframe XtOmegaXInv =  (XtOmega * X).inv();
+    XtOmegaXInv.change_layout_inplace();    
+    Dataframe beta_est =  XtOmegaXInv * (XtOmega * y);  
+
+    // Results
+    coeffs = beta_est.get_data();
+    is_fitted = true;
+
+    return XtOmegaXInv;
 }
 
 std::vector<double> LinearRegression::predict(const Dataframe& x) const {
@@ -214,7 +267,8 @@ std::vector<double> LinearRegression::predict(const Dataframe& x) const {
     return y_pred;
 }
 
-void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv, const Dataframe& y) {
+void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv, const Dataframe& y, 
+    const std::string& cov_type, const std::vector<int>& cluster_ids, const Dataframe& Omega) {
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();
@@ -226,13 +280,17 @@ void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv
     // Predict 
     std::vector<double> y_pred = predict(x);
 
-    // Calculate stats
+    // -------------------------------------Calculate stats----------------------------------------
     double r2 = Stats::rsquared(y.get_data(), y_pred);
     double mse = Stats::mse(y.get_data(), y_pred);
-    double f_stat = Stats::fisher_test(r2, df1, df2);
     std::vector<double> residuals = Stats::get_residuals(y.get_data(), y_pred);
-    std::vector<double> stdderr_b = Stats::stdderr_b(mse, XtXinv.get_data());
-        
+
+    // Covariance Matrix of Beta
+    Dataframe cov_beta = Stats::cov_beta_OLS(x, XtXinv, residuals, cov_type, cluster_ids);
+    std::vector<double> stderr_b = Stats::stderr_b(cov_beta);
+
+    double f_stat = Stats::fisher_test(r2, df1, df2, coeffs, cov_beta, cov_type);
+
     // Add them to our vector of stats
     gen_stats.push_back(r2);
 
@@ -251,7 +309,7 @@ void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv
     for (size_t i = 0; i < resid_stats.size(); i++) gen_stats.push_back(resid_stats[i]); 
 
     if (p > 1) {
-        std::vector<double> vif = Stats::VIF(x);
+        std::vector<double> vif = Stats::VIF(x, Omega);
         for (size_t i = 0; i < vif.size(); i++) gen_stats.push_back(vif[i]); 
     }
 
@@ -259,7 +317,7 @@ void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv
     std::vector<double> p_value;
     std::vector<double> t_stats(p+1, 0.0);
     if (n > 30) {
-        for (size_t i = 0; i < p+1; i++) t_stats[i] = coeffs[i] / stdderr_b[i];
+        for (size_t i = 0; i < p+1; i++) t_stats[i] = coeffs[i] / stderr_b[i];
         p_value = Stats::student_pvalue(t_stats);
     }
 
@@ -281,7 +339,7 @@ void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv
             c = {
                 headers[i],
                 coeffs[i],
-                stdderr_b[i],
+                stderr_b[i],
                 t_stats[i],
                 p_value[i]
             };
@@ -290,7 +348,7 @@ void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& XtXinv
             c = {
                 headers[i],
                 coeffs[i],
-                stdderr_b[i],
+                stderr_b[i],
                 0.0,
                 0.0
             };
@@ -310,7 +368,7 @@ void LinearRegression::summary(bool detailled) const {
     
     std::cout << std::left << std::setw(15) << "Coefficient"
               << std::right << std::setw(12) << "Beta"
-              << std::setw(12) << "Stdderr"
+              << std::setw(12) << "Stderr"
               << std::setw(10) << "t-stat"
               << std::setw(10) << "p-value";
     
@@ -328,7 +386,7 @@ void LinearRegression::summary(bool detailled) const {
         std::cout << std::left << std::setw(15) << stat.name
                   << std::right << std::fixed << std::setprecision(4)
                   << std::setw(12) << stat.beta
-                  << std::setw(12) << stat.stdderr_beta
+                  << std::setw(12) << stat.stderr_beta
                   << std::setw(10) << stat.t_stat
                   << std::setw(10) << stat.p_value
                   << "  " << stat.significance();

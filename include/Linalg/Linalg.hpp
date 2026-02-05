@@ -4,10 +4,6 @@
 #include <vector>
 #include <tuple>
 
-#ifdef __AVX2__
-    #include <immintrin.h>
-#endif
-
 class Dataframe;
 
 namespace Linalg {

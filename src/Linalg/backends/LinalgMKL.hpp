@@ -1,8 +1,7 @@
 #pragma once
 
-#include "Data/Data.hpp"
-#include <vector>
 #include <tuple>
+#include <vector>
 
 namespace Linalg::MKL {
     #ifdef USE_MKL

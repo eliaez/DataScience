@@ -1,12 +1,12 @@
 #pragma once
 
-#include <vector>
 #include <cmath>
-#include <functional>
+#include <vector>
 #include <string>
-#include <stdexcept>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
+#include <functional>
 
 namespace TestSuite {
 

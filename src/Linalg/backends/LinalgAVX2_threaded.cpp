@@ -1,4 +1,10 @@
+#include "Data/Data.hpp"
+#include "LinalgAVX2.hpp"
+#include "Utils/Utils.hpp"
+#include "Utils/ThreadPool.hpp"
 #include "LinalgAVX2_threaded.hpp"
+
+using namespace Utils;
 
 namespace Linalg::AVX2_threaded {
 #ifdef __AVX2__
@@ -318,10 +324,6 @@ std::vector<double> solveLU_inplace(const std::vector<double>& perm, const std::
         }
     }
     return y;
-}
-
-double horizontal_red(__m256d& vec) {
-    return AVX2::horizontal_red(vec);
 }
 
 std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, 

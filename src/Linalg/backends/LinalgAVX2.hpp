@@ -1,14 +1,10 @@
 #pragma once
 
-#include "Data/Data.hpp"
-#include <vector>
 #include <tuple>
+#include <vector>
 
 namespace Linalg::AVX2 {
     #ifdef __AVX2__
-    constexpr size_t NB_DB = 4; // AVX2 (256 bits) so 4 doubles
-    constexpr size_t PREFETCH_DIST = 16; // Pre-fetch 16*64 bytes ahead for contigue memory only
-    constexpr size_t PREFETCH_DIST1 = 4; // Pre-fetch 4*64 bytes ahead for Blocks algo
 
     // Sum AVX2 col col or row row only
     std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2,
@@ -40,8 +36,5 @@ namespace Linalg::AVX2 {
         std::vector<double> swaps,
         std::vector<double> LU
     );
-
-    // Horizontal Reduction
-    double horizontal_red(__m256d& vec);
     #endif
 }

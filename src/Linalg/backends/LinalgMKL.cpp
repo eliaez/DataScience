@@ -1,4 +1,9 @@
+#include "Data/Data.hpp"
 #include "LinalgMKL.hpp"
+
+#ifdef USE_MKL
+    #include <mkl.h>
+#endif
 
 namespace Linalg::MKL {
 #ifdef USE_MKL

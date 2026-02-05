@@ -1,15 +1,19 @@
 #pragma once
 
 #include <vector>
-#include "Data/Data.hpp"
-#include "Stats/stats.hpp"
-#include "Linalg/Linalg.hpp"
+
+// ---------------Forward Declaration----------------
+
+class Dataframe;
+
+
+// ---------------------------------------Reg------------------------------------------
 
 namespace Reg {
     struct CoeffStats {
         std::string name;        
         double beta;             
-        double stdderr_beta;        
+        double stderr_beta;        
         double t_stat;           
         double p_value;          
 
@@ -27,19 +31,27 @@ namespace Reg {
             // Function to verify if x non-empty,...
             void basic_verif(const Dataframe& x) const;
 
+            // Calculate Stats after fit function
+            void compute_stats(const Dataframe& x, const Dataframe& XtXinv, const Dataframe& y, 
+                const std::string& cov_type = "classical", const std::vector<int>& cluster_ids = {},
+                const Dataframe& Omega = {});
+
         public:
             // Constructor 
             LinearRegression() : is_fitted(false) {}; // Init to get col major or warn user 
 
-            // Training
-            void fit(const Dataframe& x, const Dataframe& y);
+            // Training OLS with x col-major, cov_type : classical, HC3, HAC and cluster.
+            void fit(const Dataframe& x, const Dataframe& y, 
+                const std::string& cov_type = "classical", 
+                const std::vector<int>& cluster_ids = {});
             Dataframe fit_without_stats(const Dataframe& x, const Dataframe& y);
+
+            // Training GLS (WLS, FGLS) with x col-major
+            void fit_gls(const Dataframe& x, const Dataframe& y, Dataframe& Omega);
+            Dataframe fit_gls_without_stats(const Dataframe& x, const Dataframe& y, Dataframe& Omega);
             
             // Prediction
             std::vector<double> predict(const Dataframe& x) const;
-
-            // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, const Dataframe& XtXinv, const Dataframe& y);
 
             // Display stats after training
             void summary(bool detailled = false) const;

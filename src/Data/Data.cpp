@@ -1,7 +1,16 @@
-#include "Data/Data.hpp"
-#include "Utils/ThreadPool.hpp"
 #include <iomanip>
+#include <Eigen/Dense>
 #include <system_error>
+#include "Data/Data.hpp"
+#include "Utils/Utils.hpp"
+#include "Linalg/Linalg.hpp"
+#include "Utils/ThreadPool.hpp"
+
+#ifdef USE_MKL
+    #include <mkl.h>
+#endif
+
+using namespace Utils;
 
 /*----------------------------------------Dataframe-----------------------------------*/
 // ---------------------------------Operators or Equivalents---------------------------

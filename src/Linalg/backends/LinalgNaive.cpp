@@ -1,3 +1,4 @@
+#include "Data/Data.hpp"
 #include "LinalgNaive.hpp"
 
 namespace Linalg::Naive {

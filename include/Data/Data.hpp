@@ -5,22 +5,12 @@
 #include <fstream>
 #include <sstream>
 #include <cstring>
+#include <cassert>
+#include <iostream>
+#include <algorithm>
 #include <system_error>
 #include <unordered_map>
 #include <unordered_set>
-#include <algorithm>
-#include <cassert>
-#include <iostream>
-#include <Eigen/Dense>
-#include "Linalg/Linalg.hpp"
-
-#ifdef __AVX2__
-    #include <immintrin.h>
-#endif
-
-#ifdef USE_MKL
-    #include <mkl.h>
-#endif
 
 #pragma once
 
@@ -35,12 +25,6 @@ class Dataframe
         std::vector<std::string> headers;
         std::unordered_map<int, std::unordered_map<std::string, int>> label_encoder;
         std::unordered_set<int> encoded_cols;
-
-    public:
-        #ifdef __AVX2__
-        static constexpr size_t NB_DB = 4; // AVX2 (256 bits) so 4 doubles
-        static constexpr size_t PREFETCH_DIST1 = 4; // Pre-fetch 4*64 bytes ahead for Blocks algo
-        #endif
 
     public: 
         // -------------------------Constructor----------------------------------
