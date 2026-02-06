@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <vector>
+#include <stdexcept>
 
 #ifdef __AVX2__
     #include <immintrin.h>

@@ -73,21 +73,19 @@ class Dataframe
         Dataframe operator[](size_t j) const;
         Dataframe operator[](const std::string& col_name) const;
 
-        Dataframe operator+(const Dataframe& other) const { return Linalg::Operations::sum(*this, other); }
-        Dataframe operator-(const Dataframe& other) const { return Linalg::Operations::sum(*this, other, '-'); }
-        Dataframe operator*(const Dataframe& other) const { return Linalg::Operations::multiply(*this, other); }
-        Dataframe operator~() { return Linalg::Operations::transpose(*this);}
+        Dataframe operator+(const Dataframe& other) const;
+        Dataframe operator-(const Dataframe& other) const;
+        Dataframe operator*(const Dataframe& other) const;
+        Dataframe operator~();
 
         // See Linalg.hpp for more details
-        Dataframe inv() { return Linalg::Operations::inverse(*this); }
+        Dataframe inv();
         
         // See Linalg.hpp for more details
-        std::tuple<double, std::vector<double>, std::vector<double>> det() { return Linalg::Operations::determinant(*this); }
+        std::tuple<double, std::vector<double>, std::vector<double>> det();
         
         // See Linalg.hpp for more details
-        int is_tri() const { 
-            return Linalg::Operations::triangular_matrix(*this); 
-        }
+        int is_tri() const;
     
         // -------------------------Methods----------------------------------
 

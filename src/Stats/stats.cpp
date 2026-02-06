@@ -141,12 +141,12 @@ double cov(const std::vector<double>& x, const std::vector<double>& y) {
     return sum / (n-1);
 }
 
-Dataframe cov_beta_OLS(const Dataframe& x, const Dataframe& XtXinv, 
+Dataframe cov_beta_OLS(const Dataframe& x_const, Dataframe& XtXinv, 
     const std::vector<double>& residuals, const std::string & cov_type,
     const std::vector<int>& cluster_ids) {
 
-    size_t n = x.get_rows();
-    size_t p = x.get_cols() + 1;
+    size_t n = x_const.get_rows();
+    size_t p = x_const.get_cols();
     std::vector<double> Meat(p*p, 0.0);
 
     if (cov_type == "HC3") {
@@ -158,9 +158,9 @@ Dataframe cov_beta_OLS(const Dataframe& x, const Dataframe& XtXinv,
             double h = 0.0;
             for (size_t j = 0; j < p; j++) {
                 
-                double temp = x.at(j*n + i);
+                double temp = x_const.at(j*n + i);
                 for (size_t k = 0; k < p; k++) {
-                    h += temp * XtXinv.at(j*p + k) * x.at(k*n + i); // XtXinv row major
+                    h += temp * XtXinv.at(j*p + k) * x_const.at(k*n + i); // XtXinv row major
                 }
             }
             leverages[i] = h;
@@ -172,9 +172,9 @@ Dataframe cov_beta_OLS(const Dataframe& x, const Dataframe& XtXinv,
             double w = residuals[i] * residuals[i] / ((1 - leverages[i])*(1 - leverages[i]));
             for (size_t j = 0; j < p; j++) {
 
-                double temp = x.at(j*n + i);
+                double temp = x_const.at(j*n + i);
                 for (size_t k = 0; k < p; k++) {
-                    Meat[j*p + k] += temp * w * x.at(k*n + i);
+                    Meat[j*p + k] += temp * w * x_const.at(k*n + i);
                 }
             }
         }
@@ -190,9 +190,9 @@ Dataframe cov_beta_OLS(const Dataframe& x, const Dataframe& XtXinv,
             double residual = residuals[i];
             for (size_t j = 0; j < p; j++) {
 
-                double temp = x.at(j*n + i);
+                double temp = x_const.at(j*n + i);
                 for (size_t k = 0; k < p; k++) {
-                    Meat[j*p + k] += residual * temp * residual * x.at(k*n + i);
+                    Meat[j*p + k] += residual * temp * residual * x_const.at(k*n + i);
                 }
             }
         }
@@ -208,9 +208,9 @@ Dataframe cov_beta_OLS(const Dataframe& x, const Dataframe& XtXinv,
                 double res_lag = residuals[i-lag];
                 for (size_t j = 0; j < p; j++) {
 
-                    double temp = x.at(j*n + i);
+                    double temp = x_const.at(j*n + i);
                     for (size_t k = 0; k < p; k++) {
-                        Gamma_lag[j*p + k] +=  res * temp * res_lag * x.at(k*n + i - lag);
+                        Gamma_lag[j*p + k] +=  res * temp * res_lag * x_const.at(k*n + i - lag);
                     }
                 }
             }
@@ -223,6 +223,10 @@ Dataframe cov_beta_OLS(const Dataframe& x, const Dataframe& XtXinv,
         }
     }
     else if (cov_type == "cluster") {
+            
+        if (cluster_ids.empty()) {
+            throw std::invalid_argument("Empty cluster_ids vector");
+        }
         
         size_t min_val = *std::min_element(cluster_ids.begin(), cluster_ids.end());
         if (min_val != 0) {
@@ -244,7 +248,7 @@ Dataframe cov_beta_OLS(const Dataframe& x, const Dataframe& XtXinv,
             std::vector<double> u_c(p, 0.0);
             for (size_t i : clusters[c]) {
                 for (size_t j = 0; j < p; j++) {
-                    u_c[j] += residuals[i] * x.at(j*n + i);
+                    u_c[j] += residuals[i] * x_const.at(j*n + i);
                 }
             }
             
@@ -265,19 +269,27 @@ Dataframe cov_beta_OLS(const Dataframe& x, const Dataframe& XtXinv,
     // By default classical
     else {
         // Var(Beta) = sigma2 * XtXinv
-        std::vector<double> sigma2(n*n, 0.0);
-        for (size_t i = 0; i < p; i++) {
-            sigma2[i*p + i] = residuals[i] * residuals[i];
+        double sigma2 = 0.0;
+        for (size_t i = 0; i < n; i++) {
+            sigma2 += residuals[i] * residuals[i];
         }
-        Dataframe df_sigma2 = {p, p, true, sigma2};
-        return df_sigma2 * XtXinv;
+        sigma2 /= (n - p);
+
+        // Id * sigma2
+        std::vector<double> sigma2_vec(p*p, 0.0);
+        for (size_t i = 0; i < p; i++) {
+            sigma2_vec[i*p + i] = sigma2;
+        }
+
+        Dataframe df_sigma2 = {p, p, false, sigma2_vec};
+        return XtXinv * df_sigma2;
     }
 
-    // Sandwich
     Dataframe df_Meat = {p, p, false, Meat};
     Dataframe part1 = XtXinv * df_Meat;
     part1.change_layout_inplace();
-    return  part1 * XtXinv;
+    XtXinv.change_layout_inplace();
+    return part1 * XtXinv;
 }
 
 double rsquared(const std::vector<double>& y, const std::vector<double>& y_pred) {
@@ -377,7 +389,8 @@ double fisher_test(double r2, int df1, int df2, const std::vector<double>& beta_
 
         // Erase intercept
         std::vector<double> beta_no_const(beta_est.begin()+1, beta_est.end()); 
-        Dataframe df_beta_no_const = {beta_no_const.size(), 1, true, beta_no_const};
+        size_t df1_size = static_cast<size_t>(df1);
+        Dataframe df_beta_no_const = {1, df1_size, true, beta_no_const};
 
         double wald = dot((df_beta_no_const * var_robust).get_data(), beta_no_const);
         f_stat = wald / df1;
@@ -406,7 +419,7 @@ std::vector<double> stderr_b(const Dataframe& cov_beta) {
 
     // Get diagonal of cov_beta
     for (size_t i = 0; i < p; i ++) {
-        res[i] = cov_beta.at(i*p + i);
+        res[i] = std::sqrt(cov_beta.at(i*p + i));
     }
     return res;
 }
@@ -441,12 +454,7 @@ std::vector<double> residuals_stats(const std::vector<double>& residuals) {
 
     double mean_res = mean(residuals);
     double stdd_res = std::sqrt(var(residuals));
-    double min_abs = std::abs(residuals[0]);
     double max_abs = std::abs(residuals[0]);
-    
-    for (const double& r : residuals) {
-        min_abs = std::min(min_abs, std::abs(r));
-    }
 
     for (const double& r : residuals) {
         max_abs = std::max(max_abs, std::abs(r));
@@ -468,7 +476,7 @@ std::vector<double> residuals_stats(const std::vector<double>& residuals) {
     double Q2 = calc_quantile(0.5);
     double Q3 = calc_quantile(0.75);
 
-    std::vector<double> res_stats = {mean_res, stdd_res, min_abs, max_abs, Q1, Q2, Q3};
+    std::vector<double> res_stats = {mean_res, stdd_res, max_abs, Q1, Q2, Q3};
     return res_stats;
 }
 
@@ -481,10 +489,10 @@ double durbin_watson_test(const std::vector<double>& residuals) {
         sum2 += residuals[i] * residuals[i]; 
     }
     for (size_t i = 1; i < n; i++) {
-        sum1 += (residuals[i] * residuals[i-1]) * (residuals[i] * residuals[i-1]); 
+        sum1 += (residuals[i] - residuals[i-1]) * (residuals[i] - residuals[i-1]); 
     }
 
-    return 1 - sum1/sum2/2;
+    return 1 - (sum1/sum2)/2;
 }
 
 double breusch_pagan_test(const Dataframe& x, const std::vector<double>& residuals) {
@@ -514,89 +522,41 @@ double breusch_pagan_test(const Dataframe& x, const std::vector<double>& residua
 
 std::vector<double> VIF(const Dataframe& x, const Dataframe& Omega) {
     
-    size_t n = x.get_rows();
     size_t p = x.get_cols();
-    std::vector<double> vif(p);
+    std::vector<double> vif(p, 0.0);
     
     // For each predictor variable X_j, we measure how predictable it is by the other variables.
-    constexpr size_t THREADING_THRESHOLD = 4;
-    if (p >= THREADING_THRESHOLD) {
+    for (size_t i = 0; i < p; i++) {
+        
+        // Target and X for this reg 
+        Dataframe target = x[i];
+        Dataframe x_bis = x;
+        x_bis.pop(i);
 
-        // ThreadPool Variables
-        ThreadPool& pool = ThreadPool::instance();
-        size_t nb_threads = pool.nb_threads;
-        std::vector<std::future<void>> futures;
-        futures.reserve(nb_threads);
+        // Use our functions in Reg
+        Reg::LinearRegression New_reg;
 
-         for (size_t i = 0; i < p; i++) {
-            auto fut = pool.enqueue([i, n, p, &vif, &x, &Omega] {
-                
-                // Target and X for this reg 
-                Dataframe target = x[i];
-                Dataframe x_bis = x[rangeExcept(p, i)];
-
-                // Use our functions in Reg
-                Reg::LinearRegression New_reg;
-
-                // In the case of GLS LinearRegression
-                std::vector<double> y_pred;
-                if (!Omega.get_data().empty()) {
-                    Dataframe Om = Omega;
-                    Om.pop(i);
-                    Om.pop(i, true);
-                    New_reg.fit_gls_without_stats(x_bis, target, Om);
-                    y_pred = New_reg.predict(x_bis);
-                }
-                // In the case of OLS LinearRegression
-                else {
-                    New_reg.fit_without_stats(x_bis, target);
-                    y_pred = New_reg.predict(x_bis);
-                }
-
-                // VIF
-                double r2 = rsquared(target.get_data(), y_pred);
-                if (r2 >= 0.9999) {
-                    vif[i] = INFINITY;
-                } else {
-                    vif[i] = 1.0 / (1.0 - r2);
-                }
-            });
-            futures.push_back(std::move(fut));
+        // In the case of GLS LinearRegression
+        std::vector<double> y_pred;
+        if (!Omega.get_data().empty()) {
+            Dataframe Om = Omega;
+            Om.pop(i);
+            Om.pop(i, true);
+            New_reg.fit_gls_without_stats(x_bis, target, Om);
+            y_pred = New_reg.predict(x_bis);
         }
-        for (auto& fut : futures) fut.wait();
-    }
-    else {
-        for (size_t i = 0; i < p; i++) {
-            
-            // Target and X for this reg 
-            Dataframe target = x[i];
-            Dataframe x_bis = x[rangeExcept(p, i)];
+        // In the case of OLS LinearRegression
+        else {
+            New_reg.fit_without_stats(x_bis, target);
+            y_pred = New_reg.predict(x_bis);
+        }
 
-            // Use our functions in Reg
-            Reg::LinearRegression New_reg;
-
-            // In the case of GLS LinearRegression
-            std::vector<double> y_pred;
-            if (!Omega.get_data().empty()) {
-                Dataframe Om = Omega;
-                Om.pop(i);
-                Om.pop(i, true);
-                New_reg.fit_gls_without_stats(x_bis, target, Om);
-                y_pred = New_reg.predict(x_bis);
-            }
-            // In the case of OLS LinearRegression
-            else {
-                New_reg.fit_without_stats(x_bis, target);
-                y_pred = New_reg.predict(x_bis);
-            }
-
-            // VIF
-            double r2 = rsquared(target.get_data(), y_pred);
-            if (r2 >= 0.9999) {
-                vif[i] = INFINITY;
-            } else {
-                vif[i] = 1.0 / (1.0 - r2);
-            }
+        // VIF
+        double r2 = rsquared(target.get_data(), y_pred);
+        if (r2 >= 0.9999) {
+            vif[i] = INFINITY;
+        } else {
+            vif[i] = 1.0 / (1.0 - r2);
         }
     }
     return vif;

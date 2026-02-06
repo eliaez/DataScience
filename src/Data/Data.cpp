@@ -134,6 +134,14 @@ Dataframe Dataframe::operator[](const std::string& col_name) const {
     return operator[](cols_name);
 }
 
+Dataframe Dataframe::operator+(const Dataframe& other) const { return Linalg::Operations::sum(*this, other); }
+Dataframe Dataframe::operator-(const Dataframe& other) const { return Linalg::Operations::sum(*this, other, '-'); }
+Dataframe Dataframe::operator*(const Dataframe& other) const { return Linalg::Operations::multiply(*this, other); }
+Dataframe Dataframe::operator~() { return Linalg::Operations::transpose(*this);}
+Dataframe Dataframe::inv() { return Linalg::Operations::inverse(*this); }
+std::tuple<double, std::vector<double>, std::vector<double>> Dataframe::det() { return Linalg::Operations::determinant(*this); }
+int Dataframe::is_tri() const { return Linalg::Operations::triangular_matrix(*this); }
+
 // ---------------------------------------Methods---------------------------------------
 
 std::string Dataframe::decode_label(int value, int col) const {
@@ -199,8 +207,11 @@ Dataframe Dataframe::transfer_col(size_t j) {
     data.erase(data.begin() + j*rows, data.begin() + (j+1)*rows);
     
     // Get header and erase it
-    std::vector<std::string> headers_y = {std::move(headers[j])};
-    headers.erase(headers.begin() + j);
+    std::vector<std::string> headers_y;
+    if (!headers.empty() && j < headers.size()) {
+        headers_y = {std::move(headers[j])};
+        headers.erase(headers.begin() + j);
+    }
 
     // Get encoded_labels or not
     std::unordered_set<int> encoded_cols_y;

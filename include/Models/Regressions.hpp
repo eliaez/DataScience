@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <utility>
 
 // ---------------Forward Declaration----------------
 
@@ -32,7 +33,7 @@ namespace Reg {
             void basic_verif(const Dataframe& x) const;
 
             // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, const Dataframe& XtXinv, const Dataframe& y, 
+            void compute_stats(const Dataframe& x, const Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y, 
                 const std::string& cov_type = "classical", const std::vector<int>& cluster_ids = {},
                 const Dataframe& Omega = {});
 
@@ -44,11 +45,11 @@ namespace Reg {
             void fit(const Dataframe& x, const Dataframe& y, 
                 const std::string& cov_type = "classical", 
                 const std::vector<int>& cluster_ids = {});
-            Dataframe fit_without_stats(const Dataframe& x, const Dataframe& y);
+            std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y);
 
             // Training GLS (WLS, FGLS) with x col-major
             void fit_gls(const Dataframe& x, const Dataframe& y, Dataframe& Omega);
-            Dataframe fit_gls_without_stats(const Dataframe& x, const Dataframe& y, Dataframe& Omega);
+            std::pair<Dataframe, Dataframe> fit_gls_without_stats(const Dataframe& x, const Dataframe& y, Dataframe& Omega);
             
             // Prediction
             std::vector<double> predict(const Dataframe& x) const;
@@ -57,10 +58,10 @@ namespace Reg {
             void summary(bool detailled = false) const;
 
             // Getters
+            bool is_model_fitted() { return is_fitted; }
             double get_intercept() const { return coeffs[0]; }
             const std::vector<double>& get_coeffs() const { return coeffs; }
             const std::vector<double>& get_stats() const { return gen_stats; }
-            bool is_model_fitted() { return is_fitted; }
             const std::vector<CoeffStats>& get_coefficient_stats() const { return coeff_stats; }
     };
 }

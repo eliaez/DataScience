@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(MSVC)
     add_compile_options(
         /W4         # /W4 to get warnings
-        /O2         # /02 opti-max for balance size/speed
+        #/O2         # /02 opti-max for balance size/speed
         /wd4127     # Constant conditionnal expression
         /wd4267     # size_t to int
         /wd4244     # double to int
@@ -131,6 +131,7 @@ set(LIB_SOURCES
     src/Stats/stats.cpp
 
     # Utils
+    src/Utils/Utils.cpp
     src/Utils/TestSuite.cpp
     src/Utils/ThreadPool.cpp
 )
@@ -182,32 +183,45 @@ if(BUILD_TEST)
     )
 
     enable_testing()
-    add_executable(test_all 
-        tests/tests_main.cpp
-        tests/tests_data.cpp
-        tests/tests_naive.cpp
-        tests/tests_AVX2.cpp
-        tests/tests_AVX2_threaded.cpp
-        tests/tests_MKL.cpp
-        tests/tests_Eigen.cpp
+
+    # ------------------- Tests on Backends --------------------
+    add_executable(test_backend 
+        tests/backend/tests_main.cpp
+        tests/backend/tests_data.cpp
+        tests/backend/tests_naive.cpp
+        tests/backend/tests_AVX2.cpp
+        tests/backend/tests_AVX2_threaded.cpp
+        tests/backend/tests_MKL.cpp
+        tests/backend/tests_Eigen.cpp
     )
     
-    target_link_libraries(test_all PRIVATE 
+    target_link_libraries(test_backend PRIVATE 
         linalg_full
         test_utils
     )
-    add_test(NAME TestData COMMAND test_all data)
-    add_test(NAME TestNaive COMMAND test_all naive)
-    add_test(NAME TestEigen COMMAND test_all eigen)
+    add_test(NAME TestData COMMAND test_backend data)
+    add_test(NAME TestNaive COMMAND test_backend naive)
+    add_test(NAME TestEigen COMMAND test_backend eigen)
 
     if(AVX2_FLAGS)
-        add_test(NAME TestAVX2 COMMAND test_all avx2)
-        add_test(NAME TestAVX2_TH COMMAND test_all avx2_th)
+        add_test(NAME TestAVX2 COMMAND test_backend avx2)
+        add_test(NAME TestAVX2_TH COMMAND test_backend avx2_th)
     endif()
 
     if(USE_MKL)
-        add_test(NAME TestMKL COMMAND test_all mkl)
+        add_test(NAME TestMKL COMMAND test_backend mkl)
     endif()
+
+    # ------------------- Tests on Regressions --------------------
+    add_executable(test_reg
+        tests/regression/tests_main.cpp
+        tests/regression/tests_OLS.cpp
+    )
+    target_link_libraries(test_reg PRIVATE 
+        linalg_full
+        test_utils
+    )
+    add_test(NAME TestOLS COMMAND test_reg OLS)
 endif()
 
 

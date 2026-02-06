@@ -23,7 +23,7 @@ namespace Stats {
     // Covariance Matrix for our Beta_est OLS with x col-major, 
     // cov_type : classical, HC3, HAC, cluster
     // And GLS with it's corresponding (Xt_OmegaInv_X)Inv 
-    Dataframe cov_beta_OLS(const Dataframe& x, const Dataframe& XtXinv, 
+    Dataframe cov_beta_OLS(const Dataframe& x_const, Dataframe& XtXinv, 
         const std::vector<double>& residuals, const std::string & cov_type = "classical",
         const std::vector<int>& cluster_ids = {});
 
@@ -63,10 +63,10 @@ namespace Stats {
     // Residuals
     std::vector<double> get_residuals(const std::vector<double>& y, const std::vector<double>& y_pred);
 
-    // Stats on residuals, mean, stdd, min, max, Q1, Q2, Q3
+    // Stats on residuals, mean, stderr, abs max, Q1, Q2, Q3
     std::vector<double> residuals_stats(const std::vector<double>& residuals);
 
-    // Durbin-Watson test return autocorrelation coefficient
+    // Durbin-Watson test return autocorrelation coefficient rho
     double durbin_watson_test(const std::vector<double>& residuals);
 
     // Breusch-Pagan test return p-value (for Homoskedasticity)

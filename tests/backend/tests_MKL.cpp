@@ -21,7 +21,7 @@ void multiply_mkl(Dataframe& df, Dataframe& df_t, const vector<double>& res) {
     // Col - col
     Dataframe df_mult = Operations::multiply(df_t, df);
 
-    ASSERT_EQ_VEC_EPS(df_mult.get_data(), res)
+    ASSERT_EQ_VEC_EPS(df_mult.get_data(), res, 1e-9)
 }
 
 // Testing MKL Inverse LU
@@ -33,7 +33,7 @@ void inverse_mkl(Dataframe& df, Dataframe& df_t, const std::vector<double>& res)
     // Inv
     Dataframe df_inv = Operations::inverse(df_mult);
 
-    ASSERT_EQ_VEC_EPS(df_inv.get_data(), res)
+    ASSERT_EQ_VEC_EPS(df_inv.get_data(), res, 1e-9)
 }
 
 
@@ -41,17 +41,17 @@ void tests_mkl() {
 
     Operations::set_backend(Backend::MKL);
 
-    Dataframe iris = CsvHandler::loadCsv("../tests/datasets/iris.csv");
-    Dataframe iris_t = CsvHandler::loadCsv("../tests/datasets/iris_t.csv", ',', false);
-    Dataframe iris_sum = CsvHandler::loadCsv("../tests/datasets/iris_sum.csv", ',', false);
-    Dataframe iris_mult = CsvHandler::loadCsv("../tests/datasets/iris_mult.csv", ',', false);
-    Dataframe iris_inv = CsvHandler::loadCsv("../tests/datasets/iris_multinv.csv", ',', false);
+    Dataframe iris = CsvHandler::loadCsv("../tests/datasets/backend/iris.csv");
+    Dataframe iris_t = CsvHandler::loadCsv("../tests/datasets/backend/iris_t.csv", ',', false);
+    Dataframe iris_sum = CsvHandler::loadCsv("../tests/datasets/backend/iris_sum.csv", ',', false);
+    Dataframe iris_mult = CsvHandler::loadCsv("../tests/datasets/backend/iris_mult.csv", ',', false);
+    Dataframe iris_inv = CsvHandler::loadCsv("../tests/datasets/backend/iris_multinv.csv", ',', false);
 
-    Dataframe mat = CsvHandler::loadCsv("../tests/datasets/mat.csv", ',', false);
-    Dataframe mat_t = CsvHandler::loadCsv("../tests/datasets/mat_t.csv", ',', false);
-    Dataframe mat_sum = CsvHandler::loadCsv("../tests/datasets/mat_sum.csv", ',', false);
-    Dataframe mat_mult = CsvHandler::loadCsv("../tests/datasets/mat_mult.csv", ',', false);
-    Dataframe mat_inv = CsvHandler::loadCsv("../tests/datasets/mat_multinv.csv", ',', false);
+    Dataframe mat = CsvHandler::loadCsv("../tests/datasets/backend/mat.csv", ',', false);
+    Dataframe mat_t = CsvHandler::loadCsv("../tests/datasets/backend/mat_t.csv", ',', false);
+    Dataframe mat_sum = CsvHandler::loadCsv("../tests/datasets/backend/mat_sum.csv", ',', false);
+    Dataframe mat_mult = CsvHandler::loadCsv("../tests/datasets/backend/mat_mult.csv", ',', false);
+    Dataframe mat_inv = CsvHandler::loadCsv("../tests/datasets/backend/mat_multinv.csv", ',', false);
 
     // Add tests
     TestSuite::Tests tests_mkl;

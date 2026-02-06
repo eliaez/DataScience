@@ -40,14 +40,17 @@ void transfercol_t(Dataframe& iris, const string& col,
 
 void tests_data() {
 
-    // Initialization of our data 
-    Dataframe iris = CsvHandler::loadCsv("../tests/datasets/iris.csv");
-    Dataframe iris_t = CsvHandler::loadCsv("../tests/datasets/iris_t.csv", ',', false);
-    Dataframe iris_x = CsvHandler::loadCsv("../tests/datasets/iris_x.csv");
-    Dataframe iris_y = CsvHandler::loadCsv("../tests/datasets/iris_y.csv");
+    std::string iris_file = "../tests/datasets/backend/iris.csv";
+    std::string mat_file = "../tests/datasets/backend/mat.csv";
 
-    Dataframe mat = CsvHandler::loadCsv("../tests/datasets/mat.csv", ',', false);
-    Dataframe mat_t = CsvHandler::loadCsv("../tests/datasets/mat_t.csv", ',', false);
+    // Initialization of our data 
+    Dataframe iris = CsvHandler::loadCsv(iris_file);
+    Dataframe iris_t = CsvHandler::loadCsv("../tests/datasets/backend/iris_t.csv", ',', false);
+    Dataframe iris_x = CsvHandler::loadCsv("../tests/datasets/backend/iris_x.csv");
+    Dataframe iris_y = CsvHandler::loadCsv("../tests/datasets/backend/iris_y.csv");
+
+    Dataframe mat = CsvHandler::loadCsv(mat_file, ',', false);
+    Dataframe mat_t = CsvHandler::loadCsv("../tests/datasets/backend/mat_t.csv", ',', false);
 
     // Add tests
     TestSuite::Tests tests_data;
@@ -107,7 +110,7 @@ void tests_data() {
     );
 
     #ifdef __AVX2__
-        iris = CsvHandler::loadCsv("../tests/datasets/iris.csv");
+        iris = CsvHandler::loadCsv(iris_file);
         
         tests_data.add_test(
             bind(changelayout_inplace, iris, iris_t.get_data(), "AVX2"), 
@@ -119,8 +122,8 @@ void tests_data() {
             "Change layout inplace AVX2 v2"
         );
 
-        iris = CsvHandler::loadCsv("../tests/datasets/iris.csv");
-        mat = CsvHandler::loadCsv("../tests/datasets/mat.csv", ',', false);
+        iris = CsvHandler::loadCsv(iris_file);
+        mat = CsvHandler::loadCsv(mat_file, ',', false);
 
         tests_data.add_test(
             bind(changelayout_inplace, iris, iris_t.get_data(), "AVX2_threaded"), 
@@ -133,8 +136,8 @@ void tests_data() {
         );
     #endif
 
-    iris = CsvHandler::loadCsv("../tests/datasets/iris.csv");
-    mat = CsvHandler::loadCsv("../tests/datasets/mat.csv", ',', false);
+    iris = CsvHandler::loadCsv(iris_file);
+    mat = CsvHandler::loadCsv(mat_file, ',', false);
 
     tests_data.add_test(
         bind(changelayout_inplace, iris, iris_t.get_data(), "Eigen"), 
@@ -148,8 +151,8 @@ void tests_data() {
 
     #ifdef USE_MKL
 
-        iris = CsvHandler::loadCsv("../tests/datasets/iris.csv");
-        mat = CsvHandler::loadCsv("../tests/datasets/mat.csv", ',', false);
+        iris = CsvHandler::loadCsv(iris_file);
+        mat = CsvHandler::loadCsv(mat_file, ',', false);
 
         tests_data.add_test(
             bind(changelayout_inplace, iris, iris_t.get_data(), "MKL"), 
@@ -162,7 +165,7 @@ void tests_data() {
         );
     #endif
 
-    iris = CsvHandler::loadCsv("../tests/datasets/iris.csv");
+    iris = CsvHandler::loadCsv(iris_file);
 
     tests_data.add_test(
         bind(transfercol_t, iris, "target", iris_x, iris_y.get_data()), 

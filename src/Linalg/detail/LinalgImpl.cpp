@@ -1,5 +1,6 @@
 #include <string>
 #include <stdexcept>
+#include "Utils/Utils.hpp"
 #include "Linalg/Linalg.hpp"
 #include "Linalg/detail/LinalgImpl.hpp"
 #include "Linalg/backends/LinalgMKL.hpp"
@@ -8,6 +9,7 @@
 #include "Linalg/backends/LinalgEigen.hpp"
 #include "Linalg/backends/LinalgAVX2_threaded.hpp"
 
+using namespace Utils;
 
 // ============================================
 // Macro Dispatch
@@ -261,8 +263,6 @@ int Operations::Impl::triangular_impl(
 
     #ifdef __AVX2__
         // AVX2 variables
-        size_t NB_DB = Linalg::AVX2::NB_DB;
-        size_t PREFETCH_DIST = Linalg::AVX2::PREFETCH_DIST;
         __m256d zero_vec = _mm256_set1_pd(0.0);
 
         // Triangular inf in row major
