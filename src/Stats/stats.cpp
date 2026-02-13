@@ -148,142 +148,427 @@ Dataframe cov_beta_OLS(const Dataframe& x_const, Dataframe& XtXinv,
     size_t n = x_const.get_rows();
     size_t p = x_const.get_cols();
     std::vector<double> Meat(p*p, 0.0);
-
-    if (cov_type == "HC3") {
-        
-        // Calculate leverage vector
-        std::vector<double> leverages(n);
-        for (size_t i = 0; i < n; i++) {
+    
+    #ifdef __AVX2__
+        if (cov_type == "HC3") {
             
-            double h = 0.0;
-            for (size_t j = 0; j < p; j++) {
+            // Calculate leverage vector
+            std::vector<double> leverages(n);
+            size_t vec_size = p - (p % NB_DB);
+            for (size_t i = 0; i < n; i++) {
                 
-                double temp = x_const.at(j*n + i);
-                for (size_t k = 0; k < p; k++) {
-                    h += temp * XtXinv.at(j*p + k) * x_const.at(k*n + i); // XtXinv row major
+                double h = 0.0;
+                for (size_t j = 0; j < p; j++) {
+                    
+                    size_t k = 0;
+                    __m256d vec_h = _mm256_setzero_pd();
+                    __m256d vec_temp = _mm256_set1_pd(x_const.at(j*n + i));
+                    for (; k < vec_size; k+=NB_DB) {
+                        if (k + PREFETCH_DIST < vec_size) {
+                            _mm_prefetch((const char*)&XtXinv.at(j*p + k + PREFETCH_DIST), _MM_HINT_T0);
+                        }
+
+                        __m256d vec_temp1 = _mm256_set_pd(
+                            x_const.at((k+3)*n + i),
+                            x_const.at((k+2)*n + i),
+                            x_const.at((k+1)*n + i),
+                            x_const.at((k+0)*n + i)
+                        );
+
+                        __m256d vec_XtXinv = _mm256_loadu_pd(&XtXinv.at(j*p + k));
+                        __m256d inter = _mm256_mul_pd(vec_XtXinv, vec_temp1);
+                        vec_h = _mm256_fmadd_pd(vec_temp, inter, vec_h);
+                    }
+                    h += horizontal_red(vec_h);
+
+                    // Scalar residual
+                    double temp = x_const.at(j*n + i);
+                    for (; k < p; k++) {
+                        h += temp * XtXinv.at(j*p + k) * x_const.at(k*n + i);
+                    }
                 }
+                leverages[i] = h;
             }
-            leverages[i] = h;
-        }
 
-        // Meat = X' diag(weights) X
-        for (size_t i = 0; i < n; i++) {
+            // Meat = X' diag(weights) X
+            for (size_t i = 0; i < n; i++) {
 
-            double w = residuals[i] * residuals[i] / ((1 - leverages[i])*(1 - leverages[i]));
-            for (size_t j = 0; j < p; j++) {
-
-                double temp = x_const.at(j*n + i);
-                for (size_t k = 0; k < p; k++) {
-                    Meat[j*p + k] += temp * w * x_const.at(k*n + i);
-                }
-            }
-        }
-    }
-    else if (cov_type == "HAC") {
-
-        // Newey-West lag
-        size_t L = std::floor(4.0 * std::pow(n/100.0, 2.0/9.0));
-
-        // Gamma_0
-        for (size_t i = 0; i < n; i++) {
-
-            double residual = residuals[i];
-            for (size_t j = 0; j < p; j++) {
-
-                double temp = x_const.at(j*n + i);
-                for (size_t k = 0; k < p; k++) {
-                    Meat[j*p + k] += residual * temp * residual * x_const.at(k*n + i);
-                }
-            }
-        }
-        
-        // Autocovariances
-        for (size_t lag = 1; lag <= L; lag++) {
-            
-            double weight = 1.0 - static_cast<double>(lag) / (L + 1);
-            std::vector<double> Gamma_lag(p*p, 0.0);
-            for (size_t i = lag; i < n; i++) {
-
-                double res = residuals[i];
-                double res_lag = residuals[i-lag];
+                double w = residuals[i] * residuals[i] / ((1 - leverages[i])*(1 - leverages[i]));
                 for (size_t j = 0; j < p; j++) {
 
-                    double temp = x_const.at(j*n + i);
-                    for (size_t k = 0; k < p; k++) {
-                        Gamma_lag[j*p + k] +=  res * temp * res_lag * x_const.at(k*n + i - lag);
+                    size_t k = 0;
+                    double x_w = x_const.at(j*n + i) * w;
+                    __m256d vec_x_w = _mm256_set1_pd(x_w);
+                    for (; k < vec_size; k+=NB_DB) {
+                        
+                        __m256d vec_meat = _mm256_loadu_pd(&Meat[j*p + k]);
+                        __m256d vec_temp1 = _mm256_set_pd(
+                            x_const.at((k+3)*n + i),
+                            x_const.at((k+2)*n + i),
+                            x_const.at((k+1)*n + i),
+                            x_const.at((k+0)*n + i)
+                        );
+
+                        vec_meat = _mm256_fmadd_pd(vec_x_w, vec_temp1, vec_meat);
+                        _mm256_storeu_pd(&Meat[j*p + k], vec_meat);
+                    }
+
+                    // Scalar residual
+                    for (; k < p; k++) {
+                        Meat[j*p + k] += x_w * x_const.at(k*n + i);
+                    }
+                }
+            }
+        }
+        else if (cov_type == "HAC") {
+
+            // Newey-West lag
+            size_t L = std::floor(4.0 * std::pow(n/100.0, 2.0/9.0));
+
+            // Gamma_0
+            size_t vec_size = p - (p % NB_DB);
+            for (size_t i = 0; i < n; i++) {
+
+                double residual = residuals[i];
+                for (size_t j = 0; j < p; j++) {
+
+                    size_t k = 0;
+                    double x_residual = residual * x_const.at(j*n + i) * residual;
+                    __m256d vec_residual = _mm256_set1_pd(x_residual);
+                    for (; k < vec_size; k+=NB_DB) {
+                        
+                        __m256d vec_meat = _mm256_loadu_pd(&Meat[j*p + k]);
+                        __m256d vec_temp1 = _mm256_set_pd(
+                            x_const.at((k+3)*n + i),
+                            x_const.at((k+2)*n + i),
+                            x_const.at((k+1)*n + i),
+                            x_const.at((k+0)*n + i)
+                        );
+
+                        vec_meat = _mm256_fmadd_pd(vec_residual, vec_temp1, vec_meat);
+                        _mm256_storeu_pd(&Meat[j*p + k], vec_meat);
+                    }
+
+                    // Scalar residual
+                    for (; k < p; k++) {
+                        Meat[j*p + k] += x_residual * x_const.at(k*n + i);
                     }
                 }
             }
             
-            for (size_t j = 0; j < p; j++) {
-                for (size_t k = 0; k < p; k++) {
-                    Meat[j*p + k] += weight * (Gamma_lag[j*p + k] + Gamma_lag[k*p + j]);
+            // Autocovariances
+            for (size_t lag = 1; lag <= L; lag++) {
+                
+                double weight = 1.0 - static_cast<double>(lag) / (L + 1);
+                std::vector<double> Gamma_lag(p*p, 0.0);
+                for (size_t i = lag; i < n; i++) {
+
+                    double res = residuals[i];
+                    double res_lag = residuals[i-lag];
+                    for (size_t j = 0; j < p; j++) {
+                        
+                        size_t k = 0;
+                        double x_residual_lag = res * x_const.at(j*n + i) * res_lag;
+                        __m256d vec_residual_lag = _mm256_set1_pd(x_residual_lag);
+                        for (; k < vec_size; k+=NB_DB) {
+
+                            __m256d vec_gamma = _mm256_loadu_pd(&Gamma_lag[j*p + k]);
+                            __m256d vec_temp1 = _mm256_set_pd(
+                                x_const.at((k+3)*n + i - lag),
+                                x_const.at((k+2)*n + i - lag),
+                                x_const.at((k+1)*n + i - lag),
+                                x_const.at((k+0)*n + i - lag)
+                            );
+
+                            vec_gamma = _mm256_fmadd_pd(vec_residual_lag, vec_temp1, vec_gamma);
+                            _mm256_storeu_pd(&Gamma_lag[j*p + k], vec_gamma);
+                        }
+
+                        // Scalar residual
+                        for (; k < p; k++) {
+                            Gamma_lag[j*p + k] +=  x_residual_lag * x_const.at(k*n + i - lag);
+                        }
+                    }
                 }
-            }
-        }
-    }
-    else if (cov_type == "cluster") {
-            
-        if (cluster_ids.empty()) {
-            throw std::invalid_argument("Empty cluster_ids vector");
-        }
-        
-        size_t min_val = *std::min_element(cluster_ids.begin(), cluster_ids.end());
-        if (min_val != 0) {
-            throw std::invalid_argument("Ids in cluster have to start from 0");
-        }
-
-        // Nb of clusters
-        size_t G = *std::max_element(cluster_ids.begin(), cluster_ids.end()) + 1;
-
-        // Group by Cluster
-        std::vector<std::vector<size_t>> clusters(G);
-        for (size_t i = 0; i < n; i++) {
-            clusters[cluster_ids[i]].push_back(i);
-        }
-
-        for (size_t c = 0; c < G; c++) {
-
-            // Cluster score c : u_c = sum_{i in c} e_i * x_i
-            std::vector<double> u_c(p, 0.0);
-            for (size_t i : clusters[c]) {
+                
                 for (size_t j = 0; j < p; j++) {
-                    u_c[j] += residuals[i] * x_const.at(j*n + i);
+                    
+                    size_t k = 0;
+                    __m256d vec_w = _mm256_set1_pd(weight);
+                    for (; k < vec_size; k+=NB_DB) {
+
+                        __m256d vec_meat = _mm256_loadu_pd(&Meat[j*p + k]);
+                        __m256d vec_gamma = _mm256_loadu_pd(&Gamma_lag[j*p + k]);
+                        __m256d vec_gamma1 = _mm256_set_pd(
+                            Gamma_lag[(k+3)*p + j],
+                            Gamma_lag[(k+2)*p + j],
+                            Gamma_lag[(k+1)*p + j],
+                            Gamma_lag[(k+0)*p + j]
+                        );
+
+                        vec_gamma = _mm256_add_pd(vec_gamma, vec_gamma1);
+                        vec_meat = _mm256_fmadd_pd(vec_w, vec_gamma, vec_meat);
+                        _mm256_storeu_pd(&Meat[j*p + k], vec_meat);
+                    }
+
+                    // Scalar residual
+                    for (; k < p; k++) {
+                        Meat[j*p + k] += weight * (Gamma_lag[j*p + k] + Gamma_lag[k*p + j]);
+                    }
+                }
+            }
+        }
+        else if (cov_type == "cluster") {
+                
+            if (cluster_ids.empty()) {
+                throw std::invalid_argument("Empty cluster_ids vector");
+            }
+            
+            size_t min_val = *std::min_element(cluster_ids.begin(), cluster_ids.end());
+            if (min_val != 0) {
+                throw std::invalid_argument("Ids in cluster have to start from 0");
+            }
+
+            // Nb of clusters
+            size_t G = *std::max_element(cluster_ids.begin(), cluster_ids.end()) + 1;
+
+            // Group by Cluster
+            std::vector<std::vector<size_t>> clusters(G);
+            for (size_t i = 0; i < n; i++) {
+                clusters[cluster_ids[i]].push_back(i);
+            }
+
+            size_t vec_size = p - (p % NB_DB);
+            for (size_t c = 0; c < G; c++) {
+
+                // Cluster score c : u_c = sum_{i in c} e_i * x_i
+                std::vector<double> u_c(p, 0.0);
+                for (size_t i : clusters[c]) {
+
+                    size_t j = 0;
+                    __m256d vec_residual = _mm256_set1_pd(residuals[i]);
+                    for (; j < vec_size; j+=NB_DB) {
+
+                        __m256d vec_uc = _mm256_loadu_pd(&u_c[j]);
+                        __m256d vec_x = _mm256_set_pd(
+                            x_const.at((j+3)*n + i),
+                            x_const.at((j+2)*n + i),
+                            x_const.at((j+1)*n + i),
+                            x_const.at((j+0)*n + i)
+                        );
+
+                        vec_uc = _mm256_fmadd_pd(vec_residual, vec_x, vec_uc);
+                        _mm256_storeu_pd(&u_c[j], vec_uc);
+                    }
+
+                    // Scalar residual
+                    double residual = residuals[i];
+                    for (; j < p; j++) {
+                        u_c[j] += residual * x_const.at(j*n + i);
+                    }
+                }
+                
+                // Outer product u_c * u_c'
+                for (size_t j = 0; j < p; j++) {
+
+                    size_t k = 0;
+                    __m256d vec_uc = _mm256_set1_pd(u_c[j]);
+                    for (; k < vec_size; k+=NB_DB) {
+                        if (k + PREFETCH_DIST < vec_size) {
+                            _mm_prefetch((const char*)&u_c[k + PREFETCH_DIST], _MM_HINT_T0);
+                        }
+
+                        __m256d vec_meat = _mm256_loadu_pd(&Meat[j*p + k]);
+                        __m256d uc_k = _mm256_loadu_pd(&u_c[k]);
+                        vec_meat = _mm256_fmadd_pd(vec_uc, uc_k, vec_meat);
+
+                        _mm256_storeu_pd(&Meat[j*p + k], vec_meat);
+                    }
+
+                    // Scalar residual
+                    double temp = u_c[j];
+                    for (; k < p; k++) {
+                        Meat[j*p + k] += temp * u_c[k];
+                    }
                 }
             }
             
-            // Outer product u_c * u_c'
-            for (size_t j = 0; j < p; j++) {
+            // Adjustement
+            double adj = static_cast<double>(G) / (G - 1) * (n - 1) / (n - p);
+            Meat = mult(Meat, adj);
+        }
+        else {
+            // Var(Beta) = sigma2 * XtXinv
+            size_t i = 0;
+            size_t vec_size = n - (n % NB_DB);
+            __m256d vec_sigma2 = _mm256_setzero_pd();
 
-                double temp = u_c[j];
-                for (size_t k = 0; k < p; k++) {
-                    Meat[j*p + k] += temp * u_c[k];
+            for (; i < vec_size; i+=NB_DB) {
+                
+                if (i + PREFETCH_DIST < vec_size) {
+                    _mm_prefetch((const char*)&residuals[i + PREFETCH_DIST], _MM_HINT_T0);
+                }
+
+                __m256d vec_residuals = _mm256_loadu_pd(&residuals[i]);
+                vec_sigma2 = _mm256_fmadd_pd(vec_residuals, vec_residuals, vec_sigma2);
+            }
+            double sigma2 = horizontal_red(vec_sigma2);
+
+            // Scalar residual
+            for (; i < n; i++) {
+                sigma2 += residuals[i] * residuals[i];
+            }
+            sigma2 /= (n - p);
+
+            // Id * sigma2
+            i = 0;
+            std::vector<double> sigma2_(p*p, 0.0);
+            for (; i < p; i++) {
+                sigma2_[i*p + i] = sigma2;
+            }
+
+            Dataframe df_sigma2 = {p, p, false, sigma2_};
+            return XtXinv * df_sigma2;
+        }
+    #else
+        if (cov_type == "HC3") {
+            
+            // Calculate leverage vector
+            std::vector<double> leverages(n);
+            for (size_t i = 0; i < n; i++) {
+                
+                double h = 0.0;
+                for (size_t j = 0; j < p; j++) {
+                    
+                    double temp = x_const.at(j*n + i);
+                    for (size_t k = 0; k < p; k++) {
+                        h += temp * XtXinv.at(j*p + k) * x_const.at(k*n + i); // XtXinv row major
+                    }
+                }
+                leverages[i] = h;
+            }
+
+            // Meat = X' diag(weights) X
+            for (size_t i = 0; i < n; i++) {
+
+                double w = residuals[i] * residuals[i] / ((1 - leverages[i])*(1 - leverages[i]));
+                for (size_t j = 0; j < p; j++) {
+
+                    double x_w = x_const.at(j*n + i) * w;
+                    for (size_t k = 0; k < p; k++) {
+                        Meat[j*p + k] += x_w * x_const.at(k*n + i);
+                    }
                 }
             }
         }
-        
-        // Adjustement
-        double adj = static_cast<double>(G) / (G - 1) * (n - 1) / (n - p);
-        Meat = mult(Meat, adj);
-    }
-    // By default classical
-    else {
-        // Var(Beta) = sigma2 * XtXinv
-        double sigma2 = 0.0;
-        for (size_t i = 0; i < n; i++) {
-            sigma2 += residuals[i] * residuals[i];
-        }
-        sigma2 /= (n - p);
+        else if (cov_type == "HAC") {
 
-        // Id * sigma2
-        std::vector<double> sigma2_vec(p*p, 0.0);
-        for (size_t i = 0; i < p; i++) {
-            sigma2_vec[i*p + i] = sigma2;
-        }
+            // Newey-West lag
+            size_t L = std::floor(4.0 * std::pow(n/100.0, 2.0/9.0));
 
-        Dataframe df_sigma2 = {p, p, false, sigma2_vec};
-        return XtXinv * df_sigma2;
-    }
+            // Gamma_0
+            for (size_t i = 0; i < n; i++) {
+
+                double residual = residuals[i];
+                for (size_t j = 0; j < p; j++) {
+
+                    double x_residual = residual * x_const.at(j*n + i) * residual;
+                    for (size_t k = 0; k < p; k++) {
+                        Meat[j*p + k] += x_residual * x_const.at(k*n + i);
+                    }
+                }
+            }
+            
+            // Autocovariances
+            for (size_t lag = 1; lag <= L; lag++) {
+                
+                double weight = 1.0 - static_cast<double>(lag) / (L + 1);
+                std::vector<double> Gamma_lag(p*p, 0.0);
+                for (size_t i = lag; i < n; i++) {
+
+                    double res = residuals[i];
+                    double res_lag = residuals[i-lag];
+                    for (size_t j = 0; j < p; j++) {
+
+                        double x_residual_lag = res * x_const.at(j*n + i) * res_lag;
+                        for (size_t k = 0; k < p; k++) {
+                            Gamma_lag[j*p + k] +=  x_residual_lag * x_const.at(k*n + i - lag);
+                        }
+                    }
+                }
+                
+                for (size_t j = 0; j < p; j++) {
+                    for (size_t k = 0; k < p; k++) {
+                        Meat[j*p + k] += weight * (Gamma_lag[j*p + k] + Gamma_lag[k*p + j]);
+                    }
+                }
+            }
+        }
+        else if (cov_type == "cluster") {
+                
+            if (cluster_ids.empty()) {
+                throw std::invalid_argument("Empty cluster_ids vector");
+            }
+            
+            size_t min_val = *std::min_element(cluster_ids.begin(), cluster_ids.end());
+            if (min_val != 0) {
+                throw std::invalid_argument("Ids in cluster have to start from 0");
+            }
+
+            // Nb of clusters
+            size_t G = *std::max_element(cluster_ids.begin(), cluster_ids.end()) + 1;
+
+            // Group by Cluster
+            std::vector<std::vector<size_t>> clusters(G);
+            for (size_t i = 0; i < n; i++) {
+                clusters[cluster_ids[i]].push_back(i);
+            }
+
+            for (size_t c = 0; c < G; c++) {
+
+                // Cluster score c : u_c = sum_{i in c} e_i * x_i
+                std::vector<double> u_c(p, 0.0);
+                for (size_t i : clusters[c]) {
+
+                    double residual = residuals[i];
+                    for (size_t j = 0; j < p; j++) {
+                        u_c[j] += residual * x_const.at(j*n + i);
+                    }
+                }
+                
+                // Outer product u_c * u_c'
+                for (size_t j = 0; j < p; j++) {
+
+                    double temp = u_c[j];
+                    for (size_t k = 0; k < p; k++) {
+                        Meat[j*p + k] += temp * u_c[k];
+                    }
+                }
+            }
+            
+            // Adjustement
+            double adj = static_cast<double>(G) / (G - 1) * (n - 1) / (n - p);
+            Meat = mult(Meat, adj);
+        }
+        // By default classical
+        else {
+            // Var(Beta) = sigma2 * XtXinv
+            double sigma2 = 0.0;
+            for (size_t i = 0; i < n; i++) {
+                sigma2 += residuals[i] * residuals[i];
+            }
+            sigma2 /= (n - p);
+
+            // Id * sigma2
+            std::vector<double> sigma2_vec(p*p, 0.0);
+            for (size_t i = 0; i < p; i++) {
+                sigma2_vec[i*p + i] = sigma2;
+            }
+
+            Dataframe df_sigma2 = {p, p, false, sigma2_vec};
+            return XtXinv * df_sigma2;
+        }
+    #endif
 
     Dataframe df_Meat = {p, p, false, Meat};
     Dataframe part1 = XtXinv * df_Meat;
