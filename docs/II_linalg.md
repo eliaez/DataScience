@@ -1,5 +1,5 @@
 # II - Linear Algebra
-Before implementing any ML and regression algorithms, we need fundamental linear algebra operations and functions. It's the core of the optimization process to achieve better performance, so we will implement 3 different approaches and add 2 external libraries to compare. Thus, to enable backend selection and operation dispatching, the [**Linalg**](include/Linalg/Linalg.hpp) namespace provides a unified interface. This abstraction layer enables transparent backend switching without altering function signatures.
+Before implementing any ML and regression algorithms, we need fundamental linear algebra operations and functions. It's the core of the optimization process to achieve better performance, so we will implement 3 different approaches and add 2 external libraries to compare. Thus, to enable backend selection and operation dispatching, the [**Linalg**](/include/Linalg/Linalg.hpp) namespace provides a unified interface. This abstraction layer enables transparent backend switching without altering function signatures.
 
 ## Backends
 ### Implemented:
@@ -88,9 +88,9 @@ auto df_inv = Linalg::Operations::inverse(df);
 ```
 
 **To test it yourself**, you can also check the corresponding files: 
-- [**Linalg.hpp**](include/Linalg/Linalg.hpp)
-- [**Linalg.cpp**](src/Linalg/Linalg.cpp)
-- [**Test folder**](tests/)
+- [**Linalg.hpp**](/include/Linalg/Linalg.hpp)
+- [**Linalg.cpp**](/src/Linalg/Linalg.cpp)
+- [**Test folder**](/tests/)
 
 #### Note: 
 By default, the backend used will be the best performing one among the three customized implementations, excluding MKL and Eigen libraries. Moreover, to compile MKL, the MSVC option is available to avoid any issue with MinGW-GCC.

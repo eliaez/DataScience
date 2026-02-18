@@ -128,9 +128,9 @@ As a first step, we need a class to handle and manipulate our data. Thus, our [*
 <br>
 
 **To test it yourself**, you can also check the corresponding files: 
-- [**Data.hpp**](include/Data/Data.hpp)
-- [**Data.cpp**](src/Data/Data.cpp)
-- [**Test file**](tests/tests_data.cpp)
+- [**Data.hpp**](/include/Data/Data.hpp)
+- [**Data.cpp**](/src/Data/Data.cpp)
+- [**Test file**](/tests/tests_data.cpp)
 
 #### Note: 
 By default, the backend used will be the best performing one among the three customized implementations, excluding MKL and Eigen libraries. Moreover, to compile MKL, the MSVC option is available to avoid any issue with MinGW-GCC.
