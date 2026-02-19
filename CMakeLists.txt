@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(MSVC)
     add_compile_options(
         /W4         # /W4 to get warnings
-        #/O2         # /02 opti-max for balance size/speed
+        /O2         # /02 opti-max for balance size/speed
         /wd4127     # Constant conditionnal expression
         /wd4267     # size_t to int
         /wd4244     # double to int
@@ -102,7 +102,7 @@ FetchContent_MakeAvailable(Eigen)
 # ============================================
 option(BUILD_TEST "Build tests" ON)
 option(BUILD_BENCHMARK "Build benchmark" ON)
-option(BUILD_MAIN "Build main" ON)
+option(BUILD_MAIN "Build main" OFF)
 
 
 # SOURCES
