@@ -1,0 +1,33 @@
+#pragma once
+
+#include <tuple>
+#include <vector>
+
+namespace Linalg::MKL {
+    #ifdef USE_MKL
+    // Sum MKL col - col only
+    std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2,
+        size_t m, size_t n,     // Rows / Cols
+        char op = '+'           // Operator
+    );
+
+    // Mult MKL col - col only
+    std::vector<double> multiply(const std::vector<double>& v1, const std::vector<double>& v2,
+        size_t m, size_t n,     // Rows / Cols v1
+        size_t o, size_t p     // Rows / Cols v2
+    );
+
+    // Transpose MKL
+    std::vector<double> transpose(const std::vector<double>& v1,  
+        size_t v1_rows, size_t v1_cols
+    );
+
+    // Function to inverse matrix MKL
+    std::vector<double> inverse(
+        const std::vector<double>& v1, 
+        size_t n,
+        std::vector<double> swaps,
+        std::vector<double> LU
+    );
+    #endif
+}

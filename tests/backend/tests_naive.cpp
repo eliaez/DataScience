@@ -1,5 +1,6 @@
-#include "Utils/TestSuite.hpp"
+#include "TestSuite.hpp"
 #include "Linalg/Linalg.hpp"
+#include "Data/Data.hpp"
 
 using namespace std;
 using namespace Linalg;
@@ -31,7 +32,7 @@ void multiply_naive_v2(Dataframe& mat, Dataframe& mat_t, const std::vector<doubl
     // Row - col
     Dataframe df = Operations::multiply(mat_bis_t, mat);
 
-    ASSERT_EQ_VEC_EPS(df.get_data(), mat_mult)
+    ASSERT_EQ_VEC_EPS(df.get_data(), mat_mult, 1e-9)
 }
 
 // Testing Naive Inverse - Error det = 0
@@ -58,7 +59,7 @@ void inverse_naive_v3(Dataframe& mat, Dataframe& mat_t, const std::vector<double
     // Inv
     Dataframe df_inv = Operations::inverse(df);
 
-    ASSERT_EQ_VEC_EPS(df_inv.get_data(), mat_inv)
+    ASSERT_EQ_VEC_EPS(df_inv.get_data(), mat_inv, 1e-9)
 }
 
 
@@ -81,10 +82,10 @@ void tests_naive() {
     vector<double> mult = {13,41,69,97,27,67,107,147,35,79,123,167,11,35,59,83};
     vector<double> inv3 = {1,0,0,0,-2,1,0,0,1,-2,1,0,0,1,-2,1};
 
-    Dataframe mat = CsvHandler::loadCsv("../tests/datasets/mat.csv", ',', false);
-    Dataframe mat_t = CsvHandler::loadCsv("../tests/datasets/mat_t.csv", ',', false);
-    Dataframe mat_mult = CsvHandler::loadCsv("../tests/datasets/mat_mult.csv", ',', false);
-    Dataframe mat_inv = CsvHandler::loadCsv("../tests/datasets/mat_multinv.csv", ',', false);
+    Dataframe mat = CsvHandler::loadCsv("../tests/datasets/backend/mat.csv", ',', false);
+    Dataframe mat_t = CsvHandler::loadCsv("../tests/datasets/backend/mat_t.csv", ',', false);
+    Dataframe mat_mult = CsvHandler::loadCsv("../tests/datasets/backend/mat_mult.csv", ',', false);
+    Dataframe mat_inv = CsvHandler::loadCsv("../tests/datasets/backend/mat_multinv.csv", ',', false);
 
     // Add tests
     TestSuite::Tests tests_naive;

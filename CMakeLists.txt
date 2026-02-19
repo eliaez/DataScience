@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 project(DataScience)
 
 set(CMAKE_CXX_STANDARD 20)
-
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # COMPILER : MSVC vs MinGW-GCC
 # ============================================
@@ -13,6 +13,7 @@ if(MSVC)
         /wd4127     # Constant conditionnal expression
         /wd4267     # size_t to int
         /wd4244     # double to int
+        /wd4714     # Warning boost
         /wd5054)    # operator& between enums (Eigen) 
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 else()
@@ -101,7 +102,7 @@ FetchContent_MakeAvailable(Eigen)
 # ============================================
 option(BUILD_TEST "Build tests" ON)
 option(BUILD_BENCHMARK "Build benchmark" ON)
-option(BUILD_MAIN "Build main" ON)
+option(BUILD_MAIN "Build main" OFF)
 
 
 # SOURCES
@@ -109,13 +110,28 @@ option(BUILD_MAIN "Build main" ON)
 include_directories(include)
 
 set(LIB_SOURCES 
+    # Data
     src/Data/Data.cpp
+
+    # Linalg - Core
     src/Linalg/Linalg.cpp
-    src/Linalg/LinalgNaive.cpp
-    src/Linalg/LinalgAVX2.cpp
-    src/Linalg/LinalgAVX2_threaded.cpp
-    src/Linalg/LinalgEigen.cpp
-    src/Linalg/LinalgMKL.cpp
+    src/Linalg/detail/LinalgImpl.cpp
+
+    # Linalg - Backends
+    src/Linalg/backends/LinalgNaive.cpp
+    src/Linalg/backends/LinalgAVX2.cpp
+    src/Linalg/backends/LinalgAVX2_threaded.cpp
+    src/Linalg/backends/LinalgEigen.cpp
+    src/Linalg/backends/LinalgMKL.cpp
+
+    # Models
+    src/Models/Regressions.cpp
+
+    # Stats
+    src/Stats/stats.cpp
+
+    # Utils
+    src/Utils/Utils.cpp
     src/Utils/TestSuite.cpp
     src/Utils/ThreadPool.cpp
 )
@@ -125,8 +141,19 @@ set(LIB_SOURCES
 # ============================================
 add_library(linalg_full STATIC ${LIB_SOURCES})
 
+target_include_directories(linalg_full 
+    PUBLIC 
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        "C:/Program Files (x86)/Boost/boost_1_90_0" # May need to be modified
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src  # Pour accéder à detail/ et backends/
+)
+
 target_compile_options(linalg_full PUBLIC ${AVX2_FLAGS})
-target_link_libraries(linalg_full PUBLIC Eigen3::Eigen OpenMP::OpenMP_CXX)
+target_link_libraries(linalg_full PUBLIC 
+    Eigen3::Eigen 
+    OpenMP::OpenMP_CXX
+)
 
 # Link Thread (MSVC do it automatically)
 if(MINGW)
@@ -135,47 +162,74 @@ endif()
 
 # Link MKL + TBB
 if(USE_MKL)
-    target_compile_definitions(linalg_full PUBLIC USE_MKL MKL_ILP64 EIGEN_USE_MKL_ALL)
-    target_link_libraries(linalg_full PUBLIC MKL::MKL TBB::tbb)
+    target_compile_definitions(linalg_full PUBLIC 
+        USE_MKL 
+        MKL_ILP64 
+        EIGEN_USE_MKL_ALL
+    )
+    target_link_libraries(linalg_full PUBLIC 
+        MKL::MKL 
+        TBB::tbb
+    )
 endif()
 
 
 # TESTS
 # ============================================
 if(BUILD_TEST)
+    add_library(test_utils INTERFACE)
+    target_include_directories(test_utils INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/Utils
+    )
+
     enable_testing()
-    add_executable(test_all 
-        tests/tests_main.cpp
-        tests/tests_data.cpp
-        tests/tests_naive.cpp
-        tests/tests_AVX2.cpp
-        tests/tests_AVX2_threaded.cpp
-        tests/tests_MKL.cpp
-        tests/tests_Eigen.cpp
+
+    # ------------------- Tests on Backends --------------------
+    add_executable(test_backend 
+        tests/backend/tests_main.cpp
+        tests/backend/tests_data.cpp
+        tests/backend/tests_naive.cpp
+        tests/backend/tests_AVX2.cpp
+        tests/backend/tests_AVX2_threaded.cpp
+        tests/backend/tests_MKL.cpp
+        tests/backend/tests_Eigen.cpp
     )
     
-    target_link_libraries(test_all linalg_full)
-    add_test(NAME TestData COMMAND test_all data)
-    add_test(NAME TestNaive COMMAND test_all naive)
+    target_link_libraries(test_backend PRIVATE 
+        linalg_full
+        test_utils
+    )
+    add_test(NAME TestData COMMAND test_backend data)
+    add_test(NAME TestNaive COMMAND test_backend naive)
+    add_test(NAME TestEigen COMMAND test_backend eigen)
 
     if(AVX2_FLAGS)
-        add_test(NAME TestAVX2 COMMAND test_all avx2)
-        add_test(NAME TestAVX2_TH COMMAND test_all avx2_th)
+        add_test(NAME TestAVX2 COMMAND test_backend avx2)
+        add_test(NAME TestAVX2_TH COMMAND test_backend avx2_th)
     endif()
-
-    add_test(NAME TestEigen COMMAND test_all eigen)
 
     if(USE_MKL)
-        add_test(NAME TestMKL COMMAND test_all mkl)
+        add_test(NAME TestMKL COMMAND test_backend mkl)
     endif()
+
+    # ------------------- Tests on Regressions --------------------
+    add_executable(test_reg
+        tests/regression/tests_main.cpp
+        tests/regression/tests_OLS.cpp
+    )
+    target_link_libraries(test_reg PRIVATE 
+        linalg_full
+        test_utils
+    )
+    add_test(NAME TestOLS COMMAND test_reg OLS)
 endif()
 
 
 # BENCHMARK
 # ============================================
 if(BUILD_BENCHMARK)
-    set(BENCHMARK_ENABLE_TESTING OFF)
-    set(BENCHMARK_ENABLE_GTEST_TESTS OFF)
+    set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
 
     FetchContent_Declare(
         benchmark
@@ -188,7 +242,10 @@ if(BUILD_BENCHMARK)
         benchmark/bench_data.cpp
         benchmark/bench_linalg.cpp
     )
-    target_link_libraries(my_bench benchmark::benchmark_main linalg_full)    
+    target_link_libraries(my_bench PRIVATE
+        benchmark::benchmark_main 
+        linalg_full
+    )    
 endif()
 
 

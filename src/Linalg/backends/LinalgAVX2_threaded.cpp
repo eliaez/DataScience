@@ -1,17 +1,18 @@
-#include "Linalg/LinalgAVX2_threaded.hpp"
-#include "Linalg/LinalgAVX2.hpp"
-#include "Linalg/Linalg.hpp"
+#include "Data/Data.hpp"
+#include "LinalgAVX2.hpp"
+#include "Utils/Utils.hpp"
 #include "Utils/ThreadPool.hpp"
+#include "LinalgAVX2_threaded.hpp"
 
-namespace Linalg {
-namespace AVX2_threaded {
+using namespace Utils;
+
+namespace Linalg::AVX2_threaded {
 #ifdef __AVX2__
 
-std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const Dataframe& df) {
+std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const std::vector<double>& v1, size_t n) {
 
     int nb_swaps = 0;
-    size_t n = df.get_cols();
-    std::vector<double> LU = df.get_data();
+    std::vector<double> LU = v1;
 
     // Permutation matrix is Id at first
     std::vector<double> swaps(n*n, 0.0);
@@ -165,7 +166,7 @@ std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const
     return std::make_tuple(nb_swaps, std::move(swaps), std::move(LU));
 }
 
-Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n) {
+std::vector<double> solveLU_inplace(const std::vector<double>& perm, const std::vector<double>& LU, size_t n) {
 
     // After multiple tests a minimum was decided
     constexpr size_t THREADING_THRESHOLD = 512;
@@ -174,7 +175,6 @@ Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<dou
     }
 
     std::vector<double> y(n*n, 0.0);
-    size_t prefetch_dist = NB_DB;
 
     // Store the Diag
     std::vector<double> diag_U(n);
@@ -190,6 +190,7 @@ Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<dou
 
     std::vector<std::future<void>> futures;
     futures.reserve(nb_threads);
+    const size_t prefetch_dist1 = PREFETCH_DIST1;
 
     size_t chunk = (int)(vec_size / nb_threads);
     size_t start = 0, end = chunk;
@@ -197,7 +198,7 @@ Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<dou
     for (size_t nb = 0; nb < nb_threads; nb++) {
         if (nb+1 == nb_threads) end = vec_size;
 
-        auto fut = pool.enqueue([start, end, n, prefetch_dist, &perm, &y, &diag_U, &LU] {
+        auto fut = pool.enqueue([start, end, n, prefetch_dist1, &perm, &y, &diag_U, &LU] {
             
             // By Blocks with AVX2
             for (size_t k = start; k < end; k+=NB_DB) {
@@ -206,9 +207,9 @@ Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<dou
                 // Forward substitution 
                 for (size_t i = 0; i < n; i++) {
 
-                    if (k + prefetch_dist < end) {
+                    if (k + prefetch_dist1 < end) {
                         for (size_t p = 0; p < NB_DB; p++) {
-                            _mm_prefetch((const char*)&perm[(k+p+prefetch_dist)*n + i], _MM_HINT_T0);
+                            _mm_prefetch((const char*)&perm[(k+p+prefetch_dist1)*n + i], _MM_HINT_T0);
                         }        
                     }
 
@@ -221,9 +222,9 @@ Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<dou
                     
                     for (size_t j = 0; j < i; j++) {
 
-                        if (j + prefetch_dist < i) {
+                        if (j + prefetch_dist1 < i) {
                             for (size_t p = 0; p < NB_DB; p++) {
-                                _mm_prefetch((const char*)&y[(k+p)*n + j + prefetch_dist], _MM_HINT_T0);
+                                _mm_prefetch((const char*)&y[(k+p)*n + j + prefetch_dist1], _MM_HINT_T0);
                             }
                         }
 
@@ -322,32 +323,16 @@ Dataframe solveLU_inplace(const std::vector<double>& perm, const std::vector<dou
             
         }
     }
-    return {n, n, false, std::move(y)};
+    return y;
 }
 
-double horizontal_red(__m256d& vec) {
-    return AVX2::horizontal_red(vec);
-}
-
-Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
-
-    size_t m = df1.get_rows();
-    size_t n = df1.get_cols();
-    size_t o = df2.get_rows();
-    size_t p = df2.get_cols();
+std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>& v2, 
+    size_t m, size_t n, char op) { 
 
     // After multiple tests a minimum was decided
     constexpr size_t THREADING_THRESHOLD = 512;
     if (m < THREADING_THRESHOLD) {
-        return AVX2::sum(df1, df2, op);
-    }
-
-    // Verify if we can sum them
-    if (m != o || n != p) throw std::runtime_error("Need two Matrix of equal dimensions");
-
-    // Condition to have better performances
-    if (df1.get_storage() != df2.get_storage()) {
-        throw std::runtime_error("Need two Matrix with the same storage Col-major or Row-major for performances purpose");
+        return AVX2::sum(v1, v2, m, n, op);
     }
 
     // New data
@@ -368,17 +353,17 @@ Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
         for (size_t nb = 0; nb < nb_threads; nb++) {
             if (nb+1 == nb_threads) end = vec_size;
 
-            auto fut = pool.enqueue([start, end, &df1, &df2, &new_data] {
+            auto fut = pool.enqueue([start, end, &v1, &v2, &new_data] {
                 for (size_t i = start; i < end; i += NB_DB) {
 
                     if (i + PREFETCH_DIST < end) {
                         // Pre-charged PREFETCH_DIST*8 bytes ahead
-                        _mm_prefetch((const char*)&df1.at(i+PREFETCH_DIST), _MM_HINT_T0);
-                        _mm_prefetch((const char*)&df2.at(i+PREFETCH_DIST), _MM_HINT_T0);
+                        _mm_prefetch((const char*)&v1[i+PREFETCH_DIST], _MM_HINT_T0);
+                        _mm_prefetch((const char*)&v2[i+PREFETCH_DIST], _MM_HINT_T0);
                     }
 
-                    __m256d vec1 = _mm256_loadu_pd(&df1.at(i));
-                    __m256d vec2 = _mm256_loadu_pd(&df2.at(i));
+                    __m256d vec1 = _mm256_loadu_pd(&v1[i]);
+                    __m256d vec2 = _mm256_loadu_pd(&v2[i]);
 
                     __m256d res = _mm256_add_pd(vec1, vec2);
 
@@ -394,24 +379,24 @@ Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
 
         // Scalar residual
         for (size_t i = end; i < m*n; i++) {
-            new_data[i] = df1.at(i) + df2.at(i);
+            new_data[i] = v1[i] + v2[i];
         }
     }
     else if (op == '-') {
         for (size_t nb = 0; nb < nb_threads; nb++) {
             if (nb+1 == nb_threads) end = vec_size;
 
-            auto fut = pool.enqueue([start, end, &df1, &df2, &new_data] {
+            auto fut = pool.enqueue([start, end, &v1, &v2, &new_data] {
                 for (size_t i = start; i < end; i += NB_DB) {
 
                     if (i + PREFETCH_DIST < end) {
                         // Pre-charged PREFETCH_DIST*8 bytes ahead
-                        _mm_prefetch((const char*)&df1.at(i+PREFETCH_DIST), _MM_HINT_T0);
-                        _mm_prefetch((const char*)&df2.at(i+PREFETCH_DIST), _MM_HINT_T0);
+                        _mm_prefetch((const char*)&v1[i+PREFETCH_DIST], _MM_HINT_T0);
+                        _mm_prefetch((const char*)&v2[i+PREFETCH_DIST], _MM_HINT_T0);
                     }
 
-                    __m256d vec1 = _mm256_loadu_pd(&df1.at(i));
-                    __m256d vec2 = _mm256_loadu_pd(&df2.at(i));
+                    __m256d vec1 = _mm256_loadu_pd(&v1[i]);
+                    __m256d vec2 = _mm256_loadu_pd(&v2[i]);
 
                     __m256d res = _mm256_sub_pd(vec1, vec2);
 
@@ -427,34 +412,24 @@ Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op) {
 
         // Scalar residual
         for (size_t i = end; i < m*n; i++) {
-            new_data[i] = df1.at(i) + df2.at(i);
+            new_data[i] = v1[i] - v2[i];
         }
     }
 
-    return {m, n, false, std::move(new_data)};
+    return new_data;
 }
 
-Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
-
-    size_t m = df1.get_rows();
-    size_t n = df1.get_cols();
-    size_t o = df2.get_rows();
-    size_t p = df2.get_cols();
+std::vector<double> multiply(const std::vector<double>& v1, const std::vector<double>& v2,
+    size_t m, size_t n, size_t o, size_t p ) {
 
     // After multiple tests a minimum was decided
     constexpr size_t THREADING_THRESHOLD = 512;
     if (m < THREADING_THRESHOLD) {
-        return AVX2::multiply(df1, df2);
+        return AVX2::multiply(v1, v2, m, n, o, p);
     }
-    
-    // Verify if we can multiply them
-    if (n != o) throw std::runtime_error("Need df1 cols == df2 rows");
 
-    // To optimize we want only row - col config (see explication at end of function)
-    if (!(df1.get_storage() && !df2.get_storage())) throw std::runtime_error("Need df1 row major and df2 col major");
-
-    // row - col
-    std::vector<double> data(m * p);
+    // New data
+    std::vector<double> new_data(m * p);
     size_t vec_sizei = m - (m % NB_DB);
     
     // ThreadPool Variables
@@ -470,7 +445,7 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
     for (size_t nb = 0; nb < nb_threads; nb++) {
         if (nb+1 == nb_threads) end = vec_sizei;
 
-        auto fut = pool.enqueue([start, end, m, n, o, p, &df1, &df2, &data] {
+        auto fut = pool.enqueue([start, end, m, n, o, p, &v1, &v2, &new_data] {
             for (size_t i = start; i < end; i += NB_DB) {
                 for (size_t j = 0; j < p; j++) {
 
@@ -486,25 +461,25 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
                         
                         if (k + PREFETCH_DIST < vec_size) {
                             // Pre-charged PREFETCH_DIST*8 bytes ahead
-                            if (i + df1.PREFETCH_DIST1 < end) {
+                            if (i + PREFETCH_DIST1 < end) {
                                 for (size_t l = 0; l < NB_DB; l++) {
-                                    _mm_prefetch((const char*)&df1.at((i+l+df1.PREFETCH_DIST1) * n + k + PREFETCH_DIST), _MM_HINT_T0);
+                                    _mm_prefetch((const char*)&v1[(i+l+PREFETCH_DIST1) * n + k + PREFETCH_DIST], _MM_HINT_T0);
                                 }
                             }
                             else {
-                                _mm_prefetch((const char*)&df1.at(i * n + k + PREFETCH_DIST), _MM_HINT_T0);
+                                _mm_prefetch((const char*)&v1[i * n + k + PREFETCH_DIST], _MM_HINT_T0);
                             }
-                            _mm_prefetch((const char*)&df2.at(j * o + k + PREFETCH_DIST), _MM_HINT_T0);
+                            _mm_prefetch((const char*)&v2[j * o + k + PREFETCH_DIST], _MM_HINT_T0);
                         }
 
-                        // df1 row major
-                        // df2 col major
-                        __m256d vec1_0 = _mm256_loadu_pd(&df1.at(i * n + k));
-                        __m256d vec1_1 = _mm256_loadu_pd(&df1.at((i+1) * n + k));
-                        __m256d vec1_2 = _mm256_loadu_pd(&df1.at((i+2) * n + k));
-                        __m256d vec1_3 = _mm256_loadu_pd(&df1.at((i+3) * n + k));
+                        // v1 row major
+                        // v2 col major
+                        __m256d vec1_0 = _mm256_loadu_pd(&v1[i * n + k]);
+                        __m256d vec1_1 = _mm256_loadu_pd(&v1[(i+1) * n + k]);
+                        __m256d vec1_2 = _mm256_loadu_pd(&v1[(i+2) * n + k]);
+                        __m256d vec1_3 = _mm256_loadu_pd(&v1[(i+3) * n + k]);
 
-                        __m256d vec2 = _mm256_loadu_pd(&df2.at(j * o + k)); 
+                        __m256d vec2 = _mm256_loadu_pd(&v2[j * o + k]); 
                         
                         sum_vec0 = _mm256_fmadd_pd(vec1_0, vec2, sum_vec0);
                         sum_vec1 = _mm256_fmadd_pd(vec1_1, vec2, sum_vec1);
@@ -520,16 +495,16 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
                     
                     // Scalar residual
                     for (; k < n; k++) {
-                        sum0 += df1.at(i * n + k) * df2.at(j * o + k);
-                        sum1 += df1.at((i+1) * n + k) * df2.at(j * o + k);
-                        sum2 += df1.at((i+2) * n + k) * df2.at(j * o + k);
-                        sum3 += df1.at((i+3) * n + k) * df2.at(j * o + k);
+                        sum0 += v1[i * n + k] * v2[j * o + k];
+                        sum1 += v1[(i+1) * n + k] * v2[j * o + k];
+                        sum2 += v1[(i+2) * n + k] * v2[j * o + k];
+                        sum3 += v1[(i+3) * n + k] * v2[j * o + k];
                     }
                     // Write it directly in col major
-                    data[j * m + i] = sum0;
-                    data[j * m + i+1] = sum1;
-                    data[j * m + i+2] = sum2;
-                    data[j * m + i+3] = sum3;
+                    new_data[j * m + i] = sum0;
+                    new_data[j * m + i+1] = sum1;
+                    new_data[j * m + i+2] = sum2;
+                    new_data[j * m + i+3] = sum3;
                 }
             }
         });
@@ -546,52 +521,39 @@ Dataframe multiply(const Dataframe& df1, const Dataframe& df2) {
 
             double sum = 0.0;
             for (size_t k = 0; k < n; k++) {
-                // df1 row major
-                // df2 col major
-                sum += df1.at(i * n + k) * df2.at(j * o + k);
+                // v1 row major
+                // v2 col major
+                sum += v1[i * n + k] * v2[j * o + k];
             }
             // Write it directly in col major
-            data[j * m + i] = sum;
+            new_data[j * m + i] = sum;
         }
     }
     // col - row
     // Non-optimized for AVX2 
-    // ie need to access data[j*m + i], data[(j+1)*m + i], ...
+    // ie need to access new_data[j*m + i], new_data[(j+1)*m + i], ...
     // Loss of our advantage
     
     // Return column - major
-    return Dataframe(m, p, false, std::move(data), 
-                     df1.get_headers(), df1.get_encoder(), df1.get_encodedCols());
+    return new_data;
 }
 
-Dataframe transpose(Dataframe& df) {
+std::vector<double> transpose(const std::vector<double>& v1,  
+    size_t v1_rows, size_t v1_cols) {
 
-    size_t rows = df.get_cols(), cols = df.get_rows();
-    size_t temp_row = df.get_rows(), temp_col = df.get_cols();
+    std::vector<double> new_data = Dataframe::transpose_avx2_th(v1_rows, v1_cols, v1);
 
-    // Changing layout for better performances later
-    if (df.get_storage()){
-        df.change_layout_inplace("AVX2_threaded");
-    }
-
-    std::vector<double> data = Dataframe::transpose_avx2_th(temp_row, temp_col, df.get_data());
-
-    return {rows, cols, false, std::move(data), df.get_headers(), 
-        df.get_encoder(), df.get_encodedCols()};
+    return new_data;
 }
 
-Dataframe inverse(Dataframe& df) {
+std::vector<double> inverse(const std::vector<double>& v1, size_t n,
+    std::vector<double> swaps, std::vector<double> LU) {
 
-    auto [det, swaps, LU] = determinant(df);
-
-    size_t n = df.get_cols();
-    
     // Id matrix
     std::vector<double> id(n*n, 0.0);
     for (size_t i = 0; i < n; i++) {
         id[i*n + i] = 1;
     }
-    Dataframe df_id = {n, n, false, std::move(id)};
 
     // If no LU matrix was returned, then the matrix is triangular
     if (LU.empty()) {
@@ -600,9 +562,9 @@ Dataframe inverse(Dataframe& df) {
         // Diag
         if (swaps[0] == 3) {
             for (size_t i = 0; i < n; i++) {
-               y[i*n + i] = 1 / df.at(i*n+i);
+               y[i*n + i] = 1 / v1[i*n+i];
             }
-            return {n, n, false, std::move(y)};
+            return y;
         }
         // Up
         else if (swaps[0] == 2) {
@@ -614,18 +576,18 @@ Dataframe inverse(Dataframe& df) {
             for (; k < vec_size; k+=NB_DB) {
                 for (int i = static_cast<int>(n)-1; i >= 0; i--) {
 
-                    double diag_i = df.at(i*n + i);
+                    double diag_i = v1[i*n + i];
 
                     __m256d sum = _mm256_set_pd(
-                        df_id.at((k+3)*n + i),
-                        df_id.at((k+2)*n + i),
-                        df_id.at((k+1)*n + i),
-                        df_id.at((k+0)*n + i)
+                        id[(k+3)*n + i],
+                        id[(k+2)*n + i],
+                        id[(k+1)*n + i],
+                        id[(k+0)*n + i]
                     );
                     
                     for (size_t j = i+1; j < n; j++) {
                         
-                        __m256d LU_vec = _mm256_set1_pd(df.at(j*n + i));
+                        __m256d LU_vec = _mm256_set1_pd(v1[j*n + i]);
 
                         __m256d y_vals = _mm256_set_pd(
                             y[(k+3)*n + j],
@@ -656,15 +618,15 @@ Dataframe inverse(Dataframe& df) {
             for (; k < n; k++) {
                 for (int i = static_cast<int>(n)-1; i >= 0; i--) {
 
-                    y[k*n + i] = df_id.at(k*n + i);
+                    y[k*n + i] = id[k*n + i];
                     for (size_t j = i+1; j < n; j++) {
-                        y[k*n + i] -= df.at(j*n + i) * y[k*n + j];
+                        y[k*n + i] -= v1[j*n + i] * y[k*n + j];
                     }
                     if (std::abs(y[k*n + i]) < 1e-14) y[k*n + i] = 0;
-                    else y[k*n + i] /= df.at(i*n+i);
+                    else y[k*n + i] /= v1[i*n+i];
                 }
             }
-            return {n, n, false, std::move(y)};
+            return y;
         }
         // Down
         else {
@@ -678,18 +640,18 @@ Dataframe inverse(Dataframe& df) {
 
                 for (size_t i = 0; i < n; i++) {
 
-                    double diag_i = df.at(i*n + i);
+                    double diag_i = v1[i*n + i];
 
                     __m256d sum = _mm256_set_pd(
-                        df_id.at((k+3)*n + i),
-                        df_id.at((k+2)*n + i),
-                        df_id.at((k+1)*n + i),
-                        df_id.at((k+0)*n + i)
+                        id[(k+3)*n + i],
+                        id[(k+2)*n + i],
+                        id[(k+1)*n + i],
+                        id[(k+0)*n + i]
                     );
                     
                     for (size_t j = 0; j < i; j++) {
 
-                        __m256d LU_val = _mm256_set1_pd(df.at(j*n + i));
+                        __m256d LU_val = _mm256_set1_pd(v1[j*n + i]);
                         
                         __m256d y_vals = _mm256_set_pd(
                             y[(k+3)*n + j],
@@ -720,29 +682,26 @@ Dataframe inverse(Dataframe& df) {
                 for (size_t i = 0; i < n; i++) {
 
                     double sum = 0.0;
-                    sum = df_id.at(k*n + i);
+                    sum = id[k*n + i];
                     for (size_t j = 0; j < i; j++) {
-                        sum -= df.at(j*n + i) * y[k*n + j];
+                        sum -= v1[j*n + i] * y[k*n + j];
                     }
-                    y[k*n + i] = sum / df.at(i*n + i);
+                    y[k*n + i] = sum / v1[i*n + i];
                 }
             }
-            return {n, n, false, std::move(y)};
+            return y;
         }
     }
     else {
-        
         // Permutation matrix
-        Dataframe df_swaps = {n, n, false, std::move(swaps)};
-        df_swaps.change_layout_inplace("AVX2_threaded");
+        swaps = transpose(swaps, n, n);
 
         // Row - Col to use multiply from AVX2
-        Dataframe perm = multiply(df_swaps, df_id); 
+        std::vector<double> perm = multiply(swaps, id, n, n, n, n); 
 
-        Dataframe res = solveLU_inplace(perm.get_data(), LU, n);
+        std::vector<double> res = solveLU_inplace(perm, LU, n);
         return res;
     }
 }
 #endif
-}
 }

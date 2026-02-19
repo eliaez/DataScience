@@ -1,5 +1,5 @@
 # II - Linear Algebra
-Before implementing any ML and regression algorithms, we need fundamental linear algebra operations and functions. It's the core of the optimization process to achieve better performance, so we will implement 3 different approaches and add 2 external libraries to compare. Thus, to enable backend selection and operation dispatching, the [**Linalg**](include/Linalg/Linalg.hpp) namespace provides a unified interface. This abstraction layer enables transparent backend switching without altering function signatures.
+Before implementing any ML and regression algorithms, we need fundamental linear algebra operations and functions. It's the core of the optimization process to achieve better performance, so we will implement 3 different approaches and add 2 external libraries to compare. Thus, to enable backend selection and operation dispatching, the [**Linalg**](/include/Linalg/Linalg.hpp) namespace provides a unified interface. This abstraction layer enables transparent backend switching without altering function signatures.
 
 ## Backends
 ### Implemented:
@@ -23,6 +23,9 @@ Before implementing any ML and regression algorithms, we need fundamental linear
 
 ## Architecture of `Linalg`
 
+**Implementation note**: `Operations` provides a validated `Dataframe` interface wrapping performance-optimized backends that operate on raw data. Backend headers are kept internal (`src/Linalg/backends/`) for encapsulation purpose.
+
+
 #### Backend System
 The `Operations` class manages backend selection through compile-time feature detection and runtime dispatch:
 
@@ -40,14 +43,21 @@ enum class Backend {
 Backend availability is determined at compile-time via preprocessor guards, ensuring only supported implementations are included. The `AUTO` mode defaults to `AVX2_THREADED` (if available) or `NAIVE` otherwise.
 
 #### Dispatch Mechanism
-Operations are routed through macro-based dispatch (`DISPATCH_BACKEND`) that expands to switch statements, eliminating virtual function overhead:
+Operations are routed through a two-layer architecture: first through the Linalg PIMPL-like interface, then to the corresponding backend using a macro-based dispatch (`DISPATCH_BACKEND`) that expands to switch statements, eliminating virtual function overhead:
 
 ```cpp
-// User calls
+// User calls (high-level)
 auto result = Linalg::Operations::multiply(df1, df2);
 
-// Internally dispatches to selected backend
-// e.g., Linalg::AVX2_threaded::multiply(df1, df2)
+// Internally dispatches to (low-level)
+Linalg::Operations::Impl::multiply_impl(
+    raw_data1, raw_data2, rows1, cols1, rows2, cols2, layout1, layout2
+);
+
+// Then dispatches to AVX2 threaded backend (default)
+Linalg::AVX2_threaded::multiply(
+    raw_data1, raw_data2, rows1, cols1, rows2, cols2
+);
 ```
 
 ## Core Operations
@@ -55,6 +65,9 @@ auto result = Linalg::Operations::multiply(df1, df2);
 - **Matrix arithmetic**: `sum()`, `multiply()` 
 - **Transformations**: `transpose()`, `inverse()`
 - **Utilities**: `determinant()` with triangular matrix detection (scalar or AVX2-optimized) with a LU decomposition fallback
+
+**Note**: Basic operations (`sum`, `multiply`, `transpose`, `inverse`, `determinant`) are also accessible via Dataframe operators (`+`, `-`, `*`, `~`, `.inv()`, `.det()`, `.is_tri()`) for convenience.
+
 
 #### Layout Optimization
 Operations automatically handle layout conversions when needed. For instance, `determinant()` converts to row-major if the input is column-major to optimize cache access patterns during triangular checks.
@@ -75,11 +88,11 @@ auto df_inv = Linalg::Operations::inverse(df);
 ```
 
 **To test it yourself**, you can also check the corresponding files: 
-- [**Linalg.hpp**](include/Linalg/Linalg.hpp)
-- [**Linalg.cpp**](src/Linalg/Linalg.cpp)
-- [**Test folder**](tests/)
+- [**Linalg.hpp**](/include/Linalg/Linalg.hpp)
+- [**Linalg.cpp**](/src/Linalg/Linalg.cpp)
+- [**Test folder**](/tests/)
 
 #### Note: 
 By default, the backend used will be the best performing one among the three customized implementations, excluding MKL and Eigen libraries. Moreover, to compile MKL, the MSVC option is available to avoid any issue with MinGW-GCC.
 
-To read the next part: [**III - Linear Algebra Benchmark**](docs/III_benchmark.md).
+To read the next part: [**III - Linear Algebra Benchmark**](/docs/III_benchmark.md).

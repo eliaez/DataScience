@@ -1,5 +1,6 @@
 # III - Linear Algebra Benchmark
-Comparison between backends using Google Benchmark across 4 operations.
+This benchmark section aims to evaluate and compare the performance of our custom-implemented backends (`Naive`, `AVX2`, `AVX2TH`) against industry-standard production libraries (`MKL`, `Eigen`) across a range of matrix sizes and operations using Google Benchmark. <br>
+Firstly, let's take a look at our environment: 
 
 **Environment:**
 - **CPU:** Intel Core i5-10300H @ 2.50GHz (4C/8T, Comet Lake)
@@ -77,3 +78,20 @@ LU-based inversion involves both matrix decomposition (compute-intensive) and tr
 **`MKL` and `Eigen` vastly outperform `AVX2 Threaded`** due to superior decomposition algorithms.
 
 **Note:** **`AVX2`** stopped at n=1024 due to excessive runtime
+
+## Key takeaways
+
+- **Multithreading** provides meaningful gains (~4×) but only when the operation scales well across threads
+- **Memory bandwidth saturation** is the primary bottleneck for O(n²) operations, limiting the benefit of further optimization
+- **Custom AVX2 implementations** are a viable option for memory-bound workloads but for production use, compute-intensive operations should be implemented with libraries like MKL or Eigen 
+<br> <br>
+
+**To test it yourself**, you can also check the corresponding files: 
+- [**bench_data.cpp**](/benchmark/bench_data.cpp)
+- [**bench_linalg.cpp**](/benchmark/bench_linalg.cpp)
+<br>
+
+#### Note: 
+By default, the backend used will be the best performing one among the three customized implementations, excluding MKL and Eigen libraries. Moreover, to compile MKL, the MSVC option is available to avoid any issue with MinGW-GCC.
+
+To read the next part: [**VI - Statistical Functions**](/docs/VI_stats.md).

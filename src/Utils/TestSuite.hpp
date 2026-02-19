@@ -1,12 +1,12 @@
 #pragma once
 
-#include <vector>
 #include <cmath>
-#include <functional>
+#include <vector>
 #include <string>
-#include <stdexcept>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
+#include <functional>
 
 namespace TestSuite {
 
@@ -40,15 +40,28 @@ namespace TestSuite {
     } while(0); 
 
 // Macro to compare two vectors of the same type with espilon = 1e-9 as lower threshold
-#define ASSERT_EQ_VEC_EPS(actual, expected) \
+#define ASSERT_EQ_VEC_EPS(actual, expected, EPSILON) \
     do { \
-        const double EPSILON = 1e-9; \
         auto _actual = (actual); \
         auto _expected = (expected); \
         for (size_t i = 0; i < _actual.size(); i++) { \
             if (std::abs(_actual[i] - _expected[i]) > EPSILON) { \
                 throw std::runtime_error( \
-                    std::string("Ligne ") + std::to_string(__LINE__) \
+                    std::string("Value ") + std::to_string(i) + " : " + std::to_string(_actual[i]) + " vs " + std::to_string(_expected[i]) \
+                ); \
+            } \
+        } \
+    } while(0); 
+
+// Macro to compare two vectors of the same type with relative espilon (%) as lower threshold
+#define ASSERT_VEC_EPS(actual, expected, EPSILON) \
+    do { \
+        auto _actual = (actual); \
+        auto _expected = (expected); \
+        for (size_t i = 0; i < _actual.size(); i++) { \
+            if (std::abs(_actual[i] - _expected[i]) / std::max(std::abs(_actual[i]), std::abs(_expected[i])) > EPSILON) { \
+                throw std::runtime_error( \
+                    std::string("Value ") + std::to_string(i) + " : " + std::to_string(_actual[i]) + " vs " + std::to_string(_expected[i]) \
                 ); \
             } \
         } \

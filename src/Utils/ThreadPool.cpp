@@ -1,4 +1,4 @@
-#include "Utils/ThreadPool.hpp"
+#include "ThreadPool.hpp"
 
 ThreadPool::ThreadPool() // Use physical cores instead of logical threads
     : nb_threads(std::thread::hardware_concurrency()/2), stop(false) 

@@ -1,4 +1,4 @@
-#include "Utils/TestSuite.hpp"
+#include "TestSuite.hpp"
 #include <iostream>
 
 namespace TestSuite {
@@ -15,7 +15,7 @@ void Tests::run_all() {
                 success++;
             }
             else {
-                std::cerr << "✗ " << f.second << ": Not expected result" << std::endl;
+                std::cerr << "✗ " << f.second << ": Not expected result, " << std::endl;
                 failure++;
             }
             
@@ -26,7 +26,7 @@ void Tests::run_all() {
                 success++;
             }
             else {
-                std::cerr << "✗ " << f.second << ": Not expected result" << std::endl;
+                std::cerr << "✗ " << f.second << ": Not expected result, " << e.what() << std::endl;
                 failure++;
             }
         }

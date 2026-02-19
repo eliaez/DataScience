@@ -1,15 +1,19 @@
+#include <iomanip>
+#include <Eigen/Dense>
+#include <system_error>
 #include "Data/Data.hpp"
+#include "Utils/Utils.hpp"
 #include "Linalg/Linalg.hpp"
 #include "Utils/ThreadPool.hpp"
-#include <iomanip>
-#include <system_error>
+
+#ifdef USE_MKL
+    #include <mkl.h>
+#endif
+
+using namespace Utils;
 
 /*----------------------------------------Dataframe-----------------------------------*/
-
-double Dataframe::operator()(size_t i, size_t j) const {
-    //assert(i < rows && j < cols);
-    return is_row_major ? data[i*cols+j] : data[j*rows+i];
-}
+// ---------------------------------Operators or Equivalents---------------------------
 
 const double& Dataframe::at(size_t idx) const {
     return data[idx];
@@ -19,21 +23,126 @@ double& Dataframe::at(size_t idx) {
     return data[idx];
 }
 
-Eigen::Map<Eigen::MatrixXd> Dataframe::asEigen() {
-    return Eigen::Map<Eigen::MatrixXd>(data.data(), rows, cols);
+const double& Dataframe::operator()(size_t i, size_t j) const {
+    if (i >= rows || j >= cols) {
+        throw std::out_of_range("i or j > of your Dataframe dimensions");
+    }
+    return is_row_major ? data[i*cols+j] : data[j*rows+i];
 }
 
-Eigen::Map<const Eigen::MatrixXd> Dataframe::asEigen() const {
-    return Eigen::Map<const Eigen::MatrixXd>(data.data(), rows, cols);
+double& Dataframe::operator()(size_t i, size_t j) {
+    if (i >= rows || j >= cols) {
+        throw std::out_of_range("i or j > of your Dataframe dimensions");
+    }
+    return is_row_major ? data[i*cols+j] : data[j*rows+i];
 }
 
-Eigen::Map<Eigen::MatrixXd> Dataframe::asEigen(std::vector<double>& d, size_t r, size_t c) {
-    return Eigen::Map<Eigen::MatrixXd>(d.data(), r, c);
+Dataframe Dataframe::operator[](const std::vector<size_t>& cols_idx) const {
+
+    // Test
+    for (const size_t& idx : cols_idx) {
+        if (idx >= cols) {
+            throw std::out_of_range("One of yours indexes is > of Dataframe dimensions");
+        }    
+    }
+
+    // Output
+    size_t nb = cols_idx.size();
+    std::vector<double> y_data;
+    y_data.reserve(rows * cols_idx.size());
+    std::vector<std::string> headers_y;
+    std::unordered_set<int> encoded_cols_y;
+    std::unordered_map<int, std::unordered_map<std::string, int>> label_encoder_y;
+
+    // Sort our vector
+    std::vector<size_t> idx_sorted = cols_idx;
+    std::sort(idx_sorted.begin(), idx_sorted.end());
+
+    // Extract data
+    int i = 0;
+    if (is_row_major) {
+        for (const size_t& idx : cols_idx) {
+
+            // Get data
+            for (size_t j = 0; j < rows; j++) {
+                y_data.push_back(data[j*cols+idx]);
+            }
+
+            // Get header
+            headers_y.push_back(headers[idx]);
+
+            // Get encoded cols idx
+            if (encoded_cols.find(static_cast<int>(idx)) != encoded_cols.end()) encoded_cols_y.insert(i);
+
+            // Get mapping
+            if (label_encoder.contains(static_cast<int>(idx))) label_encoder_y.insert({i, label_encoder.at(static_cast<int>(idx))});
+            i++;
+        }
+    }
+    else {
+        for (const size_t& idx : cols_idx) {
+
+            // Get data
+            for (size_t j = 0; j < rows; j++) {
+                y_data.push_back(data[idx*rows+j]);
+            }
+
+            // Get header
+            headers_y.push_back(headers[idx]);
+
+            // Get encoded cols idx
+            if (encoded_cols.find(static_cast<int>(idx)) != encoded_cols.end()) encoded_cols_y.insert(i);
+
+            // Get mapping
+            if (label_encoder.contains(static_cast<int>(idx))) label_encoder_y.insert({i, label_encoder.at(static_cast<int>(idx))});
+            i++;
+        }
+    }
+    return {rows, nb, false, std::move(y_data), std::move(headers_y), 
+        std::move(label_encoder_y), std::move(encoded_cols_y)};
 }
 
-Eigen::Map<const Eigen::MatrixXd> Dataframe::asEigen(const std::vector<double>& d, size_t r, size_t c) {
-    return Eigen::Map<const Eigen::MatrixXd>(d.data(), r, c);
+Dataframe Dataframe::operator[](const std::vector<std::string>& cols_name) const {
+    
+    // Find cols idx
+    std::vector<size_t> cols_idx;
+    cols_idx.reserve(cols_name.size());
+    for (const std::string& name : cols_name) {
+
+        auto idx = std::find(headers.begin(), headers.end(), name);
+        if (idx != headers.end()) cols_idx.push_back(static_cast<size_t>(idx - headers.begin()));
+        else throw std::invalid_argument(std::format("Column {} not found", name));
+    }
+    return operator[](cols_idx);
 }
+
+Dataframe Dataframe::operator[](std::initializer_list<int> cols_idx) const {
+    return operator[](std::vector<size_t>(cols_idx.begin(), cols_idx.end()));
+}
+
+Dataframe Dataframe::operator[](std::initializer_list<std::string> cols_name) const {
+    return operator[](std::vector<std::string>(cols_name));
+}
+
+Dataframe Dataframe::operator[](size_t j) const {
+    std::vector<size_t> cols_idx = {j};
+    return operator[](cols_idx);
+}
+
+Dataframe Dataframe::operator[](const std::string& col_name) const {
+    std::vector<std::string> cols_name = {col_name};
+    return operator[](cols_name);
+}
+
+Dataframe Dataframe::operator+(const Dataframe& other) const { return Linalg::Operations::sum(*this, other); }
+Dataframe Dataframe::operator-(const Dataframe& other) const { return Linalg::Operations::sum(*this, other, '-'); }
+Dataframe Dataframe::operator*(const Dataframe& other) const { return Linalg::Operations::multiply(*this, other); }
+Dataframe Dataframe::operator~() { return Linalg::Operations::transpose(*this);}
+Dataframe Dataframe::inv() { return Linalg::Operations::inverse(*this); }
+std::tuple<double, std::vector<double>, std::vector<double>> Dataframe::det() { return Linalg::Operations::determinant(*this); }
+int Dataframe::is_tri() const { return Linalg::Operations::triangular_matrix(*this); }
+
+// ---------------------------------------Methods---------------------------------------
 
 std::string Dataframe::decode_label(int value, int col) const {
 
@@ -98,8 +207,11 @@ Dataframe Dataframe::transfer_col(size_t j) {
     data.erase(data.begin() + j*rows, data.begin() + (j+1)*rows);
     
     // Get header and erase it
-    std::vector<std::string> headers_y = {std::move(headers[j])};
-    headers.erase(headers.begin() + j);
+    std::vector<std::string> headers_y;
+    if (!headers.empty() && j < headers.size()) {
+        headers_y = {std::move(headers[j])};
+        headers.erase(headers.begin() + j);
+    }
 
     // Get encoded_labels or not
     std::unordered_set<int> encoded_cols_y;
@@ -142,10 +254,163 @@ Dataframe Dataframe::transfer_col(const std::string& col_name) {
 
     if (idx != headers.end()) return transfer_col(static_cast<size_t>(idx - headers.begin()));
     else {
-        std::cout << "Column not found - try again" << std::endl;
-        return {};
+        throw std::invalid_argument(std::format("Column {} not found", col_name));
     }
 }
+
+Dataframe Dataframe::transfer_col(const std::vector<size_t>& cols_idx) {
+
+    // Output
+    std::vector<double> col_y; 
+    std::vector<std::string> headers_y;
+    std::unordered_set<int> encoded_cols_y;
+    std::unordered_map<int, std::unordered_map<std::string, int>> label_encoder_y;
+
+    // Sort our vector
+    std::vector<size_t> idx_sorted = cols_idx;
+    std::sort(idx_sorted.begin(), idx_sorted.end());
+
+    // Get data for each idx
+    int i = 0;
+    Dataframe df_idx;
+    for (const size_t& idx : idx_sorted){
+        df_idx = transfer_col(idx-i);
+
+        // Update our output
+        col_y.insert(df_idx.get_data().end(), col_y.begin(), col_y.end());
+        headers_y.insert(df_idx.get_headers().end(), headers_y.begin(), headers_y.end());
+
+        if (!df_idx.get_encodedCols().empty()) encoded_cols_y.insert(i);
+
+        auto lab_enc = df_idx.get_encoder();
+        if (!lab_enc.empty()) label_encoder_y.insert({i, lab_enc[0]});
+
+        i++;
+    }
+
+    return {rows, cols_idx.size(), false, std::move(col_y), std::move(headers_y), 
+        std::move(label_encoder_y), std::move(encoded_cols_y)};
+}
+
+Dataframe Dataframe::transfer_col(const std::vector<std::string>& cols_name) {
+
+    // Find cols idx
+    std::vector<size_t> cols_idx;
+    cols_idx.reserve(cols_name.size());
+    for (const std::string& name : cols_name) {
+
+        auto idx = std::find(headers.begin(), headers.end(), name);
+        if (idx != headers.end()) cols_idx.push_back(static_cast<size_t>(idx - headers.begin()));
+        else throw std::invalid_argument(std::format("Column {} not found", name));
+    }
+    return transfer_col(cols_idx);
+}
+
+Dataframe Dataframe::transfer_col(std::initializer_list<int> cols_idx) {
+    return transfer_col(std::vector<size_t>(cols_idx.begin(), cols_idx.end()));
+}
+
+Dataframe Dataframe::transfer_col(std::initializer_list<std::string> cols_name) {
+    return transfer_col(std::vector<std::string>(cols_name));
+}
+
+std::vector<double> Dataframe::popup(const std::vector<size_t>& v_idx, bool is_row) {
+
+    // Delete and return rows
+    if (is_row) {
+        if (is_row_major) this->change_layout_inplace();
+
+        // Sort our vector
+        size_t nb = v_idx.size();
+        std::vector<size_t> idx_sorted = v_idx;
+        std::sort(idx_sorted.begin(), idx_sorted.end());
+
+        // Tp know which rows will be kept
+        std::vector<bool> keep(rows, true);
+        for (size_t idx : idx_sorted) keep[idx] = false;
+        
+        std::vector<double> res;
+        res.reserve(cols * nb);
+        std::vector<double> new_data;
+        new_data.reserve(cols * (rows - nb));
+        
+        for (size_t c = 0; c < cols; c++) {
+            size_t offset = c * rows;
+            for (size_t r = 0; r < rows; r++) {
+                if (!keep[r]) {
+                    res.push_back(data[offset + r]);
+                } else {
+                    new_data.push_back(data[offset + r]);
+                }
+            }
+        }
+
+        rows -= nb;
+        data = std::move(new_data);
+        return res;
+    }
+    // Delete and return cols
+    else {
+        return transfer_col(v_idx).get_data();
+    }
+}
+
+std::vector<double> Dataframe::popup(const std::vector<std::string>& cols_name) {
+    // Find cols idx
+    std::vector<size_t> cols_idx;
+    cols_idx.reserve(cols_name.size());
+    for (const std::string& name : cols_name) {
+
+        auto idx = std::find(headers.begin(), headers.end(), name);
+        if (idx != headers.end()) cols_idx.push_back(static_cast<size_t>(idx - headers.begin()));
+        else throw std::invalid_argument(std::format("Column {} not found", name));
+    }
+    return popup(cols_idx);
+}
+
+std::vector<double> Dataframe::popup(std::initializer_list<int> v_idx, bool is_row) {
+    return popup(std::vector<size_t>(v_idx.begin(), v_idx.end()), is_row);
+}
+
+std::vector<double> Dataframe::popup(std::initializer_list<std::string> cols_name) {
+    return popup(std::vector<std::string>(cols_name));
+}
+
+std::vector<double> Dataframe::popup(size_t j, bool is_row) {
+    std::vector<size_t> v_idx = {j};
+    return popup(v_idx, is_row);
+}
+
+std::vector<double> Dataframe::popup(const std::string& col_name) {
+    std::vector<std::string> cols_name = {col_name};
+    return popup(cols_name);
+}
+
+void Dataframe::pop(const std::vector<size_t>& v_idx, bool is_row) {
+    auto res = popup(v_idx, is_row);
+}
+
+void Dataframe::pop(const std::vector<std::string>& cols_name) {
+    auto res = popup(cols_name);
+}
+
+void Dataframe::pop(std::initializer_list<int> v_idx, bool is_row) {
+    auto res = popup(std::vector<size_t>(v_idx.begin(), v_idx.end()), is_row);
+}
+
+void Dataframe::pop(std::initializer_list<std::string> cols_name) {
+    auto res = popup(std::vector<std::string>(cols_name));
+}
+
+void Dataframe::pop(size_t j, bool is_row) {
+    auto res = popup(j, is_row);
+}
+
+void Dataframe::pop(const std::string& col_name) {
+    auto res = popup(col_name);
+}
+    
+// -------------------------Methods change_layout and transpose----------------------------------
 
 Dataframe Dataframe::change_layout(const std::string& choice) const {
     
@@ -260,14 +525,14 @@ std::vector<double> Dataframe::transpose_eigen(size_t rows_, size_t cols_,
     std::vector<double> new_data(rows_*cols_);
     Eigen::Map<Eigen::MatrixXd> res(new_data.data(), cols_, rows_);
     
-    auto eigen_mat = asEigen(df, rows_, cols_);
+    auto eigen_mat = Eigen::Map<const Eigen::MatrixXd>(df.data(), rows_, cols_);
     res = eigen_mat.transpose();
     
     return new_data;
 }
 
 void Dataframe::transpose_eigen_inplace(size_t n, std::vector<double>& df) {
-    auto eigen_mat = asEigen(df, n, n);
+    auto eigen_mat = Eigen::Map<Eigen::MatrixXd>(df.data(), n, n);
     eigen_mat.transposeInPlace();
 }
 
@@ -333,7 +598,7 @@ std::vector<double> Dataframe::transpose_blocks_avx2(size_t rows_, size_t cols_,
 
     // Scalar residual 
     for (; i < rows_; i++) {
-        for(size_t j = 0; j < cols_; j++) {
+        for(j = 0; j < cols_; j++) {
             new_data[i*cols_ + j] = df[j*rows_ + i];
         }
     }   
@@ -731,7 +996,7 @@ int CsvHandler::encode_label(std::string& label, int col,
     return it->second;
 }
 
-Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep, bool is_header, const std::string& method) {
+Dataframe CsvHandler::loadCsv(const std::string& filepath, char delimiter, bool has_header, const std::string& transpose_method) {
 
     // Class Dataframe variables
     size_t rows = 0, cols = 0;
@@ -756,10 +1021,10 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep, bool is_hea
         std::string cell;
         size_t current_cols = 0;
 
-        while (std::getline(ss, cell, sep)) {
+        while (std::getline(ss, cell, delimiter)) {
 
             // For the header
-            if (rows == 0 && is_header) {
+            if (rows == 0 && has_header) {
                 headers.push_back(cell);
             }
             else {
@@ -783,12 +1048,12 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char sep, bool is_hea
         rows++;
     }
 
-    if (is_header) rows--;
+    if (has_header) rows--;
 
     Dataframe csv = {rows, cols, true, std::move(data), std::move(headers), 
         std::move(label_encoder), std::move(encoded_cols)};
     
-        csv.change_layout_inplace(method);
     // return column-major dataframe
+    csv.change_layout_inplace(transpose_method);
     return csv;
 }
