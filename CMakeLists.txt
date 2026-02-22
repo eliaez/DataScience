@@ -128,7 +128,7 @@ set(LIB_SOURCES
     src/Models/Regressions.cpp
 
     # Stats
-    src/Stats/stats.cpp
+    src/Stats/stats_reg.cpp
 
     # Utils
     src/Utils/Utils.cpp

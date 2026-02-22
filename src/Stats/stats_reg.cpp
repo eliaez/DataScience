@@ -2,7 +2,7 @@
 #include <stdexcept>
 #include "Data/Data.hpp"
 #include "Utils/Utils.hpp"
-#include "Stats/stats.hpp"
+#include "Stats/stats_reg.hpp"
 #include "Utils/ThreadPool.hpp"
 #include <boost/math/distributions/fisher_f.hpp>
 #include <boost/math/distributions/chi_squared.hpp>
@@ -141,7 +141,147 @@ double cov(const std::vector<double>& x, const std::vector<double>& y) {
     return sum / (n-1);
 }
 
-Dataframe cov_beta_OLS(const Dataframe& x_const, Dataframe& XtXinv, 
+double rsquared(const std::vector<double>& y, const std::vector<double>& y_pred) {
+    if (y.empty() || y_pred.empty()) {
+        throw std::invalid_argument("Cannot calculate rsquared with empty vector");
+    }
+
+    double SSres = 0.0;         // SSres - Sum of Squares of Residuals
+    double SStot = 0.0;         // SStot - Total Sum of Squares
+    double mean_y = mean(y);
+    size_t n = y.size(); 
+    for (size_t i = 0; i < n; i++) {
+        SSres += (y[i] - y_pred[i]) * (y[i] - y_pred[i]);
+        SStot += (y[i] - mean_y) * (y[i] - mean_y);
+    }
+
+    return 1 - SSres/SStot;
+}
+
+double radjusted(double r2, int n, int p) {
+    if ((n - p - 1) == 0) {
+        throw std::invalid_argument("Need more observations to avoid (n - p - 1) == 0");
+    }
+    
+    return 1 - (1 - r2)*(n - 1)/(n - p - 1);
+}
+
+double mae(const std::vector<double>& y, const std::vector<double>& y_pred) {
+    if (y.empty() || y_pred.empty()) {
+        throw std::invalid_argument("Cannot calculate mae with empty vector");
+    }
+
+    double sum = 0.0;
+    size_t n = y.size();
+    for (size_t i = 0; i < n; i++) {
+        sum += std::abs(y[i] - y_pred[i]);
+    }
+    
+    return sum / n;
+}
+
+double mae(const std::vector<double>& residuals) {
+    if (residuals.empty()) {
+        throw std::invalid_argument("Cannot calculate mae with empty vector");
+    }
+
+    double sum = 0.0;
+    size_t n = residuals.size();
+    for (size_t i = 0; i < n; i++) {
+        sum += std::abs(residuals[i]);
+    }
+    
+    return sum / n;
+}
+
+double mse(const std::vector<double>& y, const std::vector<double>& y_pred) {
+    if (y.empty() || y_pred.empty()) {
+        throw std::invalid_argument("Cannot calculate mse with empty vector");
+    }
+
+    double sum = 0.0;
+    size_t n = y.size();
+    for (size_t i = 0; i < n; i++) {
+        sum += (y[i] - y_pred[i]) * (y[i] - y_pred[i]);
+    }
+    
+    return sum / n; 
+}
+
+double mse(const std::vector<double>& residuals) {
+    if (residuals.empty()) {
+        throw std::invalid_argument("Cannot calculate mse with empty vector");
+    }
+
+    double sum = 0.0;
+    size_t n = residuals.size();
+    for (size_t i = 0; i < n; i++) {
+        sum += (residuals[i]) * (residuals[i]);
+    }
+    
+    return sum / n; 
+}
+
+double rmse(double mse) { return std::sqrt(mse); }
+
+double normal_cdf(double x) {
+    return 0.5 * (1.0 + std::erf(x / std::sqrt(2.0)));
+}
+
+std::vector<double> get_residuals(const std::vector<double>& y, const std::vector<double>& y_pred) {
+
+    size_t n = y.size();
+    std::vector<double> residuals(n, 0.0);
+    for (size_t i = 0; i < n; i++) residuals[i] = y[i] - y_pred[i];
+    return residuals;
+}
+
+std::vector<double> residuals_stats(const std::vector<double>& residuals) {
+
+    double mean_res = mean(residuals);
+    double stdd_res = std::sqrt(var(residuals));
+    double max_abs = std::abs(residuals[0]);
+
+    for (const double& r : residuals) {
+        max_abs = std::max(max_abs, std::abs(r));
+    }
+
+    size_t n = residuals.size();
+    auto sorted_residuals = residuals;
+    std::sort(sorted_residuals.begin(), sorted_residuals.end());
+
+    auto calc_quantile = [&](double q) {
+        double pos = q * (n - 1);
+        int idx = static_cast<int>(pos);
+        double frac = pos - idx;
+        return (idx + 1 < n) ? 
+            sorted_residuals[idx] + frac * (sorted_residuals[idx + 1] - sorted_residuals[idx]) : sorted_residuals[idx];
+    };
+
+    double Q1 = calc_quantile(0.25);
+    double Q2 = calc_quantile(0.5);
+    double Q3 = calc_quantile(0.75);
+
+    std::vector<double> res_stats = {mean_res, stdd_res, max_abs, Q1, Q2, Q3};
+    return res_stats;
+}
+
+double durbin_watson_test(const std::vector<double>& residuals) {
+
+    double sum1 = 0.0;
+    double sum2 = 0.0;
+    size_t n = residuals.size();
+    for (size_t i = 0; i < n; i++) {
+        sum2 += residuals[i] * residuals[i]; 
+    }
+    for (size_t i = 1; i < n; i++) {
+        sum1 += (residuals[i] - residuals[i-1]) * (residuals[i] - residuals[i-1]); 
+    }
+
+    return 1 - (sum1/sum2)/2;
+}
+
+Dataframe OLS::cov_beta(const Dataframe& x_const, Dataframe& XtXinv, 
     const std::vector<double>& residuals, const std::string & cov_type,
     const std::vector<int>& cluster_ids) {
 
@@ -577,90 +717,7 @@ Dataframe cov_beta_OLS(const Dataframe& x_const, Dataframe& XtXinv,
     return part1 * XtXinv;
 }
 
-double rsquared(const std::vector<double>& y, const std::vector<double>& y_pred) {
-    if (y.empty() || y_pred.empty()) {
-        throw std::invalid_argument("Cannot calculate rsquared with empty vector");
-    }
-
-    double SSres = 0.0;         // SSres - Sum of Squares of Residuals
-    double SStot = 0.0;         // SStot - Total Sum of Squares
-    double mean_y = mean(y);
-    size_t n = y.size(); 
-    for (size_t i = 0; i < n; i++) {
-        SSres += (y[i] - y_pred[i]) * (y[i] - y_pred[i]);
-        SStot += (y[i] - mean_y) * (y[i] - mean_y);
-    }
-
-    return 1 - SSres/SStot;
-}
-
-double radjusted(double r2, int n, int p) {
-    if ((n - p - 1) == 0) {
-        throw std::invalid_argument("Need more observations to avoid (n - p - 1) == 0");
-    }
-    
-    return 1 - (1 - r2)*(n - 1)/(n - p - 1);
-}
-
-double mae(const std::vector<double>& y, const std::vector<double>& y_pred) {
-    if (y.empty() || y_pred.empty()) {
-        throw std::invalid_argument("Cannot calculate mae with empty vector");
-    }
-
-    double sum = 0.0;
-    size_t n = y.size();
-    for (size_t i = 0; i < n; i++) {
-        sum += std::abs(y[i] - y_pred[i]);
-    }
-    
-    return sum / n;
-}
-
-double mae(const std::vector<double>& residuals) {
-    if (residuals.empty()) {
-        throw std::invalid_argument("Cannot calculate mae with empty vector");
-    }
-
-    double sum = 0.0;
-    size_t n = residuals.size();
-    for (size_t i = 0; i < n; i++) {
-        sum += std::abs(residuals[i]);
-    }
-    
-    return sum / n;
-}
-
-double mse(const std::vector<double>& y, const std::vector<double>& y_pred) {
-    if (y.empty() || y_pred.empty()) {
-        throw std::invalid_argument("Cannot calculate mse with empty vector");
-    }
-
-    double sum = 0.0;
-    size_t n = y.size();
-    for (size_t i = 0; i < n; i++) {
-        sum += (y[i] - y_pred[i]) * (y[i] - y_pred[i]);
-    }
-    
-    return sum / n; 
-}
-
-double mse(const std::vector<double>& residuals) {
-    if (residuals.empty()) {
-        throw std::invalid_argument("Cannot calculate mse with empty vector");
-    }
-
-    double sum = 0.0;
-    size_t n = residuals.size();
-    for (size_t i = 0; i < n; i++) {
-        sum += (residuals[i]) * (residuals[i]);
-    }
-    
-    return sum / n; 
-}
-
-double rmse(double mse) { return std::sqrt(mse); }
-
-double fisher_test(double r2, int df1, int df2, const std::vector<double>& beta_est,
+double OLS::fisher_test(double r2, int df1, int df2, const std::vector<double>& beta_est,
     const Dataframe& cov_beta, const std::string& cov_type) {
     
     double f_stat;
@@ -688,7 +745,7 @@ double fisher_test(double r2, int df1, int df2, const std::vector<double>& beta_
     return f_stat;
 }
 
-double fisher_pvalue(double f, int df1, int df2) {
+double OLS::fisher_pvalue(double f, int df1, int df2) {
     
     // F dist with its degree of liberty
     boost::math::fisher_f dist(df1, df2);
@@ -697,7 +754,7 @@ double fisher_pvalue(double f, int df1, int df2) {
     return 1.0 - boost::math::cdf(dist, f);
 }
 
-std::vector<double> stderr_b(const Dataframe& cov_beta) {
+std::vector<double> OLS::stderr_b(const Dataframe& cov_beta) {
     
     size_t p = cov_beta.get_cols();
     std::vector<double> res(p);
@@ -709,11 +766,7 @@ std::vector<double> stderr_b(const Dataframe& cov_beta) {
     return res;
 }
 
-double normal_cdf(double x) {
-    return 0.5 * (1.0 + std::erf(x / std::sqrt(2.0)));
-}
-
-std::vector<double> student_pvalue(const std::vector<double>& t_stats) {
+std::vector<double> OLS::student_pvalue(const std::vector<double>& t_stats) {
 
     size_t nb = t_stats.size();
     std::vector<double> pvalue;
@@ -727,60 +780,7 @@ std::vector<double> student_pvalue(const std::vector<double>& t_stats) {
     return pvalue;
 }
 
-std::vector<double> get_residuals(const std::vector<double>& y, const std::vector<double>& y_pred) {
-
-    size_t n = y.size();
-    std::vector<double> residuals(n, 0.0);
-    for (size_t i = 0; i < n; i++) residuals[i] = y[i] - y_pred[i];
-    return residuals;
-}
-
-std::vector<double> residuals_stats(const std::vector<double>& residuals) {
-
-    double mean_res = mean(residuals);
-    double stdd_res = std::sqrt(var(residuals));
-    double max_abs = std::abs(residuals[0]);
-
-    for (const double& r : residuals) {
-        max_abs = std::max(max_abs, std::abs(r));
-    }
-
-    size_t n = residuals.size();
-    auto sorted_residuals = residuals;
-    std::sort(sorted_residuals.begin(), sorted_residuals.end());
-
-    auto calc_quantile = [&](double q) {
-        double pos = q * (n - 1);
-        int idx = static_cast<int>(pos);
-        double frac = pos - idx;
-        return (idx + 1 < n) ? 
-            sorted_residuals[idx] + frac * (sorted_residuals[idx + 1] - sorted_residuals[idx]) : sorted_residuals[idx];
-    };
-
-    double Q1 = calc_quantile(0.25);
-    double Q2 = calc_quantile(0.5);
-    double Q3 = calc_quantile(0.75);
-
-    std::vector<double> res_stats = {mean_res, stdd_res, max_abs, Q1, Q2, Q3};
-    return res_stats;
-}
-
-double durbin_watson_test(const std::vector<double>& residuals) {
-
-    double sum1 = 0.0;
-    double sum2 = 0.0;
-    size_t n = residuals.size();
-    for (size_t i = 0; i < n; i++) {
-        sum2 += residuals[i] * residuals[i]; 
-    }
-    for (size_t i = 1; i < n; i++) {
-        sum1 += (residuals[i] - residuals[i-1]) * (residuals[i] - residuals[i-1]); 
-    }
-
-    return 1 - (sum1/sum2)/2;
-}
-
-double breusch_pagan_test(const Dataframe& x, const std::vector<double>& residuals) {
+double OLS::breusch_pagan_test(const Dataframe& x, const std::vector<double>& residuals) {
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();
@@ -805,7 +805,7 @@ double breusch_pagan_test(const Dataframe& x, const std::vector<double>& residua
     return p_value;
 }
 
-std::vector<double> VIF(const Dataframe& x, const Dataframe& Omega) {
+std::vector<double> OLS::VIF(const Dataframe& x, const Dataframe& Omega) {
     
     size_t p = x.get_cols();
     std::vector<double> vif(p, 0.0);
@@ -818,20 +818,21 @@ std::vector<double> VIF(const Dataframe& x, const Dataframe& Omega) {
         Dataframe x_bis = x;
         x_bis.pop(i);
 
-        // Use our functions in Reg
-        Reg::LinearRegression New_reg;
-
         // In the case of GLS LinearRegression
         std::vector<double> y_pred;
         if (!Omega.get_data().empty()) {
             Dataframe Om = Omega;
             Om.pop(i);
             Om.pop(i, true);
-            New_reg.fit_gls_without_stats(x_bis, target, Om);
+
+            // Use our functions in Reg
+            Reg::LinearRegression New_reg("GLS", {}, Om);
+            New_reg.fit_without_stats(x_bis, target);
             y_pred = New_reg.predict(x_bis);
         }
         // In the case of OLS LinearRegression
         else {
+            Reg::LinearRegression New_reg;
             New_reg.fit_without_stats(x_bis, target);
             y_pred = New_reg.predict(x_bis);
         }

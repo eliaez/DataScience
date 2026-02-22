@@ -108,8 +108,8 @@ std::vector<double> vif = Stats::VIF(X, omega);
 <br>
 
 **To test it yourself**, you can also check the corresponding files: 
-- [**stats.hpp**](/include/Stats/stats.hpp)
-- [**stats.cpp**](/src/Stats/stats.cpp)
+- [**stats.hpp**](/include/Stats/stats_reg.hpp)
+- [**stats.cpp**](/src/Stats/stats_reg.cpp)
 - [**Test folder**](/tests/)
 
 #### Note: 

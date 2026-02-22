@@ -53,8 +53,8 @@ void LinearRegCovtype(const Dataframe& x, const Dataframe& y, const string& cov_
     const vector<double> clean_res0, const vector<double>& clean_res1, const vector<int>& cluster_ids) {
 
     // Through implemented code
-    Reg::LinearRegression New_reg;
-    New_reg.fit(x, y, cov_type, cluster_ids);
+    Reg::LinearRegression New_reg(cov_type, cluster_ids, {});
+    New_reg.fit(x, y);
     vector<double> inter0 = New_reg.get_stats();
     vector<double> to_test0 = {inter0[0], inter0[1], inter0[5]};
 
