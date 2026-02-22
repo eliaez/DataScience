@@ -81,4 +81,14 @@ namespace Stats {
         // VIF (Variance Inflation Factor)
         std::vector<double> VIF(const Dataframe& x, const Dataframe& Omega = {});
     }
+
+    namespace Regularized {
+        double aic();
+        double bic();
+        double cv_score();
+        int effective_df();
+        
+        // Reg Path
+        std::vector<double> lambda_path();  // Testing multiple lambda
+    }
 }

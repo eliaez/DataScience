@@ -1,5 +1,6 @@
 #pragma once
 
+#include <tuple>
 #include <vector>
 #include <utility>
 
@@ -35,6 +36,9 @@ namespace Reg {
             // Calculate Stats after fit function
             virtual void compute_stats(const Dataframe& x, const Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) = 0;
 
+            // Used to center our data for Ridge, Lasso and Elastic Net regressions
+            std::tuple<Dataframe, Dataframe, std::vector<double>> center_data(const Dataframe& x, const Dataframe& y) const;
+        
         public:
             // Constructor 
             RegressionBase() : is_fitted(false) {}; // Init to get col major or warn user 
@@ -79,6 +83,25 @@ namespace Reg {
                 Omega_(std::move(Omega)) {};
 
             // Training OLS / GLS (WLS, FGLS) with x col-major
+            void fit(const Dataframe& x, const Dataframe& y) override;
+            std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;
+
+            // Display stats after training
+            void summary(bool detailled = false) const override;
+    };
+
+    class RidgeRegression : public RegressionBase {
+        private:
+            double lambda_; // L2 Penality
+
+        protected:
+            // Calculate Stats after fit function
+            void compute_stats(const Dataframe& x, const Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) override;
+        
+        public:
+            RidgeRegression(double lambda = 1.0) : lambda_(lambda) {};
+
+            // Training Ridge Regression with x col-major
             void fit(const Dataframe& x, const Dataframe& y) override;
             std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;
 

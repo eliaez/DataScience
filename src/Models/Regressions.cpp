@@ -1,4 +1,5 @@
 #include <iomanip>
+#include <numeric>
 #include <iostream>
 #include <stdexcept>
 #include "Data/Data.hpp"
@@ -25,6 +26,41 @@ void RegressionBase::basic_verif(const Dataframe& x) const {
     if (x.get_rows() == 0 || x.get_cols() == 0 || x.get_cols() < 1) {
         throw std::invalid_argument("Need non-empty input");
     }
+}
+
+std::tuple<Dataframe, Dataframe, std::vector<double>> RegressionBase::center_data(const Dataframe& x, const Dataframe& y) const {
+    
+    size_t n = x.get_rows();
+    size_t p = x.get_cols();
+
+    // Starting by centering Y
+    std::vector<double> y_c = y.get_data();
+    double y_mean = Stats::mean(y.get_data());
+    for (size_t i = 0; i < n; i++) {
+        y_c[i] -= y_mean;
+    }
+
+    // Centering X
+    std::vector<double> x_mean(p);
+    std::vector<double> x_c = x.get_data();
+    for (size_t i = 0; i < p; i++) {
+        
+        // Pointer to the start of column i
+        double* col_start = x_c.data() + i * n;
+        
+        // Mean
+        x_mean[i] = std::accumulate(col_start, col_start + n, 0.0) / n;
+        
+        // Center
+        for (size_t j = 0; j < n; j++) {
+            col_start[j] -= x_mean[i];
+        }
+    }
+
+    Dataframe X_c = {n, p, false, std::move(x_c)};
+    Dataframe Y_c = {n, 1, false, std::move(y_c)};
+
+    return {X_c, Y_c, x_mean};
 }
 
 std::vector<double> RegressionBase::predict(const Dataframe& x) const {
@@ -403,5 +439,54 @@ void LinearRegression::summary(bool detailled) const {
                 << std::setw(15) << gen_stats[13]
                 << std::setw(15) << gen_stats[14] << "\n" << std::endl;
     }
+}
+
+// ---------------------------------------RidgeReg------------------------------------------
+void RidgeRegression::fit(const Dataframe& x, const Dataframe& y) {
+    
+    auto [x_const, XtXInv] = fit_without_stats(x, y);
+    compute_stats(x, x_const, XtXInv, y);
+}
+
+std::pair<Dataframe, Dataframe> RidgeRegression::fit_without_stats(const Dataframe& x, const Dataframe& y) {
+    
+    // Tests
+    basic_verif(x);
+    basic_verif(y);
+    if (x.get_storage()) {
+        throw std::invalid_argument("Need x col-major");
+    }
+
+    size_t n = x.get_rows();
+    size_t p = x.get_cols();
+
+    // Center our data 
+    auto [X_c, Y_c, x_mean] = center_data(x, y);
+
+    // Lambda * Id Matrix
+    std::vector<double> lambId(n*n, 0.0);
+    for (size_t i = 0; i < n; i++) {
+        lambId[i*n + i] = lambda_;
+    }
+    Dataframe LambId = {n, n, false, std::move(lambId)};
+
+    // Need X_t row-major (for mult ops)
+    Dataframe X_t = ~X_c;  // Transpose change it to col-major
+    X_t.change_layout_inplace();
+
+    // Calculate Beta (our estimator) for Ridge Regression
+    Dataframe XtXInv = (X_t*X_c + LambId).inv();
+    XtXInv.change_layout_inplace();
+    Dataframe beta_est =  XtXInv * (X_t * Y_c);  
+
+    // Results
+    coeffs = beta_est.get_data();
+    is_fitted = true;
+
+    // Calculate and insert our intercept
+    double intercept = Stats::mean(y.get_data()) - dot(x_mean, coeffs);
+    coeffs.insert(coeffs.begin(), intercept);
+
+    return {X_c, XtXInv};
 }
 }
