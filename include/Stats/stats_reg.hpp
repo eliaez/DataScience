@@ -84,10 +84,5 @@ namespace Stats {
     namespace Regularized {
         double aic();
         double bic();
-        double cv_score();
-        int effective_df();
-
-        // Reg Path
-        std::vector<double> lambda_path();  // Testing multiple lambda
     }
 }

@@ -59,4 +59,16 @@ std::pair<Dataframe, Dataframe> RidgeRegression::fit_without_stats(const Datafra
 
     return {X_c, XtXInv};
 }
+
+std::vector<double> RidgeRegression::lambda_path(double start, double end, int nb) const {
+    std::vector<double> path(nb);
+    double log_min = log(start);
+    double log_max = log(end);
+    double step = (log_max - log_min) / (nb - 1);
+
+    for (int i = 0; i < nb; i++) {
+        path[i] = exp(log_min + i * step);
+    }
+    return path;
+}
 }

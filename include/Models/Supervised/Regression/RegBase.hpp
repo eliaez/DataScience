@@ -55,7 +55,7 @@ namespace Reg {
             virtual void summary(bool detailled = false) const = 0;
 
             // Getters
-            bool is_model_fitted() { return is_fitted; }
+            bool is_model_fitted() const { return is_fitted; }
             double get_intercept() const { return coeffs[0]; }
             const std::vector<double>& get_coeffs() const { return coeffs; }
             const std::vector<double>& get_stats() const { return gen_stats; }

@@ -28,5 +28,17 @@ namespace Reg {
 
             // Display stats after training
             void summary(bool detailled = false) const override;
+
+            // Generate a vector of potential lambdas to try with log-scale
+            std::vector<double> lambda_path(double start, double end, int nb) const;
+
+            // Get degree of liberty
+            double effective_df() const;
+
+            // Getter
+            double get_lambda() const { return lambda_; }
+
+            // Setter
+            void set_lambda(double lambda) { lambda_ = lambda; }
     };
 }
