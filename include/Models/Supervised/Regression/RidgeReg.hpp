@@ -32,8 +32,8 @@ namespace Reg {
             // Generate a vector of potential lambdas to try with log-scale
             std::vector<double> lambda_path(double start, double end, int nb) const;
 
-            // Get degree of liberty
-            double effective_df() const;
+            // Get degree of liberty by using Eigen library (see doc for more details)
+            double effective_df(const Dataframe& x) const;
 
             // Getter
             double get_lambda() const { return lambda_; }

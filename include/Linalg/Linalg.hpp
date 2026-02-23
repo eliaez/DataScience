@@ -40,7 +40,7 @@ namespace Linalg {
             // Sum function between two dataframes, will choose the backend accordingly to your config.
             // op stands for operator (+ or -), by default '+' 
             // For Naive, AVX2, AVX2TH, layout need to be row - row or col - col 
-            // For Eigena and MKL, layout need to be col - col
+            // For Eigen and MKL, layout need to be col - col
             static Dataframe sum(const Dataframe& df1, const Dataframe& df2, char op = '+');
 
             // Mult function between two dataframes, will choose the backend accordingly to your config.

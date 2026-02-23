@@ -2,6 +2,7 @@
 #include <numeric>
 #include <iostream>
 #include <stdexcept>
+#include <Eigen/Dense>
 #include "Data/Data.hpp"
 #include "Utils/Utils.hpp"
 #include "Linalg/Linalg.hpp"
@@ -70,5 +71,29 @@ std::vector<double> RidgeRegression::lambda_path(double start, double end, int n
         path[i] = exp(log_min + i * step);
     }
     return path;
+}
+
+double RidgeRegression::effective_df(const Dataframe& x) const {
+
+    // Convert to use Eigen function (see doc for more details)
+    Eigen::Map<const Eigen::MatrixXd> X(
+        x.get_db(), 
+        static_cast<Eigen::Index>(x.get_rows()), 
+        static_cast<Eigen::Index>(x.get_cols())
+    );
+
+    // SVD
+    Eigen::BDCSVD<Eigen::MatrixXd> svd(X, Eigen::ComputeThinU | Eigen::ComputeThinV);
+
+    // Singular Values desc
+    Eigen::VectorXd singular_values = svd.singularValues();
+    std::vector<double> sv(singular_values.data(), singular_values.data() + singular_values.size());
+
+    // Calculate df
+    double df = 0.0;
+    for (size_t i = 0; i < sv.size(); i++) {
+        df += sv[i]*sv[i] / (sv[i]*sv[i] + lambda_);
+    }
+    return df;
 }
 }

@@ -41,6 +41,9 @@ namespace Stats {
     // Cumulative distribution function of standard normal distribution
     double normal_cdf(double x);
 
+    // Log Likehood for Regression and Classification
+    double logLikehood(const std::vector<double>& y, const std::vector<double>& y_pred, const std::string& type = "Reg");
+
     // Residuals
     std::vector<double> get_residuals(const std::vector<double>& y, const std::vector<double>& y_pred);
 
@@ -82,7 +85,11 @@ namespace Stats {
     }
 
     namespace Regularized {
-        double aic();
-        double bic();
+        // AIC score with df = degree of liberty through RidgeRegression::effective_df
+        double AIC(double df, double loglikehood);
+
+        // BIC score with df = degree of liberty through RidgeRegression::effective_df
+        // and n = nb of observations
+        double BIC(double df, double loglikehood, double n);
     }
 }

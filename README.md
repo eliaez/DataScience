@@ -1,6 +1,17 @@
 # Machine Learning From Scratch
 Educational project implementing fundamental machine learning and regression algorithms in C++ **without relying on external ML libraries**.
 
+## Prerequisites
+
+- **C++20** compiler (MSVC recommended, MinGW-GCC supported)
+- **CMake** ≥ 3.15
+- **OpenMP**
+- **Eigen 3.4.1** *(auto-fetched via FetchContent)*
+- **Google Benchmark** *(auto-fetched via FetchContent)*
+- **Boost 1.90.0** — set path in CMakeLists.txt: `C:/Program Files (x86)/Boost/boost_1_90_0`
+- **Intel MKL + TBB** *(optional, MSVC only)*
+- **AVX2** *(optional, auto-detected)*
+
 ## I - Dataframe
 As a first step, we need a class to handle and manipulate our data. Thus, our **Dataframe** class which provides the structure for numerical data manipulation and is specifically designed for machine learning and linear algebra operations. It supports both row-major and column-major storage. Additionally, the class handles heterogeneous data types through automatic categorical encoding.
 

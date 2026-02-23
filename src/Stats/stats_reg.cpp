@@ -229,6 +229,30 @@ double normal_cdf(double x) {
     return 0.5 * (1.0 + std::erf(x / std::sqrt(2.0)));
 }
 
+double logLikehood(const std::vector<double>& y, const std::vector<double>& y_pred, const std::string& type) {
+
+    double n = y.size();
+    if (type != "Reg") {
+
+        // To avoid log(0)
+        double ll = 0.0;
+        const double eps = 1e-15; 
+        
+        for (int i = 0; i < n; i++) {
+            double p = std::max(eps, std::min(y_pred[i], 1.0 - eps));
+            ll += y[i] * log(p) + (1.0 - y[i]) * log(1.0 - p);
+        }
+        return ll;
+    }
+    else {
+        double sigma2 = mse(y, y_pred);
+        double rss = sigma2 * n;
+        const double M_PI = 3.14159265358979323846;
+
+        return -n / 2.0 * log(2 * M_PI * sigma2) - rss / (2 * sigma2);
+    }
+}
+
 std::vector<double> get_residuals(const std::vector<double>& y, const std::vector<double>& y_pred) {
 
     size_t n = y.size();
@@ -282,6 +306,7 @@ double durbin_watson_test(const std::vector<double>& residuals) {
     return 1 - (sum1/sum2)/2;
 }
 
+// ---------------------------------------OLS-------------------------------------------
 Dataframe OLS::cov_beta(const Dataframe& x_const, Dataframe& XtXinv, 
     const std::vector<double>& residuals, const std::string & cov_type,
     const std::vector<int>& cluster_ids) {
@@ -827,7 +852,7 @@ std::vector<double> OLS::VIF(const Dataframe& x, const Dataframe& Omega) {
             Om.pop(i, true);
 
             // Use our functions in Reg
-            Reg::LinearRegression New_reg("GLS", {}, Om);
+            Reg::LinearRegression New_reg("GLS", {}, std::make_unique<Dataframe>(Om));
             New_reg.fit_without_stats(x_bis, target);
             y_pred = New_reg.predict(x_bis);
         }
@@ -849,4 +874,12 @@ std::vector<double> OLS::VIF(const Dataframe& x, const Dataframe& Omega) {
     return vif;
 }
 
+// ---------------------------------------Regularized-------------------------------------------
+double Regularized::AIC(double df, double loglikehood) {
+    return 2 * df - 2 * loglikehood;
+}
+
+double Regularized::BIC(double df, double loglikehood, double n) {
+    return df * log(n) - 2 * loglikehood;
+}
 }
