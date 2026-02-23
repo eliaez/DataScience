@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vector>
-#include "Models/Regressions.hpp"
 
 // ---------------Forward Declaration----------------
 
@@ -87,7 +86,7 @@ namespace Stats {
         double bic();
         double cv_score();
         int effective_df();
-        
+
         // Reg Path
         std::vector<double> lambda_path();  // Testing multiple lambda
     }

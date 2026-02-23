@@ -6,6 +6,7 @@
 #include "Utils/ThreadPool.hpp"
 #include <boost/math/distributions/fisher_f.hpp>
 #include <boost/math/distributions/chi_squared.hpp>
+#include "Models/Supervised/Regression/Regressions.hpp"
 
 using namespace Utils;
 

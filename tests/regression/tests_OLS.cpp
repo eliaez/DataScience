@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include "TestSuite.hpp"
 #include "Data/Data.hpp"
-#include "Models/Regressions.hpp"
+#include "Models/Supervised/Regression/Regressions.hpp"
 
 using namespace std;
 

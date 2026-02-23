@@ -125,7 +125,7 @@ set(LIB_SOURCES
     src/Linalg/backends/LinalgMKL.cpp
 
     # Models
-    src/Models/Regressions.cpp
+    src/Models/Supervised/Regression/RegBase.cpp
 
     # Stats
     src/Stats/stats_reg.cpp

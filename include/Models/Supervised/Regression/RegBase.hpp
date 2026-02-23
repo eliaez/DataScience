@@ -2,6 +2,7 @@
 
 #include <tuple>
 #include <vector>
+#include <string>
 #include <utility>
 
 // ---------------Forward Declaration----------------
@@ -59,53 +60,5 @@ namespace Reg {
             const std::vector<double>& get_coeffs() const { return coeffs; }
             const std::vector<double>& get_stats() const { return gen_stats; }
             const std::vector<CoeffStats>& get_coefficient_stats() const { return coeff_stats; }
-    };
-
-    class LinearRegression : public RegressionBase { 
-        private:
-            std::string cov_type_;
-            std::vector<int> cluster_ids_;
-            Dataframe Omega_;
-
-        protected:
-            // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, const Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) override;
-        
-        public:
-            // Constructor, cov_type : classical, HC3, HAC and cluster.
-            // Cluster_ids for cluster version, Omega for GLS
-            LinearRegression(
-                std::string cov_type = "classical", 
-                std::vector<int> cluster_ids = {},
-                Dataframe Omega = {}
-            ) : cov_type_(cov_type),
-                cluster_ids_(std::move(cluster_ids)),
-                Omega_(std::move(Omega)) {};
-
-            // Training OLS / GLS (WLS, FGLS) with x col-major
-            void fit(const Dataframe& x, const Dataframe& y) override;
-            std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;
-
-            // Display stats after training
-            void summary(bool detailled = false) const override;
-    };
-
-    class RidgeRegression : public RegressionBase {
-        private:
-            double lambda_; // L2 Penality
-
-        protected:
-            // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, const Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) override;
-        
-        public:
-            RidgeRegression(double lambda = 1.0) : lambda_(lambda) {};
-
-            // Training Ridge Regression with x col-major
-            void fit(const Dataframe& x, const Dataframe& y) override;
-            std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;
-
-            // Display stats after training
-            void summary(bool detailled = false) const override;
     };
 }
