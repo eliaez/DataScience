@@ -85,6 +85,14 @@ As a first step, we need a class to handle and manipulate our data. Thus, our [*
   auto df_cols = df[{"feature1", "feature2"}];   // Multiple names
   ```
 
+- #### One-Hot Encoding
+  Each unique value in the column will become a new binary column and the original column is removed:
+
+  ```cpp
+  auto df_encoded = df.OneHot(2);               // By indices
+  auto df_encoded = df.OneHot("HomePlanet");    // By names
+  ```
+
 - #### Column Manipulation
   Three operation types for column management:
 

@@ -198,6 +198,55 @@ void Dataframe::display_decoded(size_t nb_rows, int space) const {
     }
 }
 
+void Dataframe::OneHot(size_t j) {
+    
+    if (is_row_major) this->change_layout_inplace();
+
+    // Get label_encoder of the col which is by default encoded
+    std::unordered_map<int, std::unordered_map<std::string, int>> label_encoder_y;
+    if (label_encoder.find(static_cast<int>(j)) != label_encoder.end()) {
+        label_encoder_y[0] = label_encoder[static_cast<int>(j)]; 
+    }
+    else {
+        throw std::invalid_argument(std::format("Column {} not found in label encoder", j));
+    }
+
+    // Get data of the col 
+    std::vector<double> to_convert = this->popup(j);
+
+    // Create a new col for each category and data for each rows
+    size_t idx = 0;
+    std::vector<double> onehot_data(rows * label_encoder_y[0].size());
+    for (auto& [str, val] : label_encoder_y[0]) {
+
+        // To avoid NAN col
+        if (str != "") {
+            headers.push_back(str);
+            for (size_t k = 0; k < rows; k++) {
+                onehot_data[rows * idx + k] = (to_convert[k] == val) ? 1.0 : 0.0;
+            }
+            idx++;
+            cols++;
+        }
+    }
+    onehot_data.shrink_to_fit();
+
+    // Insert our new data at the end
+    data.reserve(data.size() + onehot_data.size());
+    data.insert(data.end(), onehot_data.begin(), onehot_data.end());
+}
+
+void Dataframe::OneHot(const std::string& col_name) {
+
+    // Find col
+    auto idx = std::find(headers.begin(), headers.end(), col_name);
+
+    if (idx != headers.end()) return OneHot(static_cast<size_t>(idx - headers.begin()));
+    else {
+        throw std::invalid_argument(std::format("Column {} not found", col_name));
+    }
+}
+
 Dataframe Dataframe::transfer_col(size_t j) {
 
     if (is_row_major) this->change_layout_inplace();  
@@ -277,8 +326,9 @@ Dataframe Dataframe::transfer_col(const std::vector<size_t>& cols_idx) {
         df_idx = transfer_col(idx-i);
 
         // Update our output
-        col_y.insert(df_idx.get_data().end(), col_y.begin(), col_y.end());
-        headers_y.insert(df_idx.get_headers().end(), headers_y.begin(), headers_y.end());
+        col_y.insert(col_y.end(), df_idx.get_data().begin(), df_idx.get_data().end());
+        headers_y.insert(headers_y.end(), df_idx.get_headers().begin(), df_idx.get_headers().end());
+
 
         if (!df_idx.get_encodedCols().empty()) encoded_cols_y.insert(i);
 
@@ -325,7 +375,7 @@ std::vector<double> Dataframe::popup(const std::vector<size_t>& v_idx, bool is_r
         std::vector<size_t> idx_sorted = v_idx;
         std::sort(idx_sorted.begin(), idx_sorted.end());
 
-        // Tp know which rows will be kept
+        // To know which rows will be kept
         std::vector<bool> keep(rows, true);
         for (size_t idx : idx_sorted) keep[idx] = false;
         

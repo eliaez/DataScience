@@ -29,7 +29,6 @@ std::pair<Dataframe, Dataframe> RidgeRegression::fit_without_stats(const Datafra
     }
 
     size_t n = x.get_rows();
-    size_t p = x.get_cols();
 
     // Center our data 
     auto [X_c, Y_c, x_mean] = center_data(x, y);

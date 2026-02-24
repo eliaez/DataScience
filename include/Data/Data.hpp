@@ -100,6 +100,10 @@ class Dataframe
         void display_decoded(size_t nb_rows, int space = 15) const;
         void display_decoded() const {display_decoded(rows, 15);}
 
+        // One Hot encoder, insert at the end the enw cols
+        void OneHot(size_t j);  
+        void OneHot(const std::string& col_name);
+
         // Transfer columns from a Dataframe to a new one (col - major)
         // Change your layout to col - major
         Dataframe transfer_col(const std::vector<size_t>& cols_idx);
