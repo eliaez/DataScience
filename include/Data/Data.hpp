@@ -99,6 +99,10 @@ class Dataframe
         // Displaying our datas with decoded values
         void display_decoded(size_t nb_rows, int space = 15) const;
         void display_decoded() const {display_decoded(rows, 15);}
+        
+        // The Function releases all encoding-related memory allocations
+        // keeping only data and headers to lighten the structure for further processing
+        void clear_encoding();
 
         // One Hot encoder, insert at the end the enw cols
         void OneHot(size_t j);  

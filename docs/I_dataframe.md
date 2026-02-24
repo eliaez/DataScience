@@ -52,7 +52,9 @@ As a first step, we need a class to handle and manipulate our data. Thus, our [*
   ```
 
 - #### Label Encoding
-  Automatic categorical encoding handles mixed-type datasets during CSV loading. The `encode_label()` function converts string categories to unique integers, while `decode_label()` enables reversible reconstruction. Furthermore, metadata is preserved through `encoded_cols` (with column indices) and `label_encoder` (with the mapping between string and integer) to ensure encoded information are preserved through transformations.
+  Automatic categorical encoding handles mixed-type datasets during CSV loading. The `encode_label()` function converts string categories to unique integers, while `decode_label()` enables reversible reconstruction. Furthermore, metadata is preserved through `encoded_cols` (with column indices) and `label_encoder` (with the mapping between string and integer) to ensure encoded information are preserved through transformations. 
+  
+  Once encoding metadata is no longer needed, `clear_encoding()` frees label_encoder and encoded_cols to reduce memory footprint while preserving data and headers.
 
   ```cpp 
   // Display your df with encoded columns
@@ -62,6 +64,9 @@ As a first step, we need a class to handle and manipulate our data. Thus, our [*
   // Display your df with decoded columns
   df.display_decoded();
   df.display_decoded(10);
+
+  // Release encoding memory (keeps data and headers)
+  df.clear_encoding();
   ```
 
 ### Data Manipulation

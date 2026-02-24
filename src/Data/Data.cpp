@@ -198,6 +198,11 @@ void Dataframe::display_decoded(size_t nb_rows, int space) const {
     }
 }
 
+void Dataframe::clear_encoding() {
+    encoded_cols = std::unordered_set<int>();
+    label_encoder = std::unordered_map<int, std::unordered_map<std::string, int>>();
+}
+
 void Dataframe::OneHot(size_t j) {
     
     if (is_row_major) this->change_layout_inplace();
