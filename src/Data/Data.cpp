@@ -1039,7 +1039,7 @@ int CsvHandler::encode_label(std::string& label, int col,
             label_encoder[col]["False"] = 0;
         }
         else if (label == "") {
-            new_id = -999999; // NaN
+            new_id = NAN;
             label_encoder[col][label] = new_id;
         }
         else {

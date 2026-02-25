@@ -130,6 +130,9 @@ set(LIB_SOURCES
     src/Models/Supervised/Regression/LinearReg.cpp
     src/Models/Supervised/Regression/RidgeReg.cpp
 
+    # Preprocessing
+    src/Preprocessing/TrainTestSplit.cpp
+
     # Stats
     src/Stats/stats_reg.cpp
 
