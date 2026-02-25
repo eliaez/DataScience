@@ -97,8 +97,7 @@ void scaling(Dataframe& x, size_t j, const std::string& method, double min, doub
     }
     // Standard by default
     else {
-        // Getting max, min of col j
-        // Getting mean, max, min of col j
+        // Getting mean and data of col j
         double mean = 0.0;
         std::vector<double> col_j(n);
         for (size_t i = 0; i < n; i++) {
@@ -123,6 +122,61 @@ void scaling(Dataframe& x, const std::string& col_name, const std::string& metho
     auto idx = std::find(headers.begin(), headers.end(), col_name);
 
     if (idx != headers.end()) return scaling(x, static_cast<size_t>(idx - headers.begin()), method, min, max);
+    else {
+        throw std::invalid_argument(std::format("Column {} not found", col_name));
+    }
+}
+
+void transform(Dataframe& x, size_t j, const std::string& method, double lambda) {
+
+    if (j >= x.get_cols()) {
+        throw std::invalid_argument("j >= nb_cols of x");
+    }
+
+    if (x.get_storage()) x.change_layout_inplace();
+
+    size_t n = x.get_rows();
+    if (method == "box_cox") {
+        // Change data of our col
+        for (size_t i = 0; i < n; i++) {
+            x.at(j * n + i) = lambda == 0 ? std::log(x.at(j * n + i)) : (std::pow(x.at(j * n + i), lambda) - 1) / lambda;
+        }
+    }
+    else if (method == "yeo_johnson") {
+        // Change data of our col
+        for (size_t i = 0; i < n; i++) {
+            
+            double val = x.at(j * n + i);
+            if (val >= 0) {
+                x.at(j * n + i) = lambda == 0 ? std::log(x.at(j * n + i) + 1) : (std::pow((x.at(j * n + i) + 1), lambda) - 1) / lambda;
+            }
+            else {
+                x.at(j * n + i) = lambda == 2 ? -std::log(-x.at(j * n + i) + 1) : -(std::pow((-x.at(j * n + i) + 1), (2 - lambda)) - 1) / (2 - lambda);
+            }
+        }
+    }
+    else if (method == "power") {
+        // Change data of our col
+        for (size_t i = 0; i < n; i++) {
+            x.at(j * n + i) = std::pow(x.at(j * n + i), lambda);
+        }
+    }
+    // Log by default
+    else {
+        // Change data of our col
+        for (size_t i = 0; i < n; i++) {
+            x.at(j * n + i) = std::log(x.at(j * n + i));
+        }
+    }
+}
+
+void transform(Dataframe& x, const std::string& col_name, const std::string& method, double lambda) {
+
+    // Find col
+    auto headers = x.get_headers();
+    auto idx = std::find(headers.begin(), headers.end(), col_name);
+
+    if (idx != headers.end()) return transform(x, static_cast<size_t>(idx - headers.begin()), method, lambda);
     else {
         throw std::invalid_argument(std::format("Column {} not found", col_name));
     }
