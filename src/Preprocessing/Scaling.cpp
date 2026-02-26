@@ -96,7 +96,7 @@ void scaling(Dataframe& x, size_t j, const std::string& method, double min, doub
         }
     }
     // Standard by default
-    else {
+    else if (method == "standard") {
         // Getting mean and data of col j
         double mean = 0.0;
         std::vector<double> col_j(n);
@@ -112,6 +112,9 @@ void scaling(Dataframe& x, size_t j, const std::string& method, double min, doub
         for (size_t i = 0; i < n; i++) {
             x.at(j * n + i) = (x.at(j * n + i) - mean) / sigma;
         }
+    }
+    else {
+        throw std::invalid_argument("Unknown method: " + method);
     }
 }
 
@@ -162,11 +165,14 @@ void transform(Dataframe& x, size_t j, const std::string& method, double lambda)
         }
     }
     // Log by default
-    else {
+    else if (method == "log") {
         // Change data of our col
         for (size_t i = 0; i < n; i++) {
             x.at(j * n + i) = std::log(x.at(j * n + i));
         }
+    }
+    else {
+        throw std::invalid_argument("Unknown method: " + method);
     }
 }
 

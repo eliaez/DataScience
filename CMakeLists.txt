@@ -131,6 +131,8 @@ set(LIB_SOURCES
     src/Models/Supervised/Regression/RidgeReg.cpp
 
     # Preprocessing
+    src/Preprocessing/Scaling.cpp
+    src/Preprocessing/Imputation.cpp
     src/Preprocessing/TrainTestSplit.cpp
 
     # Stats
