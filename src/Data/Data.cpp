@@ -1039,7 +1039,7 @@ int CsvHandler::encode_label(std::string& label, int col,
             label_encoder[col]["False"] = 0;
         }
         else if (label == "") {
-            new_id = NAN;
+            new_id = -9999;                        // Value for NAN
             label_encoder[col][label] = new_id;
         }
         else {
@@ -1083,14 +1083,17 @@ Dataframe CsvHandler::loadCsv(const std::string& filepath, char delimiter, bool 
                 headers.push_back(cell);
             }
             else {
-                try {
-                    data.push_back(std::stod(cell));
 
-                } catch (const std::invalid_argument&) {
-                     
-                    // If col of strings
-                    int val = encode_label(cell, current_cols, label_encoder); 
+                char* end;
+                double val = std::strtod(cell.c_str(), &end);
+
+                if (end != cell.c_str() && *end == '\0') {
                     data.push_back(val);
+                } 
+                else {
+                    // If col of strings
+                    int encoded = encode_label(cell, current_cols, label_encoder); 
+                    data.push_back(encoded == -9999 ? NAN : encoded);
 
                     // Get indexes of encoded_cols
                     if (rows == 1) encoded_cols.insert(current_cols); 

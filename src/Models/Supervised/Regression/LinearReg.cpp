@@ -33,7 +33,7 @@ std::pair<Dataframe, Dataframe> LinearRegression::fit_without_stats(const Datafr
     // In case of GLS
     Dataframe Om;
     bool is_gls = false; 
-    if (!Omega_->get_data().empty()) {
+    if (Omega_ != nullptr && !Omega_->get_data().empty()) {
         is_gls = true;
         basic_verif((*Omega_));
         
@@ -122,7 +122,7 @@ void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& x_cons
     for (size_t i = 0; i < resid_stats.size(); i++) gen_stats.push_back(resid_stats[i]); 
 
     if (p > 1) {
-        std::vector<double> vif = Stats::OLS::VIF(x, (*Omega_));
+        std::vector<double> vif = Omega_ == nullptr ? Stats::OLS::VIF(x) : Stats::OLS::VIF(x, (*Omega_));
         gen_stats.push_back(NAN);
         for (size_t i = 0; i < vif.size(); i++) gen_stats.push_back(vif[i]); 
     }
