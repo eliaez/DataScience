@@ -17,7 +17,7 @@ namespace Reg {
 
         protected:
             // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, const Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) override;
+            void compute_stats(const Dataframe& x, const Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) override;
         
         public:
             RidgeRegression(double lambda = 1.0) : lambda_(lambda) {};

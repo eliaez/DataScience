@@ -22,14 +22,14 @@ namespace Split {
     };
 
     // Classical Train Test split
-    TrainTestSplit train_test_split(const Dataframe& x, const Dataframe& y, int proportion = 80);
+    TrainTestSplit train_test_split(const Dataframe& x, const Dataframe& y, int proportion = 80, bool shuffle = true);
 
     // Classical Train Test Valid split, proportion pair take % of Train and Valid 
-    TrainTestValidSplit train_test_split(const Dataframe& x, const Dataframe& y, const std::pair<int, int> proportion = {60, 20});
+    TrainTestValidSplit train_test_split(const Dataframe& x, const Dataframe& y, const std::pair<int, int> proportion = {60, 20}, bool shuffle = true);
     
     // Stratified split on y 
-    TrainTestSplit stratified_split(const Dataframe& x, const Dataframe& y, int proportion = 80);
+    TrainTestSplit stratified_split(const Dataframe& x, const Dataframe& y, int proportion = 80, bool shuffle = true);
     
     // Stratified split on y, proportion pair take % of Train and Valid 
-    TrainTestValidSplit stratified_split(const Dataframe& x, const Dataframe& y, const std::pair<int, int> proportion = {60, 20});
+    TrainTestValidSplit stratified_split(const Dataframe& x, const Dataframe& y, const std::pair<int, int> proportion = {60, 20}, bool shuffle = true);
 }
