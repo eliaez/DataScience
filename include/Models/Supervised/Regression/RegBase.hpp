@@ -1,6 +1,8 @@
 #pragma once
 
+#include <tuple>
 #include <vector>
+#include <string>
 #include <utility>
 
 // ---------------Forward Declaration----------------
@@ -22,8 +24,8 @@ namespace Reg {
         std::string significance() const;
     };
 
-    class LinearRegression {
-        private:
+    class RegressionBase {
+        protected:
             bool is_fitted;
             std::vector<double> coeffs;
             std::vector<double> gen_stats;              // General stats
@@ -33,32 +35,27 @@ namespace Reg {
             void basic_verif(const Dataframe& x) const;
 
             // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, const Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y, 
-                const std::string& cov_type = "classical", const std::vector<int>& cluster_ids = {},
-                const Dataframe& Omega = {});
+            virtual void compute_stats(const Dataframe& x, const Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) = 0;
 
+            // Used to center our data for Ridge, Lasso and Elastic Net regressions
+            std::tuple<Dataframe, Dataframe, std::vector<double>> center_data(const Dataframe& x, const Dataframe& y) const;
+        
         public:
             // Constructor 
-            LinearRegression() : is_fitted(false) {}; // Init to get col major or warn user 
+            RegressionBase() : is_fitted(false) {}; // Init to get col major or warn user 
+            virtual ~RegressionBase() = default;
 
-            // Training OLS with x col-major, cov_type : classical, HC3, HAC and cluster.
-            void fit(const Dataframe& x, const Dataframe& y, 
-                const std::string& cov_type = "classical", 
-                const std::vector<int>& cluster_ids = {});
-            std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y);
-
-            // Training GLS (WLS, FGLS) with x col-major
-            void fit_gls(const Dataframe& x, const Dataframe& y, Dataframe& Omega);
-            std::pair<Dataframe, Dataframe> fit_gls_without_stats(const Dataframe& x, const Dataframe& y, Dataframe& Omega);
-            
+            virtual void fit(const Dataframe& x, const Dataframe& y) = 0;
+            virtual std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) = 0;
+      
             // Prediction
-            std::vector<double> predict(const Dataframe& x) const;
+            virtual std::vector<double> predict(const Dataframe& x) const;
 
             // Display stats after training
-            void summary(bool detailled = false) const;
+            virtual void summary(bool detailled = false) const = 0;
 
             // Getters
-            bool is_model_fitted() { return is_fitted; }
+            bool is_model_fitted() const { return is_fitted; }
             double get_intercept() const { return coeffs[0]; }
             const std::vector<double>& get_coeffs() const { return coeffs; }
             const std::vector<double>& get_stats() const { return gen_stats; }

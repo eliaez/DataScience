@@ -3,6 +3,7 @@
 #include <cmath>
 #include <vector>
 #include <stdexcept>
+#include <unordered_map>
 
 #ifdef __AVX2__
     #include <immintrin.h>
@@ -29,6 +30,9 @@ namespace Utils {
     // Utils
     template<typename T>
     std::vector<T> rangeExcept(T max, T exclude);
+
+    template<typename T>
+    T mostFrequent(const std::vector<T>& v);
 
 // ----------------------------------Implementation----------------------------------
 
@@ -64,6 +68,25 @@ std::vector<T> rangeExcept(T max, T exclude) {
         }
     }
     return result;
+}
+
+template <typename T>
+T mostFrequent(const std::vector<T>& v) {
+    
+    T best{};
+    int maxCount = 0;
+    std::unordered_map<T, int> freq;
+    freq.reserve(v.size());
+
+    for (const auto& x : v) {
+
+        freq[x]++;
+        if (freq[x] > maxCount) {
+            maxCount = freq[x];
+            best = x;
+        }
+    }
+    return best;
 }
 
 }

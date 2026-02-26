@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(MSVC)
     add_compile_options(
         /W4         # /W4 to get warnings
-        /O2         # /02 opti-max for balance size/speed
+        #/O2         # /02 opti-max for balance size/speed
         /wd4127     # Constant conditionnal expression
         /wd4267     # size_t to int
         /wd4244     # double to int
@@ -102,7 +102,7 @@ FetchContent_MakeAvailable(Eigen)
 # ============================================
 option(BUILD_TEST "Build tests" ON)
 option(BUILD_BENCHMARK "Build benchmark" ON)
-option(BUILD_MAIN "Build main" OFF)
+option(BUILD_MAIN "Build main" ON)
 
 
 # SOURCES
@@ -125,10 +125,18 @@ set(LIB_SOURCES
     src/Linalg/backends/LinalgMKL.cpp
 
     # Models
-    src/Models/Regressions.cpp
+    # Supervised
+    src/Models/Supervised/Regression/RegBase.cpp
+    src/Models/Supervised/Regression/LinearReg.cpp
+    src/Models/Supervised/Regression/RidgeReg.cpp
+
+    # Preprocessing
+    src/Preprocessing/Scaling.cpp
+    src/Preprocessing/Imputation.cpp
+    src/Preprocessing/TrainTestSplit.cpp
 
     # Stats
-    src/Stats/stats.cpp
+    src/Stats/stats_reg.cpp
 
     # Utils
     src/Utils/Utils.cpp
