@@ -96,6 +96,10 @@ double RidgeRegression::effective_df(const Dataframe& x) const {
     return df;
 }
 
+std::unique_ptr<RegressionBase> create(const std::vector<double>& params) {
+    return std::make_unique<RidgeRegression>(params[0]);
+}
+
 void RidgeRegression::compute_stats(const Dataframe& x, const Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) {
     
     size_t n = x.get_rows();

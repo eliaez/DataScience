@@ -35,6 +35,9 @@ namespace Reg {
             // Get degree of liberty by using Eigen library (see doc for more details)
             double effective_df(const Dataframe& x) const;
 
+            // Function to create new model
+            std::unique_ptr<RegressionBase> create(const std::vector<double>& params) override;
+
             // Getter
             double get_lambda() const { return lambda_; }
 

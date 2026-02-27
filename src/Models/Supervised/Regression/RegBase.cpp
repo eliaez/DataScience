@@ -26,6 +26,10 @@ void RegressionBase::basic_verif(const Dataframe& x) const {
     }
 }
 
+std::unique_ptr<RegressionBase> RegressionBase::create(const std::vector<double>& params) {
+    throw std::logic_error("GridSearch not supported for this model");
+}
+
 std::tuple<Dataframe, Dataframe, std::vector<double>> RegressionBase::center_data(const Dataframe& x, const Dataframe& y) const {
     
     size_t n = x.get_rows();

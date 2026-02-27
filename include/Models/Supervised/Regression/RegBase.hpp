@@ -54,6 +54,9 @@ namespace Reg {
             // Display stats after training
             virtual void summary(bool detailled = false) const = 0;
 
+            // Function to create new model 
+            virtual std::unique_ptr<RegressionBase> create(const std::vector<double>& params);
+
             // Getters
             bool is_model_fitted() const { return is_fitted; }
             double get_intercept() const { return coeffs[0]; }
