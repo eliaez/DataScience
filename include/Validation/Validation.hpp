@@ -24,31 +24,40 @@ namespace Validation {
         const Dataframe& y,
         int k = 5,
         const std::string& metric = "mse",
-        bool shuffle = true
+        bool shuffle = true,
+        bool show_progression = true
     );
 
     // GSres is composed of the best result with a vector of the best parameters
-    // and nb_iter to run for the recursiv function  
+    // all_results to keep an history
     struct GSres {
         double best_score;
         std::vector<double> best_params;
-        std::pair<std::optional<int>, std::optional<int>> nb_iter;  
+        std::vector<std::pair<std::vector<double>, double>> all_results;
     };
 
     // Grid Search method by using CV
     // metric = "mse" (by default) / "mae" / "r2"
-    // params_grid need to have all inputs from the constructor of your model in the same
-    // order example: {{0}, {1, 2, 3, 4, 5}, {2}}
-    // one element in the sub vector if input is the parameter is fixed
-    GSres gridSearchCV(
-        GSres* GridSearchCV,
+    // param_grid need to have all inputs from the constructor of your model in the same order example: 
+    // {{0}, {1, 2, 3, 4, 5}, {2}}, one element in the sub vector if input is the parameter is fixed
+    GSres GSearchCV(
         Reg::RegressionBase* model,
         const Dataframe& x, 
         const Dataframe& y,
         int k = 5,
-        std::vector<std::vector<double>> params_grid,
+        const std::vector<std::vector<double>>& param_grid,
         const std::string& metric = "mse",
         bool shuffle = true
     );
 
+
+    namespace detail {
+        // Function to return all possible paths by recursivity
+        std::vector<std::vector<double>> generate_recurCombi(
+            std::vector<std::vector<double>>& result,
+            std::vector<std::vector<double>>& current,
+            const std::vector<std::vector<double>>& param_grid, 
+            size_t param_index = 0
+        );
+    }
 }
