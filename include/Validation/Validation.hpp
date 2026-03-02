@@ -44,9 +44,27 @@ namespace Validation {
         Reg::RegressionBase* model,
         const Dataframe& x, 
         const Dataframe& y,
-        int k = 5,
         const std::vector<std::vector<double>>& param_grid,
+        int k = 5,
         const std::string& metric = "mse",
+        bool shuffle = true
+    );
+
+    // Random Search method by using CV
+    // metric = "mse" (by default) / "mae" / "r2"
+    // nb_iter corresponding to nb of iteration
+    // range_grid is a grid to get the min and max of each parameters, with their type, it will be useful to choose
+    // the correct distribution log (true) or uniform (false), and it needs to have all inputs from the constructor 
+    // of your model in the same order example: {[{0, 10}, false], , [{1}, true], [{2, 5}}, true]}, one element 
+    // in the sub vector if input is the parameter is fixed
+    GSres RSearchCV(
+        Reg::RegressionBase* model,
+        const Dataframe& x, 
+        const Dataframe& y,
+        const std::vector<std::pair<std::vector<double>, bool>>& range_grid,
+        int k = 5,
+        const std::string& metric = "mse",
+        int nb_iter = 50,
         bool shuffle = true
     );
 

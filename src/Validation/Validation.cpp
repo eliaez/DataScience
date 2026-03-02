@@ -98,8 +98,8 @@ CVres cross_validation(Reg::RegressionBase* model, const Dataframe& x, const Dat
 
         // Show progression
         i++;
-        if (i % 1 == 0 || i == k) {
-            std::cout << "Progress: " << i << "/" << k << " (" << (100 * i / k) << "%)\r" << std::flush;
+        if (i % 1 == 0 || i == (k - 1)) {
+            std::cout << "Progress: " << (i+1) << "/" << k << " (" << (100 * (i+1) / k) << "%)\r" << std::flush;
         }
     }
     std::cout << std::endl;
@@ -110,7 +110,7 @@ CVres cross_validation(Reg::RegressionBase* model, const Dataframe& x, const Dat
 }
 
 GSres GSearchCV(Reg::RegressionBase* model, const Dataframe& x, const Dataframe& y, 
-    int k, const std::vector<std::vector<double>>& param_grid, const std::string& metric, bool shuffle) {
+    const std::vector<std::vector<double>>& param_grid, int k, const std::string& metric, bool shuffle) {
     
     // Tests
     if (param_grid.empty()) {
@@ -165,8 +165,103 @@ GSres GSearchCV(Reg::RegressionBase* model, const Dataframe& x, const Dataframe&
 
         // Show progression
         i++;
-        if (i % 2 == 0 || i == total) {
+        if (i % 5 == 0 || i == total) {
             std::cout << "Progress: " << i << "/" << total << " (" << (100 * i / total) << "%)\r" << std::flush;
+        }
+    }
+    std::cout << std::endl;
+    return res;
+}
+
+GSres RSearchCV(Reg::RegressionBase* model, const Dataframe& x,  const Dataframe& y, 
+    const std::vector<std::pair<std::vector<double>, bool>>& range_grid, int k, const std::string& metric, int nb_iter, bool shuffle) {
+
+    // Tests
+    if (range_grid.empty()) {
+        throw std::invalid_argument("param_grid is empty");
+    }
+
+    bool is_minimize = false;
+    if (metric == "mse" || metric == "mae") is_minimize = true;
+
+    GSres res;
+    res.best_score = is_minimize ? std::numeric_limits<double>::max() : -std::numeric_limits<double>::max();
+    res.all_results.reserve(nb_iter);
+    size_t n = range_grid.size();
+
+    // Random part
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    // Let's create a dist for each param
+    std::vector<std::uniform_real_distribution<>> vect_r_dist(n);
+    std::vector<std::uniform_int_distribution<>> vect_z_dist(n);
+    for (size_t i = 0; i < n; i++){
+
+        // If log distribution, then create one with min and max
+        if (range_grid[i].second && range_grid[i].first.size() > 1) {
+            double min_val = std::log10(range_grid[i].first[0]);
+            double max_val = std::log10(range_grid[i].first[1]);
+            
+            vect_r_dist[i].param(
+                std::uniform_real_distribution<>::param_type(min_val, max_val)
+            );
+        }
+        else if (range_grid[i].first.size() > 1) {
+            int min_val = range_grid[i].first[0];
+            int max_val = range_grid[i].first[1];
+
+            vect_z_dist[i].param(
+                std::uniform_int_distribution<>::param_type(min_val, max_val)
+            );
+        }
+    }
+
+    // Calculating result on each one
+    std::vector<double> grid_to_test;
+    grid_to_test.reserve(n);
+    for (size_t i = 0; i < nb_iter; i++) {
+
+        // Let's create our grid_to_test
+        for (size_t j = 0; j < n; j++) {
+
+            if (range_grid[i].first.size() > 1) {
+                grid_to_test[j] = range_grid[j].second ? 
+                    std::pow(10, vect_r_dist[j](gen)) : 
+                    static_cast<double>(vect_z_dist[j](gen));
+            }
+            // If fixed parameter
+            else {
+                grid_to_test[j] = range_grid[j].first[0];
+            }
+        }
+
+        // Model with our parameters to test
+        std::unique_ptr<Reg::RegressionBase> new_model = model->create(grid_to_test);
+
+        // Cross Validation
+        CVres CV = cross_validation(new_model.get(), x, y, k, metric, shuffle, false);
+
+        // Adjust accordingly to the metric used
+        if (is_minimize) {
+            if (res.best_score > CV.mean_score) {
+                res.best_score = CV.mean_score;
+                res.best_params = grid_to_test;
+            }
+        }
+        else {
+            if (res.best_score < CV.mean_score) {
+                res.best_score = CV.mean_score;
+                res.best_params = grid_to_test;
+            }
+        }
+
+        // Update history
+        res.all_results.push_back(std::make_pair(grid_to_test, CV.mean_score));
+
+        // Show progression
+        if (i % 5 == 0 || i == (nb_iter - 1)) {
+            std::cout << "Progress: " << (i+1) << "/" << nb_iter << " (" << (100 * (i+1) / nb_iter) << "%)\r" << std::flush;
         }
     }
     std::cout << std::endl;
