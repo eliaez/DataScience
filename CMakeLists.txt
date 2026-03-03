@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(MSVC)
     add_compile_options(
         /W4         # /W4 to get warnings
+        #/bigobj     # Eigen generates too many sections
         #/O2         # /02 opti-max for balance size/speed
         /wd4127     # Constant conditionnal expression
         /wd4267     # size_t to int
@@ -135,6 +136,9 @@ set(LIB_SOURCES
     src/Preprocessing/Imputation.cpp
     src/Preprocessing/TrainTestSplit.cpp
 
+    # Validation
+    src/Validation/Validation.cpp
+
     # Stats
     src/Stats/stats_reg.cpp
 
@@ -224,12 +228,14 @@ if(BUILD_TEST)
     add_executable(test_reg
         tests/regression/tests_main.cpp
         tests/regression/tests_OLS.cpp
+        tests/regression/tests_Ridge.cpp
     )
     target_link_libraries(test_reg PRIVATE 
         linalg_full
         test_utils
     )
     add_test(NAME TestOLS COMMAND test_reg OLS)
+    add_test(NAME TestRidge COMMAND test_reg Ridge)
 endif()
 
 

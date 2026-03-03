@@ -35,7 +35,7 @@ namespace Reg {
             void basic_verif(const Dataframe& x) const;
 
             // Calculate Stats after fit function
-            virtual void compute_stats(const Dataframe& x, const Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) = 0;
+            virtual void compute_stats(const Dataframe& x, Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) = 0;
 
             // Used to center our data for Ridge, Lasso and Elastic Net regressions
             std::tuple<Dataframe, Dataframe, std::vector<double>> center_data(const Dataframe& x, const Dataframe& y) const;
@@ -56,6 +56,9 @@ namespace Reg {
 
             // Function to create new model 
             virtual std::unique_ptr<RegressionBase> create(const std::vector<double>& params);
+
+            // Function to clean params from RegressionBase
+            void clean_params();
 
             // Getters
             bool is_model_fitted() const { return is_fitted; }

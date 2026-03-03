@@ -17,7 +17,7 @@ namespace Reg {
 
         protected:
             // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, const Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) override;
+            void compute_stats(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) override;
         
         public:
             RidgeRegression(double lambda = 1.0) : lambda_(lambda) {};
@@ -32,8 +32,8 @@ namespace Reg {
             // Generate a vector of potential lambdas to try with log-scale
             std::vector<double> lambda_path(double start, double end, int nb) const;
 
-            // Get degree of liberty by using Eigen library (see doc for more details)
-            double effective_df(const Dataframe& x) const;
+            // Get degree of liberty by using x_c (X centered and scaled)
+            double effective_df(Dataframe& X_c, Dataframe& XtXInv) const;
 
             // Function to create new model
             std::unique_ptr<RegressionBase> create(const std::vector<double>& params) override;

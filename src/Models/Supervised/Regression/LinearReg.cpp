@@ -1,14 +1,10 @@
 #include <iomanip>
-#include <numeric>
 #include <iostream>
 #include <stdexcept>
 #include "Data/Data.hpp"
-#include "Utils/Utils.hpp"
-#include "Linalg/Linalg.hpp"
 #include "Stats/stats_reg.hpp"
 #include "Models/Supervised/Regression/LinearReg.hpp"
 
-using namespace Utils;
 
 namespace Reg {
 
@@ -81,7 +77,7 @@ std::pair<Dataframe, Dataframe> LinearRegression::fit_without_stats(const Datafr
     return {X, XtXInv};
 }
 
-void LinearRegression::compute_stats(const Dataframe& x, const Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) {
+void LinearRegression::compute_stats(const Dataframe& x, Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) {
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();

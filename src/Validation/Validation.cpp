@@ -25,10 +25,11 @@ CVres cross_validation(Reg::RegressionBase* model, const Dataframe& x, const Dat
     }
 
     // Proportion of each fold
-    int proportion = std::floor(n / k);
+    size_t proportion = std::floor(n / k);
+    size_t train_size = proportion * (k - 1);
 
     // Vector of indices
-    std::vector<size_t> indices(proportion);
+    std::vector<size_t> indices(proportion * k);
     std::iota(indices.begin(), indices.end(), 0);
 
     // Random shuffle
@@ -40,9 +41,9 @@ CVres cross_validation(Reg::RegressionBase* model, const Dataframe& x, const Dat
 
     CVres CV;
     CV.scores.reserve(k);
-    std::vector<double> X_train(proportion * (k - 1) * p);
+    std::vector<double> X_train(train_size * p);
     std::vector<double> X_test(proportion * p);
-    std::vector<double> y_train(proportion * (k - 1));    
+    std::vector<double> y_train(train_size);    
     std::vector<double> y_test(proportion);
 
     // Split and fit
@@ -58,23 +59,24 @@ CVres cross_validation(Reg::RegressionBase* model, const Dataframe& x, const Dat
                 for (size_t l = 0; l < p; l++) {
                     X_test[l * proportion + test_idx] = storage ? x.at(indices[j] * p + l) : x.at(l * n + indices[j]);
                 }
-                y_test[j] = y.at(indices[j]);
+                y_test[test_idx] = y.at(indices[j]);
                 test_idx++;
             }
             else {
                 for (size_t l = 0; l < p; l++) {
-                    X_train[l * proportion + train_idx] = storage ? x.at(indices[j] * p + l) : x.at(l * n + indices[j]);
+                    X_train[l * train_size + train_idx] = storage ? x.at(indices[j] * p + l) : x.at(l * n + indices[j]);
                 }
-                y_train[j] = y.at(indices[j]);
+                y_train[train_idx] = y.at(indices[j]);
                 train_idx++;
             }
         }
 
-        Dataframe X_train_ = {proportion * (k - 1), p, false, std::move(X_train)};
+        Dataframe X_train_ = {train_size, p, false, std::move(X_train)};
         Dataframe X_test_ = {proportion, p, false, std::move(X_test)};
-        Dataframe y_train_ = {proportion * (k - 1), 1, false, std::move(y_train)};
+        Dataframe y_train_ = {train_size, 1, false, std::move(y_train)};
 
         // Fitting
+        model->clean_params();
         model->fit_without_stats(X_train_, y_train_);
         std::vector<double> y_pred = model->predict(X_test_);
 
@@ -96,14 +98,22 @@ CVres cross_validation(Reg::RegressionBase* model, const Dataframe& x, const Dat
         // Save results
         CV.scores.push_back(score);
 
+        // For next loop
+        X_train.assign(train_size * p, 0.0);
+        X_test.assign(proportion * p, 0.0);
+        y_train.assign(train_size, 0.0);
+        y_test.assign(proportion, 0.0);
+
         // Show progression
-        i++;
-        if (i % 1 == 0 || i == (k - 1)) {
-            std::cout << "Progress: " << (i+1) << "/" << k << " (" << (100 * (i+1) / k) << "%)\r" << std::flush;
+        if (show_progression) {
+            if (i % 1 == 0 || i == (k - 1)) {
+                std::cout << "Progress: " << (i+1) << "/" << k << " (" << (100 * (i+1) / k) << "%)\n" << std::flush;
+            }
         }
     }
     std::cout << std::endl;
 
+    model->clean_params();
     CV.mean_score = Stats::mean(CV.scores);
     CV.std_score = std::sqrt(Stats::var(CV.scores));
     return CV;
@@ -133,8 +143,8 @@ GSres GSearchCV(Reg::RegressionBase* model, const Dataframe& x, const Dataframe&
     // Getting all possible combinations
     std::vector<std::vector<double>> all_combi;
     all_combi.reserve(total);
-    std::vector<std::vector<double>> current;
-    all_combi = detail::generate_recurCombi(all_combi, current, param_grid);
+    std::vector<double> current;
+    detail::generate_recurCombi(all_combi, current, param_grid);
 
     // Calculating result on each one
     int i = 0;
@@ -267,26 +277,22 @@ GSres RSearchCV(Reg::RegressionBase* model, const Dataframe& x,  const Dataframe
     std::cout << std::endl;
     return res;
 }
-
-namespace detail {
-std::vector<std::vector<double>> generate_recurCombi(
-    std::vector<std::vector<double>>& result, 
-    std::vector<double>& current,
-    const std::vector<std::vector<double>>& param_grid,
-    size_t param_index
-) {
-
-    if (param_index == param_grid.size()) {
-        result.push_back(current);
-        return;
-    }
-    
-    // Recursivity, try every parameters
-    for (double value : param_grid[param_index]) {
-        current.push_back(value);              // Add value
-        generate_recurCombi(result, current, param_grid, param_index + 1);
-        current.pop_back();                    // Try another one
-    }
 }
-}
+
+namespace Validation::detail {
+    void generate_recurCombi(std::vector<std::vector<double>>& result, std::vector<double>& current,
+        const std::vector<std::vector<double>>& param_grid, size_t param_index) {
+
+        if (param_index == param_grid.size()) {
+            result.push_back(current);
+            return;
+        }
+        
+        // Recursivity, try every parameters
+        for (double value : param_grid[param_index]) {
+            current.push_back(value);              // Add value
+            generate_recurCombi(result, current, param_grid, param_index + 1);
+            current.pop_back();                    // Try another one
+        }
+    }
 }

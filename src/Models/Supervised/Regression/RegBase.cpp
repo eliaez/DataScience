@@ -1,10 +1,7 @@
-#include <iomanip>
 #include <numeric>
-#include <iostream>
 #include <stdexcept>
 #include "Data/Data.hpp"
 #include "Utils/Utils.hpp"
-#include "Linalg/Linalg.hpp"
 #include "Stats/stats_reg.hpp"
 #include "Models/Supervised/Regression/RegBase.hpp"
 
@@ -26,7 +23,7 @@ void RegressionBase::basic_verif(const Dataframe& x) const {
     }
 }
 
-std::unique_ptr<RegressionBase> RegressionBase::create(const std::vector<double>& params) {
+std::unique_ptr<RegressionBase> RegressionBase::create(const std::vector<double>& /*params*/) {
     throw std::logic_error("GridSearch not supported for this model");
 }
 
@@ -207,5 +204,12 @@ std::vector<double> RegressionBase::predict(const Dataframe& x) const {
     }
 
     return y_pred;
+}
+
+void RegressionBase::clean_params() {
+    is_fitted = false;
+    coeffs = {};
+    gen_stats = {};
+    coeff_stats = {};
 }
 }

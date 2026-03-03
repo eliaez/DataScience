@@ -71,9 +71,9 @@ namespace Validation {
 
     namespace detail {
         // Function to return all possible paths by recursivity
-        std::vector<std::vector<double>> generate_recurCombi(
+        void generate_recurCombi(
             std::vector<std::vector<double>>& result,
-            std::vector<std::vector<double>>& current,
+            std::vector<double>& current,
             const std::vector<std::vector<double>>& param_grid, 
             size_t param_index = 0
         );

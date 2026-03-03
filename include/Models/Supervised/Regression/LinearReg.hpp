@@ -19,7 +19,7 @@ namespace Reg {
 
         protected:
             // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, const Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) override;
+            void compute_stats(const Dataframe& x, Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) override;
         
         public:
             // Constructor, cov_type : classical, HC3, HAC and cluster.
