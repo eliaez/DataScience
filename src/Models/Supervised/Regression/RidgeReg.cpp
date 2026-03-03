@@ -3,6 +3,7 @@
 #include "Data/Data.hpp"
 #include "Utils/Utils.hpp"
 #include "Stats/stats_reg.hpp"
+#include "Validation/Validation.hpp"
 #include "Models/Supervised/Regression/RidgeReg.hpp"
 
 using namespace Utils;
@@ -56,7 +57,7 @@ std::pair<Dataframe, Dataframe> RidgeRegression::fit_without_stats(const Datafra
     return {X_c, XtXInv};
 }
 
-std::vector<double> RidgeRegression::lambda_path(double start, double end, int nb) const {
+void RidgeRegression::optimal_lambda(double start, double end, int nb, const Dataframe& x, const Dataframe& y) {
     std::vector<double> path(nb);
     double log_min = log(start);
     double log_max = log(end);
@@ -65,7 +66,11 @@ std::vector<double> RidgeRegression::lambda_path(double start, double end, int n
     for (int i = 0; i < nb; i++) {
         path[i] = exp(log_min + i * step);
     }
-    return path;
+
+    std::vector<std::vector<double>> param_grid = {path};
+    Validation::GSres res = Validation::GSearchCV(this, x, y, param_grid);
+
+    lambda_ = res.best_params[0];
 }
 
 double RidgeRegression::effective_df(Dataframe& X_c, Dataframe& XtXInv) const {

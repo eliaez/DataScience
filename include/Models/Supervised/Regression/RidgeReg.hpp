@@ -29,8 +29,10 @@ namespace Reg {
             // Display stats after training
             void summary(bool detailled = false) const override;
 
-            // Generate a vector of potential lambdas to try with log-scale
-            std::vector<double> lambda_path(double start, double end, int nb) const;
+            // Generate a vector of potential lambdas to try with log-scale then 
+            // it'll try finding the optimal lambda through Validation::GridSearchCV
+            // Start & end for the range and nb for the steps
+            void optimal_lambda(double start, double end, int nb, const Dataframe& x, const Dataframe& y);
 
             // Get degree of liberty by using x_c (X centered and scaled)
             double effective_df(Dataframe& X_c, Dataframe& XtXInv) const;

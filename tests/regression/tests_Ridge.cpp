@@ -80,6 +80,6 @@ void tests_Ridge() {
         "Linear Regression - cov_type = classical"
     );*/
 
-    cout << "Testing Ridge, Stats, Preprocessing and Validation functions:" << endl;
+    cout << "Testing Ridge, Stats, Preprocessing functions:" << endl;
     tests_Ridge.run_all();
 }

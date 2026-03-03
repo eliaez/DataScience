@@ -176,7 +176,7 @@ GSres GSearchCV(Reg::RegressionBase* model, const Dataframe& x, const Dataframe&
         // Show progression
         i++;
         if (i % 5 == 0 || i == total) {
-            std::cout << "Progress: " << i << "/" << total << " (" << (100 * i / total) << "%)\r" << std::flush;
+            std::cout << "Progress: " << i << "/" << total << " (" << (100 * i / total) << "%)\n" << std::flush;
         }
     }
     std::cout << std::endl;
@@ -228,14 +228,13 @@ GSres RSearchCV(Reg::RegressionBase* model, const Dataframe& x,  const Dataframe
     }
 
     // Calculating result on each one
-    std::vector<double> grid_to_test;
-    grid_to_test.reserve(n);
+    std::vector<double> grid_to_test(n);
     for (size_t i = 0; i < nb_iter; i++) {
 
         // Let's create our grid_to_test
         for (size_t j = 0; j < n; j++) {
 
-            if (range_grid[i].first.size() > 1) {
+            if (range_grid[j].first.size() > 1) {
                 grid_to_test[j] = range_grid[j].second ? 
                     std::pow(10, vect_r_dist[j](gen)) : 
                     static_cast<double>(vect_z_dist[j](gen));
@@ -271,7 +270,7 @@ GSres RSearchCV(Reg::RegressionBase* model, const Dataframe& x,  const Dataframe
 
         // Show progression
         if (i % 5 == 0 || i == (nb_iter - 1)) {
-            std::cout << "Progress: " << (i+1) << "/" << nb_iter << " (" << (100 * (i+1) / nb_iter) << "%)\r" << std::flush;
+            std::cout << "Progress: " << (i+1) << "/" << nb_iter << " (" << (100 * (i+1) / nb_iter) << "%)\n" << std::flush;
         }
     }
     std::cout << std::endl;
