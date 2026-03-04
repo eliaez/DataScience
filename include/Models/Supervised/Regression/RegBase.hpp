@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <utility>
+#include <functional>
 
 // ---------------Forward Declaration----------------
 
@@ -36,6 +37,13 @@ namespace Reg {
 
             // Calculate Stats after fit function
             virtual void compute_stats(const Dataframe& x, Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) = 0;
+            
+            // ------------------------------------------ Penalized Regressions ------------------------------------------
+            
+            void compute_stats_penalized(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y,
+                std::function<double(Dataframe&, Dataframe&)> effective_df);
+
+            void summary_penalized(double lambda_, bool detailled = false) const;
 
             // Used to center our data for Ridge, Lasso and Elastic Net regressions
             std::tuple<Dataframe, Dataframe, std::vector<double>> center_data(const Dataframe& x, const Dataframe& y) const;
@@ -45,7 +53,7 @@ namespace Reg {
             RegressionBase() : is_fitted(false) {}; // Init to get col major or warn user 
             virtual ~RegressionBase() = default;
 
-            virtual void fit(const Dataframe& x, const Dataframe& y) = 0;
+            virtual void fit(const Dataframe& x, const Dataframe& y);
             virtual std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) = 0;
       
             // Prediction

@@ -23,7 +23,6 @@ namespace Reg {
             LassoRegression(double lambda = 1.0) : lambda_(lambda) {};
 
             // Training Lasso Regression with x col-major
-            void fit(const Dataframe& x, const Dataframe& y) override;
             std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;
 
             // Display stats after training
@@ -34,8 +33,8 @@ namespace Reg {
             // Start & end for the range and nb for the steps
             void optimal_lambda(double start, double end, int nb, const Dataframe& x, const Dataframe& y);
 
-            // Function to get non-null coefs following the fitting of lasso 
-            int nonzero_coeffs() const;
+            // Calculate degree of liberty by getting non-null coefs following the fitting of lasso 
+            double effective_df() const;
 
             // Function to create new model
             std::unique_ptr<RegressionBase> create(const std::vector<double>& params) override;

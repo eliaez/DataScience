@@ -23,7 +23,6 @@ namespace Reg {
             RidgeRegression(double lambda = 1.0) : lambda_(lambda) {};
 
             // Training Ridge Regression with x col-major
-            void fit(const Dataframe& x, const Dataframe& y) override;
             std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;
 
             // Display stats after training

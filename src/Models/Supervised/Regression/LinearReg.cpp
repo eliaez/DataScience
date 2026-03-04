@@ -8,12 +8,6 @@
 
 namespace Reg {
 
-void LinearRegression::fit(const Dataframe& x, const Dataframe& y) {
-    
-    auto [x_const, XtXInv] = fit_without_stats(x, y);
-    compute_stats(x, x_const, XtXInv, y);
-}
-
 std::pair<Dataframe, Dataframe> LinearRegression::fit_without_stats(const Dataframe& x, const Dataframe& y) {
     
     // Tests

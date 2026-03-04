@@ -33,7 +33,6 @@ namespace Reg {
                 Omega_(std::move(Omega)) {};
 
             // Training OLS / GLS (WLS, FGLS) with x col-major
-            void fit(const Dataframe& x, const Dataframe& y) override;
             std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;
 
             // Display stats after training
