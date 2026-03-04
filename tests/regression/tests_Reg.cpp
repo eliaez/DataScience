@@ -9,22 +9,29 @@
 
 using namespace std;
 
-// Testing Ridge Regression with Z-score Scaling for lambda = 1.0
-void RidgeReg(Dataframe& x, const Dataframe& y, const vector<double> clean_res0,
-    const vector<double>& clean_res1) {
+// Testing Other Regression with Z-score Scaling for lambda = 1.0
+void OtherReg(Dataframe& x, const Dataframe& y, const vector<double> clean_res0,
+    const vector<double>& clean_res1, const std::string& model) {
 
     for (size_t i = 0; i < x.get_cols(); i++) {
         Scaling::scaling(x, i);
     }
 
     // Through implemented code
-    Reg::RidgeRegression New_reg(1.0);
-    New_reg.fit(x, y);
-    vector<double> to_test0 = New_reg.get_stats();
+    std::unique_ptr<Reg::RegressionBase> New_reg;
+    if (model == "Ridge") {
+        New_reg = std::make_unique<Reg::RidgeRegression>(1.0);
+    }
+    else if (model == "Lasso") {
+        New_reg = std::make_unique<Reg::LassoRegression>(0.1);
+    }
+    
+    New_reg->fit(x, y);
+    vector<double> to_test0 = New_reg->get_stats();
     to_test0.erase(to_test0.begin()+9, to_test0.begin()+15);
 
     // Extract data from CoeffStats
-    vector<Reg::CoeffStats> inter = New_reg.get_coefficient_stats();
+    vector<Reg::CoeffStats> inter = New_reg->get_coefficient_stats();
     vector<double> to_test1(clean_res1.size());
     for (size_t i = 0; i < clean_res1.size(); i++) {
         to_test1[i] = inter[i].beta;
@@ -35,7 +42,7 @@ void RidgeReg(Dataframe& x, const Dataframe& y, const vector<double> clean_res0,
     ASSERT_VEC_EPS(to_test1, clean_res1, 2e-2)
 }
 
-void tests_Ridge() {
+void tests_Reg() {
     
 
     // Initialization of our data 
@@ -67,19 +74,43 @@ void tests_Ridge() {
         -0.8699,      // Beta8
     };
 
-    // Add tests
-    TestSuite::Tests tests_Ridge;
+    vector<double> clean_res2 = {
+        0.4937,     // R2
+        0.4935,     // R2 adjusted
+        3.00,       // Effective DF
+        0.6741,     // MSE
+        0.8211,     // RMSE
+        0.6203,     // MAE
+        50441.12,   // AIC
+        50464.92,   // BIC
+        0.6871,     // Durbin-Watson - rho value
+    };
 
-    tests_Ridge.add_test(
-        bind(RidgeReg, california, y, clean_res0, clean_res1), 
+    vector<double> clean_res3 = {
+        2.0686,       // Beta0
+        0.7057,       // Beta1
+        0.1060,       // Beta2
+        0,            // Beta3
+        0,            // Beta4
+        0,            // Beta5
+        0,            // Beta6
+        -0.0112,      // Beta7
+        0,            // Beta8
+    };
+
+    // Add tests
+    TestSuite::Tests tests_Reg;
+
+    tests_Reg.add_test(
+        bind(OtherReg, california, y, clean_res0, clean_res1, "Ridge"), 
         "Ridge Regression with Z-score Scaling for lambda = 1.0"
     );
 
-    /*tests_Ridge.add_test(
-        bind(LinearReg, california, y, clean_res2, clean_res3), 
-        "Linear Regression - cov_type = classical"
-    );*/
+    tests_Reg.add_test(
+        bind(OtherReg, california, y, clean_res2, clean_res3, "Lasso"), 
+        "Lasso Regression with Z-score Scaling for lambda = 0.1"
+    );
 
     cout << "Testing Ridge, Stats, Preprocessing functions:" << endl;
-    tests_Ridge.run_all();
+    tests_Reg.run_all();
 }

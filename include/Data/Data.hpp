@@ -107,6 +107,13 @@ class Dataframe
         // One Hot encoder, insert at the end the enw cols
         void OneHot(size_t j);  
         void OneHot(const std::string& col_name);
+        
+        // Returns a vector of pointers, where each pointer points to the a column elem
+        std::vector<const double*> getColumnPtrs(size_t j) const;
+        std::vector<const double*> getColumnPtrs(const std::string& col_name) const;
+
+        // Returns a vector of pointers, where each pointer points to the a column elem
+        std::vector<const double*> getRowPtrs(size_t i) const;
 
         // Transfer columns from a Dataframe to a new one (col - major)
         // Change your layout to col - major

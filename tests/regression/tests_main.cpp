@@ -3,7 +3,7 @@
 #include <string>
 
 void tests_OLS();
-void tests_Ridge();
+void tests_Reg();
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -16,8 +16,8 @@ int main(int argc, char* argv[]) {
     if (test == "OLS") {
         tests_OLS();
     } 
-    else if (test == "Ridge") {
-        tests_Ridge();
+    else if (test == "Reg") {
+        tests_Reg();
     }
     else {
         std::cerr << "Test inconnu: " << test << "\n";

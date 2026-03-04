@@ -130,6 +130,7 @@ set(LIB_SOURCES
     src/Models/Supervised/Regression/RegBase.cpp
     src/Models/Supervised/Regression/LinearReg.cpp
     src/Models/Supervised/Regression/RidgeReg.cpp
+    src/Models/Supervised/Regression/LassoReg.cpp
 
     # Preprocessing
     src/Preprocessing/Scaling.cpp
@@ -228,14 +229,14 @@ if(BUILD_TEST)
     add_executable(test_reg
         tests/regression/tests_main.cpp
         tests/regression/tests_OLS.cpp
-        tests/regression/tests_Ridge.cpp
+        tests/regression/tests_Reg.cpp
     )
     target_link_libraries(test_reg PRIVATE 
         linalg_full
         test_utils
     )
     add_test(NAME TestOLS COMMAND test_reg OLS)
-    add_test(NAME TestRidge COMMAND test_reg Ridge)
+    add_test(NAME TestReg COMMAND test_reg Reg)
 endif()
 
 
