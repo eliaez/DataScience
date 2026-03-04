@@ -1,17 +1,14 @@
-#include <iomanip>
-#include <iostream>
 #include "Data/Data.hpp"
 #include "Utils/Utils.hpp"
 #include "Stats/stats_reg.hpp"
 #include "Validation/Validation.hpp"
-#include "Models/Supervised/Regression/RidgeReg.hpp"
-#include "Models/Supervised/Regression/LassoReg.hpp"
+#include "Models/Supervised/Regression/ElasticNetReg.hpp"
 
 using namespace Utils;
 
 namespace Reg {
 
-std::pair<Dataframe, Dataframe> LassoRegression::fit_without_stats(const Dataframe& x, const Dataframe& y) {
+std::pair<Dataframe, Dataframe> ElasticRegression::fit_without_stats(const Dataframe& x, const Dataframe& y) {
     
     // Tests
     basic_verif(x);
@@ -21,6 +18,8 @@ std::pair<Dataframe, Dataframe> LassoRegression::fit_without_stats(const Datafra
     }
 
     size_t p = x.get_cols();
+    double lambda1 = alpha_ * l1_ratio_;
+    double lambda2 = alpha_ * (1 - l1_ratio_);
 
     // Center our data 
     auto [X_c, Y_c, x_mean] = center_data(x, y);
@@ -61,7 +60,7 @@ std::pair<Dataframe, Dataframe> LassoRegression::fit_without_stats(const Datafra
             // Core
             std::vector<double> r_j = add((Y_c - X_c * beta_est).get_data(), mult(X_j[j], v_beta_est[j]));
             double beta_tild = dot(X_j[j], r_j) / dot(X_j[j], X_j[j]);
-            v_beta_est[j] = soft_thres(beta_tild, lambda_ / X_j_norm[j]);
+            v_beta_est[j] = soft_thres(beta_tild, lambda1 / X_j_norm[j]) / (1 + lambda2 / X_j_norm[j]);
             
             // Update
             beta_est = Dataframe(p, 1, false, v_beta_est);
@@ -91,44 +90,63 @@ std::pair<Dataframe, Dataframe> LassoRegression::fit_without_stats(const Datafra
     return {X_c, {}};
 }
 
-void LassoRegression::optimal_lambda(double start, double end, int nb, const Dataframe& x, const Dataframe& y) {
-    std::vector<double> path(nb);
-    double log_min = log(start);
-    double log_max = log(end);
-    double step = (log_max - log_min) / (nb - 1);
+double ElasticRegression::effective_df(Dataframe& X_c) const {
 
-    for (int i = 0; i < nb; i++) {
-        path[i] = exp(log_min + i * step);
+    basic_verif(X_c);
+    size_t n = X_c.get_rows();
+    size_t p = X_c.get_cols();
+    double lambda2 = alpha_ * (1 - l1_ratio_);
+
+    for (size_t i = (coeffs.size() - 1); i >= 1; i--) {
+        if (std::abs(coeffs[i]) < 1e-10) {
+            X_c.pop(i - 1);
+            p--;
+        }
     }
 
-    std::vector<std::vector<double>> param_grid = {path};
-    Validation::GSres res = Validation::GSearchCV(this, x, y, param_grid);
+    // Lambda * Id Matrix
+    std::vector<double> lambId(p*p, 0.0);
+    for (size_t i = 0; i < p; i++) {
+        lambId[i*p + i] = lambda2;
+    }
+    Dataframe LambId = {p, p, false, std::move(lambId)};
 
-    lambda_ = res.best_params[0];
-}
+    // Transpose
+    Dataframe X_t = ~X_c;
+    X_t.change_layout_inplace();
 
-double LassoRegression::effective_df() const {
-    double df = 0;
-    for (size_t i = 1; i < coeffs.size(); i++) {
-        if (std::abs(coeffs[i]) > 1e-10) df++;
+    // Calculate XtXInv
+    Dataframe XtXInv = (X_t*X_c + LambId).inv();
+    X_c.change_layout_inplace(); // Need to be row_major for next operation
+
+    // Calculate M matrix
+    Dataframe M =  X_c * XtXInv;
+
+    // Getting effective_df
+    double df = 0.0;
+    for (size_t i = 0; i < n; i++) {
+        double hii = 0.0;
+        for (size_t j = 0; j < p; j++)
+            hii += M.at(i * p + j) * X_t.at(i * p + j);
+        df += hii;
     }
     return df;
 }
 
-std::unique_ptr<RegressionBase> LassoRegression::create(const std::vector<double>& params) {
-    return std::make_unique<LassoRegression>(params[0]);
+std::unique_ptr<RegressionBase> ElasticRegression::create(const std::vector<double>& params) {
+    return std::make_unique<ElasticRegression>(params[0], params[1]);
 }
 
-void LassoRegression::compute_stats(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) {
+void ElasticRegression::compute_stats(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) {
     
     RegressionBase::compute_stats_penalized(
         x, x_c, XtXinv, y,
-        [this](Dataframe &/*a*/, Dataframe &/*b*/) {
-            return effective_df();
+        [this](Dataframe &a, Dataframe &/*b*/) {
+            return effective_df(a);
     });
 }
 
-void LassoRegression::summary(bool detailled) const {
-    RegressionBase::summary_penalized(lambda_, detailled);
+void ElasticRegression::summary(bool detailled) const {
+    RegressionBase::summary_penalized(-1, detailled, alpha_, l1_ratio_);
 }
 }

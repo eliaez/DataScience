@@ -25,6 +25,9 @@ void OtherReg(Dataframe& x, const Dataframe& y, const vector<double> clean_res0,
     else if (model == "Lasso") {
         New_reg = std::make_unique<Reg::LassoRegression>(0.1);
     }
+    else if (model == "Elastic") {
+        New_reg = std::make_unique<Reg::ElasticRegression>(0.1, 0.5);
+    }
     
     New_reg->fit(x, y);
     vector<double> to_test0 = New_reg->get_stats();
@@ -98,6 +101,30 @@ void tests_Reg() {
         0,            // Beta8
     };
 
+    vector<double> clean_res4 = {
+        0.5272,     // R2
+        0.5270,     // R2 adjusted
+        4.0,       // Effective DF
+        0.6295,     // MSE
+        0.7934,     // RMSE
+        0.5953,     // MAE
+        49030.21,   // AIC
+        49061.95,   // BIC
+        0.6591,     // Durbin-Watson - rho value
+    };
+
+    vector<double> clean_res5 = {
+        2.0686,       // Beta0
+        0.7088,       // Beta1
+        0.1370,       // Beta2
+        0,            // Beta3
+        0,            // Beta4
+        0,            // Beta5
+        0,            // Beta6
+        -0.1757,      // Beta7
+        -0.1333,      // Beta8
+    };
+
     // Add tests
     TestSuite::Tests tests_Reg;
 
@@ -109,6 +136,11 @@ void tests_Reg() {
     tests_Reg.add_test(
         bind(OtherReg, california, y, clean_res2, clean_res3, "Lasso"), 
         "Lasso Regression with Z-score Scaling for lambda = 0.1"
+    );
+
+    tests_Reg.add_test(
+        bind(OtherReg, california, y, clean_res4, clean_res5, "Elastic"), 
+        "ElasticNet Regression with Z-score Scaling for alpha = 0.1, l1_ratio = 0.5"
     );
 
     cout << "Testing Ridge, Stats, Preprocessing functions:" << endl;

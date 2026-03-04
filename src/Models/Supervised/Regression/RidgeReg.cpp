@@ -70,14 +70,6 @@ double RidgeRegression::effective_df(Dataframe& X_c, Dataframe& XtXInv) const {
     basic_verif(X_c);
     basic_verif(XtXInv);
     size_t n = X_c.get_rows();
-    size_t p = X_c.get_cols();
-
-    // Lambda * Id Matrix
-    std::vector<double> lambId(p*p, 0.0);
-    for (size_t i = 0; i < p; i++) {
-        lambId[i*p + i] = lambda_;
-    }
-    Dataframe LambId = {p, p, false, std::move(lambId)};
 
     // Need X_t col major 
     Dataframe X_t = ~X_c;           // Transpose change it to col-major
@@ -109,6 +101,6 @@ void RidgeRegression::compute_stats(const Dataframe& x, Dataframe& x_c, Datafram
 }
 
 void RidgeRegression::summary(bool detailled) const {
-    RegressionBase::summary_penalized(detailled);
+    RegressionBase::summary_penalized(lambda_, detailled);
 }
 }

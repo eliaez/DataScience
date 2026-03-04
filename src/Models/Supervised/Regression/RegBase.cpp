@@ -246,18 +246,24 @@ void RegressionBase::compute_stats_penalized(const Dataframe& x, Dataframe& x_c,
     }
 }
 
-void RegressionBase::summary_penalized(double lambda_, bool detailled) const {
+void RegressionBase::summary_penalized(double lambda_, bool detailled, double alpha, double l1_ratio) const {
     std::cout << "\n=== REGRESSION SUMMARY ===\n\n";
     
-    std::cout << "Choosen lambda: " << lambda_ << "\n"
-              << "R2 = " << gen_stats[0] << "\n";
+    if (lambda_ == -1) {
+        std::cout << "Choosen alpha: " << alpha << "\n"
+                  << "Choosen L1 ratio: " << l1_ratio << "\n";
+    }
+    else {
+        std::cout << "Choosen lambda: " << lambda_ << "\n";
+    }
+    std::cout << "R2 = " << gen_stats[0] << "\n";
 
     if (gen_stats[1] != -1.0) std::cout << "Adjusted R2 = " << gen_stats[1] << "\n";
 
-    std::cout << "Eff. DF: " << gen_stats[2] << "\n";
+    std::cout << "Eff. DF: " << std::round(gen_stats[2]) << "\n";
     
     std::cout << "MSE = " << gen_stats[3] << "\n"
-              << "RMSE = " << gen_stats[5] << "\n"
+              << "RMSE = " << gen_stats[4] << "\n"
               << "MAE = " << gen_stats[5] << "\n"
               << "AIC = " << gen_stats[6] << "\n"
               << "BIC = " << gen_stats[7] << "\n\n";

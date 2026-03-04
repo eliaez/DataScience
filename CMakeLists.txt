@@ -131,6 +131,7 @@ set(LIB_SOURCES
     src/Models/Supervised/Regression/LinearReg.cpp
     src/Models/Supervised/Regression/RidgeReg.cpp
     src/Models/Supervised/Regression/LassoReg.cpp
+    src/Models/Supervised/Regression/ElasticNetReg.cpp
 
     # Preprocessing
     src/Preprocessing/Scaling.cpp

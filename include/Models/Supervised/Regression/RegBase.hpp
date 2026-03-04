@@ -43,7 +43,7 @@ namespace Reg {
             void compute_stats_penalized(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y,
                 std::function<double(Dataframe&, Dataframe&)> effective_df);
 
-            void summary_penalized(double lambda_, bool detailled = false) const;
+            void summary_penalized(double lambda_, bool detailled = false, double alpha = 0, double l1_ratio = 0) const;
 
             // Used to center our data for Ridge, Lasso and Elastic Net regressions
             std::tuple<Dataframe, Dataframe, std::vector<double>> center_data(const Dataframe& x, const Dataframe& y) const;
