@@ -792,6 +792,25 @@ std::vector<double> OLS::stderr_b(const Dataframe& cov_beta) {
     return res;
 }
 
+std::vector<double> OLS::stderr_b(const std::vector<double>& residuals, const Dataframe& XtXinv) {
+    
+    size_t n = residuals.size();
+    size_t p = XtXinv.get_cols();
+
+    // Var(Beta) = sigma2 * XtXinv
+    double sigma2 = 0.0;
+    for (size_t i = 0; i < n; i++) {
+        sigma2 += residuals[i] * residuals[i];
+    }
+    sigma2 /= (n - p);
+
+    std::vector<double> var_beta(p);
+    for (size_t j = 0; j < p; j++) {
+        var_beta[j] = sigma2 * XtXinv.at(j*p + j);
+    }
+    return var_beta;
+}
+
 std::vector<double> OLS::student_pvalue(const std::vector<double>& t_stats) {
 
     size_t nb = t_stats.size();

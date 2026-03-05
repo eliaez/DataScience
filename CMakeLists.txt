@@ -15,6 +15,7 @@ if(MSVC)
         /wd4267     # size_t to int
         /wd4244     # double to int
         /wd4714     # Warning boost
+        /wd4701     # Variable potentialy non init
         /wd5054)    # operator& between enums (Eigen) 
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 else()
@@ -132,6 +133,7 @@ set(LIB_SOURCES
     src/Models/Supervised/Regression/RidgeReg.cpp
     src/Models/Supervised/Regression/LassoReg.cpp
     src/Models/Supervised/Regression/ElasticNetReg.cpp
+    src/Models/Supervised/Regression/StepwiseReg.cpp
 
     # Preprocessing
     src/Preprocessing/Scaling.cpp

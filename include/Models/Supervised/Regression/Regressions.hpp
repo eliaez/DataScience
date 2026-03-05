@@ -5,3 +5,4 @@
 #include "LassoReg.hpp"
 #include "LinearReg.hpp"
 #include "ElasticNetReg.hpp"
+#include "StepwiseReg.hpp"
