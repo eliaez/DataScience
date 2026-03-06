@@ -806,7 +806,7 @@ std::vector<double> OLS::stderr_b(const std::vector<double>& residuals, const Da
 
     std::vector<double> var_beta(p);
     for (size_t j = 0; j < p; j++) {
-        var_beta[j] = sigma2 * XtXinv.at(j*p + j);
+        var_beta[j] = std::sqrt(sigma2 * XtXinv.at(j*p + j));
     }
     return var_beta;
 }

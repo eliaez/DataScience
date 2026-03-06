@@ -16,15 +16,16 @@ namespace Reg {
             std::pair<double, double> alpha_;
             std::string method_;
             std::string threshold_;
+            std::vector<double> selected_features;
 
             // Function for Forward
-            std::pair<std::vector<double>, std::vector<double>> forward_reg(const Dataframe& x, const Dataframe& y);
+            std::vector<double> forward_reg(const Dataframe& x, const Dataframe& y);
 
             // Function for Backward
-            std::pair<std::vector<double>, std::vector<double>> backward_reg(const Dataframe& x, const Dataframe& y);
+            std::vector<double> backward_reg(const Dataframe& x, const Dataframe& y);
 
             // Function for Stepwise
-            std::pair<std::vector<double>, std::vector<double>> stepwise_reg(const Dataframe& x, const Dataframe& y);
+            std::vector<double> stepwise_reg(const Dataframe& x, const Dataframe& y);
         
         protected:
             // Calculate Stats after fit function
@@ -47,7 +48,7 @@ namespace Reg {
             std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;
             
             // Function to know nb of selected features
-            double selected_features() const;
+            double effective_df() const;
 
             // Display stats after training
             void summary(bool detailled = false) const override;

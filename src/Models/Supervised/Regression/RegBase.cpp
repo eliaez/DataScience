@@ -118,6 +118,7 @@ std::vector<double> RegressionBase::predict(const Dataframe& x) const {
         #endif
     }
     else {
+        /*
         #ifdef __AVX2__
 
             size_t i = 0;
@@ -159,7 +160,7 @@ std::vector<double> RegressionBase::predict(const Dataframe& x) const {
             for (; i < n; i++) {
                 y_pred[i] += coeffs[0];
             }
-        #else
+        #else */
             for (size_t j = 0; j < p; j++) {
                 
                 double coeff = coeffs[1 + j];
@@ -173,7 +174,7 @@ std::vector<double> RegressionBase::predict(const Dataframe& x) const {
             for (size_t i = 0; i < n; i++) {
                 y_pred[i] += intercept;
             }
-        #endif
+        //#endif
     }
 
     return y_pred;

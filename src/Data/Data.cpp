@@ -69,7 +69,7 @@ Dataframe Dataframe::operator[](const std::vector<size_t>& cols_idx) const {
             }
 
             // Get header
-            headers_y.push_back(headers[idx]);
+            if (!headers.empty()) headers_y.push_back(headers[idx]);
 
             // Get encoded cols idx
             if (encoded_cols.find(static_cast<int>(idx)) != encoded_cols.end()) encoded_cols_y.insert(i);
@@ -88,7 +88,7 @@ Dataframe Dataframe::operator[](const std::vector<size_t>& cols_idx) const {
             }
 
             // Get header
-            headers_y.push_back(headers[idx]);
+            if (!headers.empty()) headers_y.push_back(headers[idx]);
 
             // Get encoded cols idx
             if (encoded_cols.find(static_cast<int>(idx)) != encoded_cols.end()) encoded_cols_y.insert(i);

@@ -23,21 +23,14 @@ std::pair<Dataframe, Dataframe> StepwiseRegression::fit_without_stats(const Data
 
     size_t n = x.get_rows();
     std::vector<double> x_v(n, 1.0);
-    std::vector<double> features_kept;
     if (method_ == "backward") {
-        auto [tmp_x, tmp_features] = backward_reg(x, y);
-        x_v = std::move(tmp_x);
-        features_kept = std::move(tmp_features);
+        x_v = backward_reg(x, y);
     }
     else if (method_ == "forward") {
-        auto [tmp_x, tmp_features] = forward_reg(x, y);
-        x_v = std::move(tmp_x);
-        features_kept = std::move(tmp_features);
+        x_v = forward_reg(x, y);
     }
     else if (method_ == "stepwise") {
-        auto [tmp_x, tmp_features] = stepwise_reg(x, y);
-        x_v = std::move(tmp_x);
-        features_kept = std::move(tmp_features);
+        x_v = stepwise_reg(x, y);
     }
     else {
         throw std::invalid_argument(std::format("Unknown method {}", method_));
@@ -56,24 +49,33 @@ std::pair<Dataframe, Dataframe> StepwiseRegression::fit_without_stats(const Data
     XtXInv.change_layout_inplace();
     Dataframe beta_est =  XtXInv * (X_t * y);  
 
-    // Results
+    // Getting coeffs with selected features
     clean_params();
-    std::vector<double> res_coeffs(n, 0.0);
-    std::set<size_t> kept_set(features_kept.begin(), features_kept.end());
-    for (size_t i = 0; i < p; i++) {
-        auto it = kept_set.find(i);
-        if (it != kept_set.end()) {
-            size_t idx = std::distance(kept_set.begin(), it);
-            res_coeffs[i] = beta_est.at(idx);
+    std::vector<double> res_coeffs(x.get_cols() + 1, 0.0);
+
+    // Mapping
+    std::unordered_map<size_t, size_t> feature_to_beta_idx;
+    for (size_t i = 0; i < selected_features.size(); i++) {
+        feature_to_beta_idx[selected_features[i]] = i + 1; // +1 for intercept
+    }
+
+    // Filling in order
+    for (size_t i = 0; i < x.get_cols(); i++) {
+        auto it = feature_to_beta_idx.find(i);
+        if (it != feature_to_beta_idx.end()) {
+            res_coeffs[i + 1] = beta_est.at(it->second);
         }
     }
+
+    // Results
+    res_coeffs[0] = beta_est.at(0);
     coeffs = res_coeffs;
     is_fitted = true;
 
     return {X, XtXInv};
 }
 
-std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::stepwise_reg(const Dataframe& x, const Dataframe& y) {
+std::vector<double> StepwiseRegression::stepwise_reg(const Dataframe& x, const Dataframe& y) {
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();
@@ -155,6 +157,7 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::stepwise
             coeffs = beta_est.get_data();
 
             // Stats
+            X_try.pop(0);
             double RSS_model = Stats::mse(y.get_data(), predict(X_try)) * n;
             if (threshold_ == "alpha") {
                 criteria.push_back((RSS_baseline - RSS_model) / (RSS_model / (n - k)));
@@ -171,45 +174,64 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::stepwise
         // Getting max or min accordingly to the threshold choosens
         // Testing if it go through our threshold
         if (threshold_ == "alpha") {
-            auto it = std::max_element(criteria.begin(), criteria.end());
-            size_t idx = std::distance(criteria.begin(), it);
-            double p_val = Stats::OLS::fisher_pvalue(criteria[idx], n, n - k); 
-            RSS_baseline = v_RSS_model[idx];
 
-            if (p_val < alpha_in) {
-                
-                // Adding feature 
-                x_v.reserve(x_v.size() + n);
-                for (size_t i = 0; i < n; i++) {
-                    x_v.push_back(*X_j[features_idx[idx]][i]);
-                }
-
-                features_kept.push_back(features_idx[idx]);
-                features_idx.erase(features_idx.begin() + idx);
+            // In case of one last value
+            size_t idx;
+            double p_val;
+            if (criteria.size() == 1) {
+                keep_cond_forward = false;
             }
             else {
-                keep_cond_forward = false;
+                auto it = std::max_element(criteria.begin(), criteria.end());
+                idx = std::distance(criteria.begin(), it);
+                p_val = Stats::OLS::fisher_pvalue(criteria[idx], n, n - k); 
+                RSS_baseline = v_RSS_model[idx];
+            }
+            if (keep_cond_forward) {
+                if (p_val < alpha_in) {
+                    
+                    // Adding feature 
+                    x_v.reserve(x_v.size() + n);
+                    for (size_t i = 0; i < n; i++) {
+                        x_v.push_back(*X_j[features_idx[idx]][i]);
+                    }
+
+                    features_kept.push_back(features_idx[idx]);
+                    features_idx.erase(features_idx.begin() + idx);
+                }
+                else {
+                    keep_cond_forward = false;
+                }
             }
         }
         else {
-            auto it = std::min_element(criteria.begin(), criteria.end());
-            size_t idx = std::distance(criteria.begin(), it);
-            double score_model = criteria[idx];
-            RSS_baseline = v_RSS_model[idx];
-
-            if ((score_model - score) < 0) {
-                
-                // Adding feature 
-                x_v.reserve(x_v.size() + n);
-                for (size_t i = 0; i < n; i++) {
-                    x_v.push_back(*X_j[features_idx[idx]][i]);
-                }
-
-                features_kept.push_back(features_idx[idx]);
-                features_idx.erase(features_idx.begin() + idx);
+            // In case of one last value
+            size_t idx;
+            double score_model;
+            if (criteria.size() == 1) {
+                keep_cond_forward = false;
             }
             else {
-                keep_cond_forward = false;
+                auto it = std::min_element(criteria.begin(), criteria.end());
+                idx = std::distance(criteria.begin(), it);
+                score_model = criteria[idx];
+                RSS_baseline = v_RSS_model[idx];
+            }
+            if (keep_cond_forward) {
+                if ((score_model - score) < 0) {
+                    
+                    // Adding feature 
+                    x_v.reserve(x_v.size() + n);
+                    for (size_t i = 0; i < n; i++) {
+                        x_v.push_back(*X_j[features_idx[idx]][i]);
+                    }
+
+                    features_kept.push_back(features_idx[idx]);
+                    features_idx.erase(features_idx.begin() + idx);
+                }
+                else {
+                    keep_cond_forward = false;
+                }
             }
         }
 
@@ -220,20 +242,21 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::stepwise
         }
 
         // Backward
-        k = x_v.size() / n - 1;
         std::vector<double> criteria_;
-        criteria_.reserve(features_idx.size());
+        criteria_.reserve(features_kept.size());
 
-        if ((threshold_ == "aic" || threshold_ == "bic")) {
+        if ((threshold_ == "aic" || threshold_ == "bic") && k > 2) {
             
             // Linear Reg to test each features with the one selected
+            k = x_v.size() / n - 1;
             v_RSS_model.clear();
-            v_RSS_model.reserve(features_idx.size());
-            for (auto& feature : features_idx) {
+            v_RSS_model.reserve(features_kept.size());
+            std::vector<size_t> feature_backward = rangeExcept(features_kept.size(), features_kept.size());
+            for (auto& feature : feature_backward) {
                 
                 // Erasing a feature 
                 std::vector<double> x_try = x_v;
-                x_try.erase(x_try.begin() + n * feature, x_try.begin() + n * (feature + 1));
+                x_try.erase(x_try.begin() + n * (feature + 1), x_try.begin() + n * (feature + 2));
                 
                 // Transform to dataframe
                 X_try = {n, k, false, std::move(x_try)};
@@ -250,6 +273,7 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::stepwise
                 coeffs = beta_est.get_data();
 
                 // Stats
+                X_try.pop(0);
                 double RSS_model = Stats::mse(y.get_data(), predict(X_try)) * n;
                 if (threshold_ == "aic") {
                     criteria_.push_back(n * std::log(RSS_model / n) + 2 * k);
@@ -270,10 +294,11 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::stepwise
             if ((score_model - score) < 0) {
                 
                 // Erasing a feature 
-                x_v.erase(x_v.begin() + n * features_idx[idx], x_v.begin() + n * (features_idx[idx] + 1));
-                blacklist.insert(features_idx[idx]);
-                features_idx.erase(features_idx.begin() + idx);
-                features_kept.erase(features_kept.begin() + idx);
+                x_v.erase(x_v.begin() + n * features_kept[idx], x_v.begin() + n * (features_kept[idx] + 1));
+                
+                blacklist.insert(features_kept[idx]);
+                features_idx.insert(features_idx.begin(), features_kept[idx]);
+                features_kept.erase(features_kept.begin() + idx - 1);
             }
             else {
                 if (!keep_cond_forward) {
@@ -290,6 +315,7 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::stepwise
         else if (threshold_ == "alpha") {
                     
             // Linear Reg to test each features with the one selected
+            k = x_v.size() / n;
             X_try = {n, k, false, x_v};
 
             // Linear Reg
@@ -304,6 +330,7 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::stepwise
             coeffs = beta_est.get_data();
 
             // Calculating Stats
+            X_try.pop(0);
             std::vector<double> residuals = Stats::get_residuals(y.get_data(), predict(X_try));
             std::vector<double> stderr_b = Stats::OLS::stderr_b(residuals, XtXInv);
             std::vector<double> t_stats(k, 0.0);
@@ -318,10 +345,12 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::stepwise
             if (p_val > alpha_out) {
                 
                 // Erasing a feature 
-                x_v.erase(x_v.begin() + n * features_idx[idx], x_v.begin() + n * (features_idx[idx] + 1));
-                blacklist.insert(features_idx[idx]);
-                features_idx.erase(features_idx.begin() + idx);
-                features_kept.erase(features_kept.begin() + idx);
+                
+                x_v.erase(x_v.begin() + n * features_kept[idx], x_v.begin() + n * (features_kept[idx] + 1));
+
+                blacklist.insert(features_kept[idx]);
+                features_idx.insert(features_idx.begin(), features_kept[idx]);
+                features_kept.erase(features_kept.begin() + idx - 1);
             }
             else {
                 if (!keep_cond_forward) {
@@ -331,10 +360,11 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::stepwise
             }
         }
     }
-    return {x_v, features_kept};
+    selected_features = features_kept;
+    return x_v;
 }
 
-std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::backward_reg(const Dataframe& x, const Dataframe& y) {
+std::vector<double> StepwiseRegression::backward_reg(const Dataframe& x, const Dataframe& y) {
     
     // Copy our data 
     size_t n = x.get_rows();
@@ -365,7 +395,7 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::backward
     double score; // AIC or BIC
     double alpha_out;
     std::vector<size_t> features_idx = rangeExcept(p, p);
-    std::vector<double> residuals = Stats::get_residuals(y.get_data(), predict(X_try));
+    std::vector<double> residuals = Stats::get_residuals(y.get_data(), predict(x));
     if (threshold_ == "alpha" && n > 30) {
 
         std::vector<double> stderr_b = Stats::OLS::stderr_b(residuals, XtXInv);
@@ -378,16 +408,17 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::backward
         auto it = std::max_element(p_value.begin() + 1, p_value.end());
         size_t idx = std::distance(p_value.begin(), it);
         double p_val = p_value[idx];
-
+        
         if (p_val > alpha_out) {
             
             // Erasing a feature 
             x_v.erase(x_v.begin() + n * features_idx[idx], x_v.begin() + n * (features_idx[idx] + 1));
-            features_idx = rangeExcept(features_idx.size() - 1, features_idx[idx]);
-            features_kept.erase(features_kept.begin() + idx);
+            features_idx = rangeExcept(features_idx.size() - 1, features_idx.size() - 1);
+            features_kept.erase(features_kept.begin() + idx - 1);
         }
         else {
-            return {x_v, features_kept};
+            selected_features = features_kept;
+            return x_v;
         }
     }
     else if (threshold_ == "aic" || threshold_ == "bic") {
@@ -402,20 +433,20 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::backward
     // Keep going until no variable go through the threshold
     bool keep_cond = true;
     while (keep_cond) {
-        size_t k = x_v.size() / n - 1;
         std::vector<double> criteria;
         criteria.reserve(features_idx.size());
 
         if ((threshold_ == "aic" || threshold_ == "bic")) {
             
             // Linear Reg to test each features with the one selected
+            size_t k = x_v.size() / n - 1;
             std::vector<double> v_RSS_model;
             v_RSS_model.reserve(features_idx.size());
             for (auto& feature : features_idx) {
                 
                 // Erasing a feature 
                 std::vector<double> x_try = x_v;
-                x_try.erase(x_try.begin() + n * feature, x_try.begin() + n * (feature + 1));
+                x_try.erase(x_try.begin() + n * (feature + 1), x_try.begin() + n * (feature + 2));
                 
                 // Transform to dataframe
                 X_try = {n, k, false, std::move(x_try)};
@@ -432,6 +463,7 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::backward
                 coeffs = beta_est.get_data();
 
                 // Stats
+                X_try.pop(0);
                 double RSS_model = Stats::mse(y.get_data(), predict(X_try)) * n;
                 if (threshold_ == "aic") {
                     criteria.push_back(n * std::log(RSS_model / n) + 2 * k);
@@ -453,8 +485,8 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::backward
                 
                 // Erasing a feature 
                 x_v.erase(x_v.begin() + n * features_idx[idx], x_v.begin() + n * (features_idx[idx] + 1));
-                features_idx = rangeExcept(features_idx.size() - 1, features_idx[idx]);
-                features_kept.erase(features_kept.begin() + idx);
+                features_idx = rangeExcept(features_idx.size() - 1, features_idx.size() - 1);
+                features_kept.erase(features_kept.begin() + idx - 1);
             }
             else {
                 keep_cond = false;
@@ -469,7 +501,8 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::backward
         
         else if (threshold_ == "alpha") {
                     
-            // Linear Reg to test each features with the one selected
+            // Linear Reg to test each features with the ones selected
+            size_t k = x_v.size() / n;
             X_try = {n, k, false, x_v};
 
             // Linear Reg
@@ -484,6 +517,7 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::backward
             coeffs = beta_est.get_data();
 
             // Calculating Stats
+            X_try.pop(0);
             residuals = Stats::get_residuals(y.get_data(), predict(X_try));
             std::vector<double> stderr_b = Stats::OLS::stderr_b(residuals, XtXInv);
             std::vector<double> t_stats(k, 0.0);
@@ -500,7 +534,7 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::backward
                 // Erasing a feature 
                 x_v.erase(x_v.begin() + n * features_idx[idx], x_v.begin() + n * (features_idx[idx] + 1));
                 features_idx = rangeExcept(features_idx.size() - 1, features_idx[idx]);
-                features_kept.erase(features_kept.begin() + idx);
+                features_kept.erase(features_kept.begin() + idx - 1);
             }
             else {
                 keep_cond = false;
@@ -508,10 +542,11 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::backward
             }
         }
     }
-    return {x_v, features_kept};
+    selected_features = features_kept;
+    return x_v;
 }
 
-std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::forward_reg(const Dataframe& x, const Dataframe& y) {
+std::vector<double> StepwiseRegression::forward_reg(const Dataframe& x, const Dataframe& y) {
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();
@@ -587,6 +622,7 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::forward_
             coeffs = beta_est.get_data();
 
             // Stats
+            X_try.pop(0);
             double RSS_model = Stats::mse(y.get_data(), predict(X_try)) * n;
             if (threshold_ == "alpha") {
                 criteria.push_back((RSS_baseline - RSS_model) / (RSS_model / (n - k)));
@@ -616,8 +652,8 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::forward_
                     x_v.push_back(*X_j[features_idx[idx]][i]);
                 }
 
-                features_idx.erase(features_idx.begin() + idx);
                 features_kept.push_back(features_idx[idx]);
+                features_idx.erase(features_idx.begin() + idx);
             }
             else {
                 keep_cond = false;
@@ -638,8 +674,8 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::forward_
                     x_v.push_back(*X_j[features_idx[idx]][i]);
                 }
 
-                features_idx.erase(features_idx.begin() + idx);
                 features_kept.push_back(features_idx[idx]);
+                features_idx.erase(features_idx.begin() + idx);
             }
             else {
                 keep_cond = false;
@@ -653,10 +689,11 @@ std::pair<std::vector<double>, std::vector<double>> StepwiseRegression::forward_
             score = (threshold_ == "aic") ? n * std::log(RSS_baseline / n) + 2 * k : n * std::log(RSS_baseline / n) + k * std::log(n);
         }
     }
-    return {x_v, features_kept};
+    selected_features = features_kept;
+    return x_v;
 }
 
-double StepwiseRegression::selected_features() const {
+double StepwiseRegression::effective_df() const {
     double df = 0;
     for (size_t i = 1; i < coeffs.size(); i++) {
         if (std::abs(coeffs[i]) > 1e-10) df++;
@@ -668,6 +705,7 @@ void StepwiseRegression::compute_stats(const Dataframe& x, Dataframe& x_const, D
     
     size_t n = x.get_rows();
     size_t p = x_const.get_cols() - 1;
+    size_t p_bis = x.get_cols() + 1;
     
     // Degree of liberty
     int df1 = p;
@@ -675,7 +713,7 @@ void StepwiseRegression::compute_stats(const Dataframe& x, Dataframe& x_const, D
 
     // Predict 
     std::vector<double> y_pred = predict(x);
-    double nb_features = selected_features();
+    double nb_features = effective_df();
 
     // -------------------------------------Calculate stats----------------------------------------
     double r2 = Stats::rsquared(y.get_data(), y_pred);
@@ -706,24 +744,58 @@ void StepwiseRegression::compute_stats(const Dataframe& x, Dataframe& x_const, D
     for (size_t i = 0; i < resid_stats.size(); i++) gen_stats.push_back(resid_stats[i]); 
 
     if (p > 1) {
-        std::vector<double> vif = Stats::OLS::VIF(x);
-        gen_stats.push_back(NAN);
-        for (size_t i = 0; i < vif.size(); i++) gen_stats.push_back(vif[i]); 
+        x_const.popup(0);
+        std::vector<double> vif = Stats::OLS::VIF(x_const);
+
+        // Mapping
+        std::unordered_map<size_t, size_t> feature_to_vif_idx;
+        for (size_t i = 0; i < selected_features.size(); i++) {
+            feature_to_vif_idx[selected_features[i]] = i;
+        }
+
+        gen_stats.push_back(NAN); // intercept
+        for (size_t i = 0; i < (p_bis - 1); i++) {
+            auto it = feature_to_vif_idx.find(i);
+            if (it != feature_to_vif_idx.end()) {
+                gen_stats.push_back(vif[it->second]);
+            } else {
+                gen_stats.push_back(0.0);
+            }
+        }
     }
+
+    // Update our stderr
+    // Mapping
+    std::unordered_map<size_t, size_t> beta_idx_to_feature;
+    beta_idx_to_feature[0] = 0; // intercept
+    for (size_t i = 0; i < selected_features.size(); i++) {
+        beta_idx_to_feature[i + 1] = selected_features[i] + 1; // +1 for intercept
+    }
+
+    std::vector<double> stderr_b_full(p_bis, 0.0);
+    stderr_b_full[0] = stderr_b[0]; // intercept
+    for (size_t i = 0; i < selected_features.size(); i++) {
+        size_t orig_col = selected_features[i] + 1;
+        stderr_b_full[orig_col] = stderr_b[i + 1];
+    }
+    stderr_b = stderr_b_full;
 
     // The t-distribution approaches the standard normal distribution for n > 30 
     std::vector<double> p_value;
-    std::vector<double> t_stats(p+1, 0.0);
+    std::vector<double> t_stats(p_bis, 0.0);
     if (n > 30) {
-        for (size_t i = 0; i < p+1; i++) t_stats[i] = coeffs[i] / stderr_b[i];
+        // T_stat
+        for (size_t i = 0; i < p_bis; i++) {
+            t_stats[i] = (stderr_b[i] != 0.0) ? coeffs[i] / stderr_b[i] : 0.0;
+        }
         p_value = Stats::OLS::student_pvalue(t_stats);
     }
 
     // If we have not the cols name
-    std::vector<std::string> headers(p+1, "");
+    std::vector<std::string> headers(p_bis, "");
     headers[0] = "Intercept";
     if (x.get_headers().empty()) {
-        for (size_t i = 1; i < p+1; i++) headers[i] = "c" + std::to_string(i);
+        for (size_t i = 1; i < p_bis; i++) headers[i] = "c" + std::to_string(i);
     }
     else {
         headers = {"Intercept"};
@@ -732,7 +804,7 @@ void StepwiseRegression::compute_stats(const Dataframe& x, Dataframe& x_const, D
 
     // Save our stats
     CoeffStats c;
-    for (size_t i = 0; i < p+1; i++) {
+    for (size_t i = 0; i < p_bis; i++) {
         if (n > 30) {
             c = {
                 headers[i],
