@@ -46,7 +46,7 @@ std::pair<Dataframe, Dataframe> StepwiseRegression::fit_without_stats(const Data
 
     // Calculate Beta (our estimator)
     Dataframe XtXInv = (X_t*X).inv();
-    XtXInv.change_layout_inplace();
+    XtXInv.is_symmetric();
     Dataframe beta_est =  XtXInv * (X_t * y);  
 
     // Getting coeffs with selected features
@@ -95,7 +95,7 @@ std::vector<double> StepwiseRegression::stepwise_reg(const Dataframe& x, const D
     Dataframe X_t = ~X_try;  
     X_t.change_layout_inplace();
     Dataframe XtXInv = (X_t*X_try).inv();
-    XtXInv.change_layout_inplace();
+    XtXInv.is_symmetric();
     Dataframe beta_est =  XtXInv * (X_t * y);
 
     clean_params();
@@ -149,7 +149,7 @@ std::vector<double> StepwiseRegression::stepwise_reg(const Dataframe& x, const D
             X_t = ~X_try;  
             X_t.change_layout_inplace();
             XtXInv = (X_t*X_try).inv();
-            XtXInv.change_layout_inplace();
+            XtXInv.is_symmetric();
             beta_est =  XtXInv * (X_t * y);
 
             clean_params();
@@ -265,7 +265,7 @@ std::vector<double> StepwiseRegression::stepwise_reg(const Dataframe& x, const D
                 X_t = ~X_try;  
                 X_t.change_layout_inplace();
                 XtXInv = (X_t*X_try).inv();
-                XtXInv.change_layout_inplace();
+                XtXInv.is_symmetric();
                 beta_est =  XtXInv * (X_t * y);
 
                 clean_params();
@@ -288,7 +288,7 @@ std::vector<double> StepwiseRegression::stepwise_reg(const Dataframe& x, const D
             auto it = std::min_element(criteria_.begin() + 1, criteria_.end());
             size_t idx = std::distance(criteria_.begin(), it);
             double score_model = criteria_[idx];
-            RSS_baseline = v_RSS_model[idx];
+            double RSS_baseline_backward = v_RSS_model[idx];
 
             // Testing if it go through our threshold
             if ((score_model - score) < 0) {
@@ -308,7 +308,7 @@ std::vector<double> StepwiseRegression::stepwise_reg(const Dataframe& x, const D
 
             // Calculate our new_score / RSS
             k = x_v.size() / n;
-            score = (threshold_ == "aic") ? n * std::log(RSS_baseline / n) + 2 * k : n * std::log(RSS_baseline / n) + k * std::log(n);
+            score = (threshold_ == "aic") ? n * std::log(RSS_baseline_backward / n) + 2 * k : n * std::log(RSS_baseline / n) + k * std::log(n);
         }
         
         
@@ -322,7 +322,7 @@ std::vector<double> StepwiseRegression::stepwise_reg(const Dataframe& x, const D
             X_t = ~X_try;  
             X_t.change_layout_inplace();
             XtXInv = (X_t*X_try).inv();
-            XtXInv.change_layout_inplace();
+            XtXInv.is_symmetric();
             beta_est =  XtXInv * (X_t * y);
 
             clean_params();
@@ -345,7 +345,6 @@ std::vector<double> StepwiseRegression::stepwise_reg(const Dataframe& x, const D
             if (p_val > alpha_out) {
                 
                 // Erasing a feature 
-                
                 x_v.erase(x_v.begin() + n * features_kept[idx], x_v.begin() + n * (features_kept[idx] + 1));
 
                 blacklist.insert(features_kept[idx]);
@@ -384,7 +383,7 @@ std::vector<double> StepwiseRegression::backward_reg(const Dataframe& x, const D
     Dataframe X_t = ~X_try;  
     X_t.change_layout_inplace();
     Dataframe XtXInv = (X_t*X_try).inv();
-    XtXInv.change_layout_inplace();
+    XtXInv.is_symmetric();
     Dataframe beta_est =  XtXInv * (X_t * y);
 
     clean_params();
@@ -455,7 +454,7 @@ std::vector<double> StepwiseRegression::backward_reg(const Dataframe& x, const D
                 X_t = ~X_try;  
                 X_t.change_layout_inplace();
                 XtXInv = (X_t*X_try).inv();
-                XtXInv.change_layout_inplace();
+                XtXInv.is_symmetric();
                 beta_est =  XtXInv * (X_t * y);
 
                 clean_params();
@@ -509,7 +508,7 @@ std::vector<double> StepwiseRegression::backward_reg(const Dataframe& x, const D
             X_t = ~X_try;  
             X_t.change_layout_inplace();
             XtXInv = (X_t*X_try).inv();
-            XtXInv.change_layout_inplace();
+            XtXInv.is_symmetric();
             beta_est =  XtXInv * (X_t * y);
 
             clean_params();
@@ -566,7 +565,7 @@ std::vector<double> StepwiseRegression::forward_reg(const Dataframe& x, const Da
     Dataframe X_t = ~X_try;  
     X_t.change_layout_inplace();
     Dataframe XtXInv = (X_t*X_try).inv();
-    XtXInv.change_layout_inplace();
+    XtXInv.is_symmetric();
     Dataframe beta_est =  XtXInv * (X_t * y);
 
     clean_params();
@@ -614,7 +613,7 @@ std::vector<double> StepwiseRegression::forward_reg(const Dataframe& x, const Da
             X_t = ~X_try;  
             X_t.change_layout_inplace();
             XtXInv = (X_t*X_try).inv();
-            XtXInv.change_layout_inplace();
+            XtXInv.is_symmetric();
             beta_est =  XtXInv * (X_t * y);
 
             clean_params();

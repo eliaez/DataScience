@@ -152,6 +152,9 @@ class Dataframe
         // Change from row - major to col - major inplace, choose between Naive, AVX2...
         void change_layout_inplace(const std::string& choice = "AVX2_threaded");
 
+        // Change your is_row_major variable if your matrix is symmetric
+        void is_symmetric() { is_row_major = !is_row_major; }
+
         // Tranpose Naive
         static std::vector<double> transpose_naive(size_t rows_, size_t cols_, const std::vector<double>& df);
 

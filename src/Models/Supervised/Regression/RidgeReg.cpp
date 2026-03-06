@@ -35,7 +35,7 @@ std::pair<Dataframe, Dataframe> RidgeRegression::fit_without_stats(const Datafra
 
     // Calculate Beta (our estimator) for Ridge Regression
     Dataframe XtXInv = (X_t*X_c + LambId).inv();
-    XtXInv.change_layout_inplace();
+    XtXInv.is_symmetric();
     Dataframe beta_est =  XtXInv * (X_t * Y_c);  
 
     // Results
@@ -74,7 +74,7 @@ double RidgeRegression::effective_df(Dataframe& X_c, Dataframe& XtXInv) const {
     // Need X_t col major 
     Dataframe X_t = ~X_c;           // Transpose change it to col-major
     if (!X_c.get_storage()) X_c.change_layout_inplace();        // Need to be row_major for next operation
-    if (!XtXInv.get_storage()) XtXInv.change_layout_inplace();  // Need to be row_major for next operation
+    if (!XtXInv.get_storage()) XtXInv.is_symmetric();  // Need to be row_major for next operation
 
     // Calculate H matrix
     Dataframe H =  X_c * (XtXInv * X_t);  

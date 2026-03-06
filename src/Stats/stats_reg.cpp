@@ -739,7 +739,7 @@ Dataframe OLS::cov_beta(const Dataframe& x_const, Dataframe& XtXinv,
     Dataframe df_Meat = {p, p, false, Meat};
     Dataframe part1 = XtXinv * df_Meat;
     part1.change_layout_inplace();
-    XtXinv.change_layout_inplace();
+    XtXinv.is_symmetric();
     return part1 * XtXinv;
 }
 

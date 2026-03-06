@@ -55,12 +55,12 @@ std::pair<Dataframe, Dataframe> LinearRegression::fit_without_stats(const Datafr
         Dataframe XtOmega = X_t * Om;
         XtOmega.change_layout_inplace();
         XtXInv =  (XtOmega * X).inv();
-        XtXInv.change_layout_inplace();    
+        XtXInv.is_symmetric();    
         beta_est =  XtXInv * (XtOmega * y);
     }
     else {
         XtXInv = (X_t*X).inv();
-        XtXInv.change_layout_inplace();
+        XtXInv.is_symmetric(); 
         beta_est =  XtXInv * (X_t * y);  
     }
 
