@@ -56,7 +56,7 @@ Once the model is estimated, we need tools to assess its reliability and quality
 
 For further details, see [**IV - Statistical Functions**](/docs/IV_stats.md).
 
-## V - Preprocessing & Validation
+## V - Preprocessing
 
 Before training a model, raw data rarely comes in a form suitable for direct use: features may live on incompatible scales, distributions can be heavily skewed and missing values corrupt otherwise clean datasets. The preprocessing utilities address these concerns by providing column-wise scaling, distribution transforms and imputation strategies:
 
