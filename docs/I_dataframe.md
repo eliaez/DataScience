@@ -34,6 +34,9 @@ As a first step, we need a class to handle and manipulate our data. Thus, our [*
 
   // Change layout in-place with default backend
   df.change_layout_inplace();
+
+  // Change your is_row_major variable if your matrix is symmetric to avoid any memory reallocation
+  df.is_symmetric();
   ```
 
 ### CSV Loading Pipeline
@@ -76,7 +79,10 @@ As a first step, we need a class to handle and manipulate our data. Thus, our [*
 
   - `operator()(i, j)`: provides an indexed access and abstracts layout complexity
   - `at(idx)`: provides direct access for raw vector manipulation
-  - `operator[]`: Column extraction returning `Dataframe` <br> <br>
+  - `operator[]`: column extraction returning `Dataframe` 
+  - `getColumnPtrs()`: returns a vector of pointers to each element of a given column
+  - `getRowPtrs()`: returns a vector of pointers to each element of a given row <br> <br>
+
 
   ```cpp 
   // Get i, j value (be careful of your layout and your indices)
@@ -88,14 +94,19 @@ As a first step, we need a class to handle and manipulate our data. Thus, our [*
   auto df_col = df["target"];                    // By name
   auto df_cols = df[{0, 2, 4}];                  // Multiple indices
   auto df_cols = df[{"feature1", "feature2"}];   // Multiple names
+
+  // Get pointers to column/row elements
+  auto col_ptrs = df.getColumnPtrs(j);
+  auto col_ptrs = df.getColumnPtrs("col_name");
+  auto row_ptrs = df.getRowPtrs(i);
   ```
 
 - #### One-Hot Encoding
-  Each unique value in the column will become a new binary column and the original column is removed:
+  Each unique value in the column will become a new binary column, appended at the end of the Dataframe and the original column is removed:
 
   ```cpp
-  auto df_encoded = df.OneHot(2);               // By indices
-  auto df_encoded = df.OneHot("HomePlanet");    // By names
+  df.OneHot(2);              // By index
+  df.OneHot("HomePlanet");   // By name
   ```
 
 - #### Column Manipulation
