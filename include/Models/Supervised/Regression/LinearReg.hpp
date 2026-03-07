@@ -19,7 +19,7 @@ namespace Reg {
 
         protected:
             // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, const Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) override;
+            void compute_stats(const Dataframe& x, Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) override;
         
         public:
             // Constructor, cov_type : classical, HC3, HAC and cluster.
@@ -33,7 +33,6 @@ namespace Reg {
                 Omega_(std::move(Omega)) {};
 
             // Training OLS / GLS (WLS, FGLS) with x col-major
-            void fit(const Dataframe& x, const Dataframe& y) override;
             std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;
 
             // Display stats after training

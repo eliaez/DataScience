@@ -739,7 +739,7 @@ Dataframe OLS::cov_beta(const Dataframe& x_const, Dataframe& XtXinv,
     Dataframe df_Meat = {p, p, false, Meat};
     Dataframe part1 = XtXinv * df_Meat;
     part1.change_layout_inplace();
-    XtXinv.change_layout_inplace();
+    XtXinv.is_symmetric();
     return part1 * XtXinv;
 }
 
@@ -790,6 +790,25 @@ std::vector<double> OLS::stderr_b(const Dataframe& cov_beta) {
         res[i] = std::sqrt(cov_beta.at(i*p + i));
     }
     return res;
+}
+
+std::vector<double> OLS::stderr_b(const std::vector<double>& residuals, const Dataframe& XtXinv) {
+    
+    size_t n = residuals.size();
+    size_t p = XtXinv.get_cols();
+
+    // Var(Beta) = sigma2 * XtXinv
+    double sigma2 = 0.0;
+    for (size_t i = 0; i < n; i++) {
+        sigma2 += residuals[i] * residuals[i];
+    }
+    sigma2 /= (n - p);
+
+    std::vector<double> var_beta(p);
+    for (size_t j = 0; j < p; j++) {
+        var_beta[j] = std::sqrt(sigma2 * XtXinv.at(j*p + j));
+    }
+    return var_beta;
 }
 
 std::vector<double> OLS::student_pvalue(const std::vector<double>& t_stats) {

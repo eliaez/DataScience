@@ -69,7 +69,7 @@ Dataframe Dataframe::operator[](const std::vector<size_t>& cols_idx) const {
             }
 
             // Get header
-            headers_y.push_back(headers[idx]);
+            if (!headers.empty()) headers_y.push_back(headers[idx]);
 
             // Get encoded cols idx
             if (encoded_cols.find(static_cast<int>(idx)) != encoded_cols.end()) encoded_cols_y.insert(i);
@@ -88,7 +88,7 @@ Dataframe Dataframe::operator[](const std::vector<size_t>& cols_idx) const {
             }
 
             // Get header
-            headers_y.push_back(headers[idx]);
+            if (!headers.empty()) headers_y.push_back(headers[idx]);
 
             // Get encoded cols idx
             if (encoded_cols.find(static_cast<int>(idx)) != encoded_cols.end()) encoded_cols_y.insert(i);
@@ -250,6 +250,45 @@ void Dataframe::OneHot(const std::string& col_name) {
     else {
         throw std::invalid_argument(std::format("Column {} not found", col_name));
     }
+}
+
+std::vector<const double*> Dataframe::getColumnPtrs(size_t j) const {
+    
+    std::vector<const double*> col(rows);
+    if (is_row_major) {
+        for (size_t i = 0; i < rows; i++)
+            col[i] = &data[i * cols + j];
+    }
+    else {
+        for (size_t i = 0; i < rows; i++)
+            col[i] = &data[j * rows + i];
+    }
+    return col;
+}
+
+std::vector<const double*> Dataframe::getColumnPtrs(const std::string& col_name) const {
+    
+    // Find col
+    auto idx = std::find(headers.begin(), headers.end(), col_name);
+
+    if (idx != headers.end()) return getColumnPtrs(static_cast<size_t>(idx - headers.begin()));
+    else {
+        throw std::invalid_argument(std::format("Column {} not found", col_name));
+    }
+}
+
+std::vector<const double*> Dataframe::getRowPtrs(size_t i) const {
+    
+    std::vector<const double*> row(rows);
+    if (is_row_major) {
+        for (size_t j = 0; j < rows; j++)
+            row[j] = &data[i * cols + j];
+    }
+    else {
+        for (size_t j = 0; j < rows; j++)
+            row[j] = &data[j * rows + i];
+    }
+    return row;
 }
 
 Dataframe Dataframe::transfer_col(size_t j) {

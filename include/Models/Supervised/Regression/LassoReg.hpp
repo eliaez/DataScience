@@ -11,18 +11,18 @@ class Dataframe;
 // ---------------------------------------Reg------------------------------------------
 
 namespace Reg {
-    class RidgeRegression : public RegressionBase {
+    class LassoRegression : public RegressionBase {
         private:
-            double lambda_; // L2 Penality
+            double lambda_; // L1 Penality
 
         protected:
             // Calculate Stats after fit function
             void compute_stats(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) override;
         
         public:
-            RidgeRegression(double lambda = 1.0) : lambda_(lambda) {};
+            LassoRegression(double lambda = 0.1) : lambda_(lambda) {};
 
-            // Training Ridge Regression with x col-major
+            // Training Lasso Regression with x col-major
             std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;
 
             // Display stats after training
@@ -33,8 +33,8 @@ namespace Reg {
             // Start & end for the range and nb for the steps
             void optimal_lambda(double start, double end, int nb, const Dataframe& x, const Dataframe& y);
 
-            // Get degree of liberty by using x_c (X centered and scaled)
-            double effective_df(Dataframe& X_c, Dataframe& XtXInv) const;
+            // Calculate degree of liberty by getting non-null coefs following the fitting of lasso 
+            double effective_df() const;
 
             // Function to create new model
             std::unique_ptr<RegressionBase> create(const std::vector<double>& params) override;

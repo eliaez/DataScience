@@ -73,6 +73,9 @@ namespace Stats {
 
         // Stderr of beta (take the diag of cov_beta)
         std::vector<double> stderr_b(const Dataframe& cov_beta);
+        
+        // Stderr of beta for cov_type = "classical"
+        std::vector<double> stderr_b(const std::vector<double>& residuals, const Dataframe& XtXinv);
 
         // Student p-value
         std::vector<double> student_pvalue(const std::vector<double>& t_stats);

@@ -7,7 +7,7 @@
 
 namespace Split {
 
-TrainTestSplit train_test_split(const Dataframe& x, const Dataframe& y, int proportion) {
+TrainTestSplit train_test_split(const Dataframe& x, const Dataframe& y, int proportion, bool shuffle) {
 
     size_t n = x.get_rows();
     size_t p = x.get_cols();
@@ -28,9 +28,11 @@ TrainTestSplit train_test_split(const Dataframe& x, const Dataframe& y, int prop
     std::iota(indices.begin(), indices.end(), 0);
 
     // Random shuffle
-    std::mt19937 rng;
-    rng.seed(std::random_device{}());
-    std::shuffle(indices.begin(), indices.end(), rng);
+    if (shuffle) {
+        std::mt19937 rng;
+        rng.seed(std::random_device{}());
+        std::shuffle(indices.begin(), indices.end(), rng);
+    }
 
     // Generic Lambda Function
     auto fill = [&](
@@ -66,7 +68,7 @@ TrainTestSplit train_test_split(const Dataframe& x, const Dataframe& y, int prop
     return res;
 }
 
-TrainTestValidSplit train_test_split(const Dataframe& x, const Dataframe& y, const std::pair<int, int> proportion) {
+TrainTestValidSplit train_test_split(const Dataframe& x, const Dataframe& y, const std::pair<int, int> proportion, bool shuffle) {
 
     size_t n = x.get_rows();
     size_t p = x.get_cols();
@@ -95,9 +97,11 @@ TrainTestValidSplit train_test_split(const Dataframe& x, const Dataframe& y, con
     std::iota(indices.begin(), indices.end(), 0);
 
     // Random shuffle
-    std::mt19937 rng;
-    rng.seed(std::random_device{}());
-    std::shuffle(indices.begin(), indices.end(), rng);
+    if (shuffle) {
+        std::mt19937 rng;
+        rng.seed(std::random_device{}());
+        std::shuffle(indices.begin(), indices.end(), rng);
+    }
 
     // Generic Lambda Function
     auto fill = [&](
@@ -140,7 +144,7 @@ TrainTestValidSplit train_test_split(const Dataframe& x, const Dataframe& y, con
     return res;
 }
 
-TrainTestSplit stratified_split(const Dataframe& x, const Dataframe& y, int proportion) {
+TrainTestSplit stratified_split(const Dataframe& x, const Dataframe& y, int proportion, bool shuffle) {
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();
@@ -163,10 +167,12 @@ TrainTestSplit stratified_split(const Dataframe& x, const Dataframe& y, int prop
     }
 
     // Random shuffle for each group
-    std::mt19937 rng;
-    rng.seed(std::random_device{}());
-    for (auto& [idx, indices] : map_indices) {
-        std::shuffle(indices.begin(), indices.end(), rng);
+    if (shuffle) {
+        std::mt19937 rng;
+        rng.seed(std::random_device{}());
+        for (auto& [idx, indices] : map_indices) {
+            std::shuffle(indices.begin(), indices.end(), rng);
+        }
     }
 
     // Verif
@@ -226,7 +232,7 @@ TrainTestSplit stratified_split(const Dataframe& x, const Dataframe& y, int prop
     return res;
 }
 
-TrainTestValidSplit stratified_split(const Dataframe& x, const Dataframe& y, const std::pair<int, int> proportion) {
+TrainTestValidSplit stratified_split(const Dataframe& x, const Dataframe& y, const std::pair<int, int> proportion, bool shuffle) {
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();
@@ -257,10 +263,12 @@ TrainTestValidSplit stratified_split(const Dataframe& x, const Dataframe& y, con
     }
 
     // Random shuffle for each group
-    std::mt19937 rng;
-    rng.seed(std::random_device{}());
-    for (auto& [idx, indices] : map_indices) {
-        std::shuffle(indices.begin(), indices.end(), rng);
+    if (shuffle) {
+        std::mt19937 rng;
+        rng.seed(std::random_device{}());
+        for (auto& [idx, indices] : map_indices) {
+            std::shuffle(indices.begin(), indices.end(), rng);
+        }
     }
 
     // Verif and save original size

@@ -21,11 +21,35 @@ namespace Utils {
 
     // Dot product
     template<typename T>
-    T dot(const std::vector<T>& x, const std::vector<T>& y);
+    T dot(const std::vector<T>& v, const std::vector<T>& v1);
+
+    template<typename T>
+    T dot(const std::vector<const T*>& v, const std::vector<T>& v1);
+
+    template<typename T>
+    T dot(const std::vector<const T*>& v, const std::vector<const T*>& v1);
 
     // Const x Vector
     template<typename T>
     std::vector<T> mult(const std::vector<T>& v, T scalar);
+    
+    template<typename T>
+    std::vector<T> mult(const std::vector<const T*>& v, T scalar);
+
+    // Vector + Vector
+    template<typename T>
+    std::vector<T> add(const std::vector<T>& v, const std::vector<T>& v1);
+
+    // Vector - Vector
+    template<typename T>
+    std::vector<T> sub(const std::vector<T>& v, const std::vector<T>& v1);
+
+    // Norm L**p
+    template<typename T>
+    double Lnorm(const std::vector<T>& v, int p, int pow = 1);
+
+    template<typename T>
+    double Lnorm(const std::vector<const T*>& v, int p, int pow = 1);
 
     // Utils
     template<typename T>
@@ -37,14 +61,40 @@ namespace Utils {
 // ----------------------------------Implementation----------------------------------
 
 template<typename T>
-T dot(const std::vector<T>& x, const std::vector<T>& y) {
-    if (x.size() != y.size()) {
+T dot(const std::vector<T>& v, const std::vector<T>& v1) {
+    if (v.size() != v1.size()) {
         throw std::invalid_argument("Need input of same length");
     }
 
     T res = 0.0;
-    for (size_t i = 0; i < x.size(); ++i) {
-        res += x[i] * y[i];
+    for (size_t i = 0; i < v.size(); ++i) {
+        res += v[i] * v1[i];
+    }
+    return res;
+}
+
+template<typename T>
+T dot(const std::vector<const T*>& v, const std::vector<T>& v1) {
+    if (v.size() != v1.size()) {
+        throw std::invalid_argument("Need input of same length");
+    }
+
+    T res = 0.0;
+    for (size_t i = 0; i < v.size(); ++i) {
+        res += (*v[i]) * v1[i];
+    }
+    return res;
+}
+
+template<typename T>
+T dot(const std::vector<const T*>& v, const std::vector<const T*>& v1) {
+    if (v.size() != v1.size()) {
+        throw std::invalid_argument("Need input of same length");
+    }
+
+    T res = 0.0;
+    for (size_t i = 0; i < v.size(); ++i) {
+        res += (*v[i]) * (*v1[i]);
     }
     return res;
 }
@@ -57,6 +107,64 @@ std::vector<T> mult(const std::vector<T>& v, T scalar) {
         result[i] = v[i] * scalar;
     }
     return result;
+}
+
+template<typename T>
+std::vector<T> mult(const std::vector<const T*>& v, T scalar) {
+    
+    std::vector<T> result(v.size());
+    for(size_t i = 0; i < v.size(); ++i) {
+        result[i] = (*v[i]) * scalar;
+    }
+    return result;
+}
+
+template<typename T>
+std::vector<T> add(const std::vector<T>& v, const std::vector<T>& v1) {
+
+    if (v.size() != v1.size()) {
+        throw std::invalid_argument("Need input of same length");
+    }
+    
+    std::vector<T> result(v.size());
+    for(size_t i = 0; i < v.size(); ++i) {
+        result[i] = v[i] + v1[i];
+    }
+    return result;
+}
+
+template<typename T>
+std::vector<T> sub(const std::vector<T>& v, const std::vector<T>& v1) {
+
+    if (v.size() != v1.size()) {
+        throw std::invalid_argument("Need input of same length");
+    }
+    
+    std::vector<T> result(v.size());
+    for(size_t i = 0; i < v.size(); ++i) {
+        result[i] = v[i] - v1[i];
+    }
+    return result;
+}
+
+template<typename T>
+double Lnorm(const std::vector<T>& v, int p, int pow) {
+
+    double sum = 0.0;
+    for (size_t i = 0; i < v.size(); i++) {
+        sum += std::pow(abs(v[i]), p);
+    }
+    return std::pow(sum, (1 / p) * pow);
+}
+
+template<typename T>
+double Lnorm(const std::vector<const T*>& v, int p, int pow) {
+
+    double sum = 0.0;
+    for (size_t i = 0; i < v.size(); i++) {
+        sum += std::pow(abs((*v[i])), p);
+    }
+    return std::pow(sum, (1 / p) * pow);
 }
 
 template<typename T>

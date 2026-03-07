@@ -4,7 +4,6 @@
 #include <stdexcept>
 #include "Data/Data.hpp"
 #include "Utils/Utils.hpp"
-#include "Linalg/Linalg.hpp"
 #include "Stats/stats_reg.hpp"
 #include "Models/Supervised/Regression/RegBase.hpp"
 
@@ -26,39 +25,14 @@ void RegressionBase::basic_verif(const Dataframe& x) const {
     }
 }
 
-std::tuple<Dataframe, Dataframe, std::vector<double>> RegressionBase::center_data(const Dataframe& x, const Dataframe& y) const {
+void RegressionBase::fit(const Dataframe& x, const Dataframe& y) {
     
-    size_t n = x.get_rows();
-    size_t p = x.get_cols();
+    auto [x_const, XtXInv] = fit_without_stats(x, y);
+    compute_stats(x, x_const, XtXInv, y);
+}
 
-    // Starting by centering Y
-    std::vector<double> y_c = y.get_data();
-    double y_mean = Stats::mean(y.get_data());
-    for (size_t i = 0; i < n; i++) {
-        y_c[i] -= y_mean;
-    }
-
-    // Centering X
-    std::vector<double> x_mean(p);
-    std::vector<double> x_c = x.get_data();
-    for (size_t i = 0; i < p; i++) {
-        
-        // Pointer to the start of column i
-        double* col_start = x_c.data() + i * n;
-        
-        // Mean
-        x_mean[i] = std::accumulate(col_start, col_start + n, 0.0) / n;
-        
-        // Center
-        for (size_t j = 0; j < n; j++) {
-            col_start[j] -= x_mean[i];
-        }
-    }
-
-    Dataframe X_c = {n, p, false, std::move(x_c)};
-    Dataframe Y_c = {n, 1, false, std::move(y_c)};
-
-    return {X_c, Y_c, x_mean};
+std::unique_ptr<RegressionBase> RegressionBase::create(const std::vector<double>& /*params*/) {
+    throw std::logic_error("GridSearch not supported for this model");
 }
 
 std::vector<double> RegressionBase::predict(const Dataframe& x) const {
@@ -144,6 +118,7 @@ std::vector<double> RegressionBase::predict(const Dataframe& x) const {
         #endif
     }
     else {
+        /*
         #ifdef __AVX2__
 
             size_t i = 0;
@@ -185,7 +160,7 @@ std::vector<double> RegressionBase::predict(const Dataframe& x) const {
             for (; i < n; i++) {
                 y_pred[i] += coeffs[0];
             }
-        #else
+        #else */
             for (size_t j = 0; j < p; j++) {
                 
                 double coeff = coeffs[1 + j];
@@ -199,9 +174,171 @@ std::vector<double> RegressionBase::predict(const Dataframe& x) const {
             for (size_t i = 0; i < n; i++) {
                 y_pred[i] += intercept;
             }
-        #endif
+        //#endif
     }
 
     return y_pred;
+}
+
+void RegressionBase::clean_params() {
+    is_fitted = false;
+    coeffs = {};
+    gen_stats = {};
+    coeff_stats = {};
+}
+
+// --------------------------------------- Penalized Regressions ---------------------------------
+void RegressionBase::compute_stats_penalized(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y, 
+    std::function<double(Dataframe&, Dataframe&)> effective_df) {
+    
+    size_t n = x.get_rows();
+    size_t p = x.get_cols();
+
+    // Predict 
+    std::vector<double> y_pred = predict(x);
+
+    // -------------------------------------Calculate stats----------------------------------------
+    double r2 = Stats::rsquared(y.get_data(), y_pred);
+    double mse = Stats::mse(y.get_data(), y_pred);
+    std::vector<double> residuals = Stats::get_residuals(y.get_data(), y_pred);
+    double df = effective_df(x_c, XtXinv);
+    double loglikehood = Stats::logLikehood(y.get_data(), y_pred);
+
+
+    // Add them to our vector of stats
+    gen_stats.push_back(r2);
+
+    if (p > 1) gen_stats.push_back(Stats::radjusted(r2, n, p));
+    else gen_stats.push_back(-1.0);
+
+    gen_stats.push_back(df);
+    gen_stats.push_back(mse);
+    gen_stats.push_back(Stats::rmse(mse));
+    gen_stats.push_back(Stats::mae(y.get_data(), y_pred));
+    gen_stats.push_back(Stats::Regularized::AIC(df, loglikehood));
+    gen_stats.push_back(Stats::Regularized::BIC(df, loglikehood, n));
+    gen_stats.push_back(Stats::durbin_watson_test(residuals));
+
+    std::vector<double> resid_stats = Stats::residuals_stats(residuals);
+    for (size_t i = 0; i < resid_stats.size(); i++) gen_stats.push_back(resid_stats[i]); 
+
+    // If we have not the cols name
+    std::vector<std::string> headers(p+1, "");
+    headers[0] = "Intercept";
+    if (x.get_headers().empty()) {
+        for (size_t i = 1; i < p+1; i++) headers[i] = "c" + std::to_string(i);
+    }
+    else {
+        headers = {"Intercept"};
+        headers.insert(headers.end(), x.get_headers().begin(), x.get_headers().end());
+    }
+
+    // Save our stats
+    CoeffStats c;
+    for (size_t i = 0; i < p+1; i++) {
+        c = {
+            headers[i],
+            coeffs[i],
+            NAN,
+            NAN,
+            NAN
+        };
+        coeff_stats.push_back(c);
+    }
+}
+
+void RegressionBase::summary_penalized(double lambda_, bool detailled, double alpha, double l1_ratio) const {
+    std::cout << "\n=== REGRESSION SUMMARY ===\n\n";
+    
+    if (lambda_ == -1) {
+        std::cout << "Choosen alpha: " << alpha << "\n"
+                  << "Choosen L1 ratio: " << l1_ratio << "\n";
+    }
+    else {
+        std::cout << "Choosen lambda: " << lambda_ << "\n";
+    }
+    std::cout << "R2 = " << gen_stats[0] << "\n";
+
+    if (gen_stats[1] != -1.0) std::cout << "Adjusted R2 = " << gen_stats[1] << "\n";
+
+    std::cout << "Eff. DF: " << std::round(gen_stats[2]) << "\n";
+    
+    std::cout << "MSE = " << gen_stats[3] << "\n"
+              << "RMSE = " << gen_stats[4] << "\n"
+              << "MAE = " << gen_stats[5] << "\n"
+              << "AIC = " << gen_stats[6] << "\n"
+              << "BIC = " << gen_stats[7] << "\n\n";
+    
+    std::cout << std::left << std::setw(15) << "Coefficient"
+              << std::right << std::setw(15) << "Beta"
+              << "  \n"
+              << std::string(35, '-') << "\n";
+
+    size_t i = 0;
+    for (const auto& stat : coeff_stats) {
+        std::cout << std::left << std::setw(15) << stat.name
+                  << std::right << std::fixed << std::setprecision(4)
+                  << std::setw(15) << stat.beta
+                  << "\n";
+        i++;
+    }
+    std::cout << std::endl;
+
+    if (detailled) {
+        std::cout << "Additional stats:\n";
+        std::cout << "Durbin-Watson - rho-value = " << gen_stats[8] << "\n\n";
+
+        std::cout << "Residuals:\n";
+        std::cout << std::right << std::fixed
+                << std::setw(15) << "Mean" 
+                << std::setw(15) << "Stdd"
+                << std::setw(15) << "Abs Max"
+                << std::setw(15) << "Q1"
+                << std::setw(15) << "Q2"
+                << std::setw(15) << "Q3" << "\n";
+        std::cout << std::setw(90) << std::setfill('-') << "" << std::setfill(' ') << "\n";
+        std::cout << std::right << std::fixed << std::setprecision(4)
+                << std::setw(15) << gen_stats[9]
+                << std::setw(15) << gen_stats[10]
+                << std::setw(15) << gen_stats[11]
+                << std::setw(15) << gen_stats[12]
+                << std::setw(15) << gen_stats[13]
+                << std::setw(15) << gen_stats[14] << "\n" << std::endl;
+    }
+}
+
+std::tuple<Dataframe, Dataframe, std::vector<double>> RegressionBase::center_data(const Dataframe& x, const Dataframe& y) const {
+    
+    size_t n = x.get_rows();
+    size_t p = x.get_cols();
+
+    // Starting by centering Y
+    std::vector<double> y_c = y.get_data();
+    double y_mean = Stats::mean(y.get_data());
+    for (size_t i = 0; i < n; i++) {
+        y_c[i] -= y_mean;
+    }
+
+    // Centering X
+    std::vector<double> x_mean(p);
+    std::vector<double> x_c = x.get_data();
+    for (size_t i = 0; i < p; i++) {
+        
+        // Pointer to the start of column i
+        double* col_start = x_c.data() + i * n;
+        
+        // Mean
+        x_mean[i] = std::accumulate(col_start, col_start + n, 0.0) / n;
+        
+        // Center
+        for (size_t j = 0; j < n; j++) {
+            col_start[j] -= x_mean[i];
+        }
+    }
+
+    Dataframe X_c = {n, p, false, std::move(x_c)};
+    Dataframe Y_c = {n, 1, false, std::move(y_c)};
+
+    return {X_c, Y_c, x_mean};
 }
 }

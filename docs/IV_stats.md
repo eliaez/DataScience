@@ -7,7 +7,7 @@ Once the model is estimated, assessing its reliability and quality is essential.
 
 ### Covariance Matrix
 Computes the variance-covariance matrix of the β estimators, used to derive standard 
-errors, t-statistics and confidence intervals for inference (`cov_beta_OLS`):
+errors, t-statistics and confidence intervals for inference (`Stats::OLS::cov_beta`):
 - **`classical`**: Assumes standard OLS conditions (homoskedasticity, no autocorrelation)
 
 - **`HC3`**: Implements White's Heteroskedasticity-Consistent (HC) estimator which provides an  adjustment for non-constant error variance without assuming a specific structure
@@ -24,7 +24,7 @@ suitable when observations are grouped (individuals within firms)
 std::vector<double> residuals = Stats::get_residuals(y, y_pred);
 
 // Compute Covariance Matrix 
-std::vector<double> cov_beta = Stats::cov_beta_OLS(X, XtXinv, residuals, "HC3");
+std::vector<double> cov_beta = Stats::OLS::cov_beta(X, XtXinv, residuals, "HC3");
 ```
 
 **Interpretation**: 
@@ -37,22 +37,42 @@ Computes standard goodness-of-fit and prediction error metrics to evaluate model
 
 - **`radjusted()`**: The adjusted R² penalizes model complexity by accounting for the number of predictors (including intercept), thus preventing overfitting
 
-- **`mae()`, `mse()`, `rmse()`**: The **Mean Absolute Error** is used to measure the average prediction error (robust to outliers), the **Mean Squared Error** to penalize large errors more heavily and the **Root Mean Squared Error** for an easier interpretation.
+- **`mae()`, `mse()`, `rmse()`**: The **Mean Absolute Error** is used to measure the average prediction error (robust to outliers), the **Mean Squared Error** to penalize large errors more heavily and the **Root Mean Squared Error** for an easier interpretation
+
+- **`logLikehood()`**: Computes the log-likelihood of the model, used for information criteria and model comparison. Supports both regression ("Reg") and classification ("Clf") modes
 
 ```cpp
 // Goodness-of-fit
 double r2     = Stats::rsquared(y, y_pred);
-double r2_adj = Stats::radjusted(y, y_pred, p);
+double r2_adj = Stats::radjusted(r2, n, p);
 
 // Prediction error
 double mae  = Stats::mae(y, y_pred);
 double mse  = Stats::mse(y, y_pred);
 double rmse = Stats::rmse(y, y_pred);
+
+// Log-likelihood
+double ll = Stats::logLikehood(y, y_pred, "Reg");
 ```
 
 **Interpretation**:
 - R² and adjusted R² measure how well the model fits the data, higher is better.
 - MAE, MSE and RMSE measure prediction error, lower is better. Prefer RMSE for interpretability, MAE when robustness to outliers matters.
+- Log-likelihood measures how well the model fits the data probabilistically, higher is better.
+
+### Information Criteria (Regularized Models)
+For regularized models (`Ridge`, `Lasso`, ...), the effective degrees of freedom replace the standard parameter count. Our methods, `Stats::Regularized::AIC` and `Stats::Regularized::BIC` will penalize model complexity to balance fit and parsimony:
+
+- **`AIC`**: Akaike Information Criterion, penalizes by `2 × df`
+
+- **`BIC`**: Bayesian Information Criterion, penalizes more strongly as `n` grows via `log(n) × df`
+
+```cpp
+double aic = Stats::Regularized::AIC(effective_df, loglikehood);
+double bic = Stats::Regularized::BIC(effective_df, loglikehood, n);
+```
+
+**Interpretation:** Both `AIC` and `BIC` compare models by balancing goodness-of-fit against complexity. A lower score indicates a better trade-off between the two. The key difference lies in how strongly each penalizes complexity: `BIC` tends to select more parsimonious models than `AIC` for large `n`.
 
 ## Hypothesis Testing
 
@@ -61,8 +81,8 @@ Tests global model significance under H₀: all coefficients equal zero. A low p
 
 ```cpp
 // Fisher test with df1 = p and df2 = n - p - 1 and cov_type : classical, HC3,...
-double F_stat = Stats::fisher_test(r2, df1, df2, beta_est, cov_beta, "HC3");
-double F_pval = Stats::fisher_pvalue(F_stat, df1, df2); 
+double F_stat = Stats::OLS::fisher_test(r2, df1, df2, beta_est, cov_beta, "HC3");
+double F_pval = Stats::OLS::fisher_pvalue(F_stat, df1, df2); 
 // Low p-value → reject H₀, model is globally significant
 ```
 
@@ -70,8 +90,8 @@ double F_pval = Stats::fisher_pvalue(F_stat, df1, df2);
 Tests individual coefficient significance under H₀: βⱼ = 0. A low p-value rejects H₀, indicating that the predictor has a statistically significant individual effect on y independently of the other predictors.
 
 ```cpp
-std::vector<double> stderr = Stats::stderr_b(cov_beta);
-std::vector<double> p_vals = Stats::student_pvalue(t_stats);
+std::vector<double> stderr = Stats::OLS::stderr_b(cov_beta);
+std::vector<double> p_vals = Stats::OLS::student_pvalue(t_stats);
 // Low p-value → reject H₀, coefficient is individually significant
 ```
 
@@ -87,7 +107,7 @@ std::vector<double> res_stats = Stats::residuals_stats(residuals);
 **`durbin_watson_test()`** detects serial autocorrelation in residuals. The statistic lies in [0, 4] where 2 indicates no autocorrelation. Returns the correlation coefficient `ρ = 1 − DW/2` where ρ > 0.25 indicates positive autocorrelation, meaning standard errors are underestimated and HAC should be used, while ρ ≈ 0 confirms no autocorrelation and OLS standard errors remain valid.
 
 ```cpp
-double rho = Stats::durbin_watson_test(residuals);
+double rho = Stats::OLS::durbin_watson_test(residuals);
 ```
 <br>
 
@@ -101,9 +121,9 @@ double p_bp = Stats::breusch_pagan_test(X, residuals);
 The **Variance Inflation Factor** measures how much the standard error of βⱼ is inflated due to correlation with other predictors: `VIFⱼ = 1 / (1 - R²ⱼ)` where R²ⱼ comes from regressing Xⱼ on all other predictors. A VIF below 5 is acceptable, while a VIF above 10 signals severe multicollinearity, suggesting to remove or combine correlated features.
 
 ```cpp
-std::vector<double> vif = Stats::VIF(X);
+std::vector<double> vif = Stats::OLS::VIF(X);
 // or with GLS
-std::vector<double> vif = Stats::VIF(X, omega);
+std::vector<double> vif = Stats::OLS::VIF(X, omega);
 ```
 <br>
 
@@ -112,7 +132,4 @@ std::vector<double> vif = Stats::VIF(X, omega);
 - [**stats.cpp**](/src/Stats/stats_reg.cpp)
 - [**Test folder**](/tests/)
 
-#### Note: 
-By default, the backend used will be the best performing one among the three customized implementations, excluding MKL and Eigen libraries. Moreover, to compile MKL, the MSVC option is available to avoid any issue with MinGW-GCC.
-
-To read the next part: [**V - Regressions**](/docs/V_regressions.md).
+To read the next part: [**V - Preprocessing**](/docs/V_preprocessing.md).

@@ -70,6 +70,29 @@ void LinearRegCovtype(const Dataframe& x, const Dataframe& y, const string& cov_
     ASSERT_VEC_EPS(to_test1, clean_res1, 1e-4)
 }
 
+// Testing Stepwise Regression 
+void StepWReg(const Dataframe& x, const Dataframe& y, const vector<double> clean_res0, 
+    const vector<double>& clean_res1, const std::string& threshold = "alpha") {
+    
+    // Through implemented code
+    Reg::StepwiseRegression New_reg({0.05, 0.1}, "stepwise", threshold);
+    New_reg.fit(x, y);
+    vector<double> to_test0 = New_reg.get_stats();
+    to_test0.erase(to_test0.begin()+10, to_test0.begin()+16);
+
+    // Extract data from CoeffStats
+    vector<Reg::CoeffStats> inter = New_reg.get_coefficient_stats();
+    vector<double> to_test1(clean_res1.size());
+    for (size_t i = 0; i < (clean_res1.size()/2); i++) {
+        to_test1[i*2] = inter[i].beta;
+        to_test1[(i*2)+1] = inter[i].t_stat;
+    }
+
+    ASSERT_VEC_EPS(to_test0, clean_res0, 1e-4)
+
+    ASSERT_VEC_EPS(to_test1, clean_res1, 2e-2)
+}
+
 void tests_OLS() {
     
 
@@ -198,6 +221,49 @@ void tests_OLS() {
     vector<double> latitude = california["Latitude"].get_data(); 
     vector<int> clusters = create_clusters(latitude);
 
+    vector<double> clean_res10 = {
+        0.606219,   // R2
+        0.606086,   // R2 adjusted
+        7,          // DF
+        0.524339,   // MSE
+        0.724112,   // RMSE
+        0.531184,   // MAE
+        4537.52,    // Fisher - F
+        0.0,        // Fisher - p-value
+        0.557398,   // Durbin-Watson - rho value
+        0.0,        // Breusch-Pagan - p-value
+        NAN,
+        2.500400,   // VIF MedInc
+        1.113897,   // VIF HouseAge
+        8.330644,   // VIF ...
+        6.994658,   // VIF ...
+        0,   // VIF ...
+        1.001817,   // VIF ...
+        9.200787,   // VIF ...
+        8.912155,   // VIF ...
+    };
+
+    vector<double> clean_res11 = {
+        -36.9175,       // Beta0
+        -56.0847,       // Beta0 t-value
+        0.4368,         // Beta1
+        104.0890,       // Beta1 t-value
+        0.0096,         // Beta2
+        22.6025,        // Beta2 t-value
+        -0.1071,        // Beta3
+        -18.2168,       // Beta3 t-value
+        0.6449,         // Beta4
+        22.9225,        // Beta4 t-value
+        0,              // Beta5
+        0,              // Beta5 t-value
+        -0.0038,        // Beta6
+        -7.8614,        // Beta6 t-value
+        -0.4207,        // Beta7
+        -58.7632,       // Beta7 t-value
+        -0.4340,        // Beta8
+        -57.7818        // Beta8 t-value
+    };
+
     // Add tests
     TestSuite::Tests tests_OLS;
 
@@ -224,6 +290,16 @@ void tests_OLS() {
     tests_OLS.add_test(
         bind(LinearRegCovtype, california, y, "cluster", clean_res8, clean_res9, clusters), 
         "Linear Regression - cov_type = cluster"
+    );
+
+    tests_OLS.add_test(
+        bind(StepWReg, california, y, clean_res10, clean_res11, "alpha"), 
+        "Stepwise Regression - Threshold: alpha in/out"
+    );
+
+    tests_OLS.add_test(
+        bind(StepWReg, california, y, clean_res10, clean_res11, "aic"), 
+        "Stepwise Regression - Threshold: AIC"
     );
 
     cout << "Testing OLS and Stats functions:" << endl;

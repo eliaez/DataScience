@@ -1,23 +1,12 @@
-#include <iomanip>
-#include <numeric>
-#include <iostream>
-#include <stdexcept>
-#include <Eigen/Dense>
 #include "Data/Data.hpp"
 #include "Utils/Utils.hpp"
-#include "Linalg/Linalg.hpp"
 #include "Stats/stats_reg.hpp"
+#include "Validation/Validation.hpp"
 #include "Models/Supervised/Regression/RidgeReg.hpp"
 
 using namespace Utils;
 
 namespace Reg {
-
-void RidgeRegression::fit(const Dataframe& x, const Dataframe& y) {
-    
-    auto [x_const, XtXInv] = fit_without_stats(x, y);
-    compute_stats(x, x_const, XtXInv, y);
-}
 
 std::pair<Dataframe, Dataframe> RidgeRegression::fit_without_stats(const Dataframe& x, const Dataframe& y) {
     
@@ -28,17 +17,17 @@ std::pair<Dataframe, Dataframe> RidgeRegression::fit_without_stats(const Datafra
         throw std::invalid_argument("Need x col-major");
     }
 
-    size_t n = x.get_rows();
+    size_t p = x.get_cols();
 
     // Center our data 
     auto [X_c, Y_c, x_mean] = center_data(x, y);
 
     // Lambda * Id Matrix
-    std::vector<double> lambId(n*n, 0.0);
-    for (size_t i = 0; i < n; i++) {
-        lambId[i*n + i] = lambda_;
+    std::vector<double> lambId(p*p, 0.0);
+    for (size_t i = 0; i < p; i++) {
+        lambId[i*p + i] = lambda_;
     }
-    Dataframe LambId = {n, n, false, std::move(lambId)};
+    Dataframe LambId = {p, p, false, std::move(lambId)};
 
     // Need X_t row-major (for mult ops)
     Dataframe X_t = ~X_c;  // Transpose change it to col-major
@@ -46,7 +35,7 @@ std::pair<Dataframe, Dataframe> RidgeRegression::fit_without_stats(const Datafra
 
     // Calculate Beta (our estimator) for Ridge Regression
     Dataframe XtXInv = (X_t*X_c + LambId).inv();
-    XtXInv.change_layout_inplace();
+    XtXInv.is_symmetric();
     Dataframe beta_est =  XtXInv * (X_t * Y_c);  
 
     // Results
@@ -60,7 +49,7 @@ std::pair<Dataframe, Dataframe> RidgeRegression::fit_without_stats(const Datafra
     return {X_c, XtXInv};
 }
 
-std::vector<double> RidgeRegression::lambda_path(double start, double end, int nb) const {
+void RidgeRegression::optimal_lambda(double start, double end, int nb, const Dataframe& x, const Dataframe& y) {
     std::vector<double> path(nb);
     double log_min = log(start);
     double log_max = log(end);
@@ -69,30 +58,49 @@ std::vector<double> RidgeRegression::lambda_path(double start, double end, int n
     for (int i = 0; i < nb; i++) {
         path[i] = exp(log_min + i * step);
     }
-    return path;
+
+    std::vector<std::vector<double>> param_grid = {path};
+    Validation::GSres res = Validation::GSearchCV(this, x, y, param_grid);
+
+    lambda_ = res.best_params[0];
 }
 
-double RidgeRegression::effective_df(const Dataframe& x) const {
+double RidgeRegression::effective_df(Dataframe& X_c, Dataframe& XtXInv) const {
 
-    // Convert to use Eigen function (see doc for more details)
-    Eigen::Map<const Eigen::MatrixXd> X(
-        x.get_db(), 
-        static_cast<Eigen::Index>(x.get_rows()), 
-        static_cast<Eigen::Index>(x.get_cols())
-    );
+    basic_verif(X_c);
+    basic_verif(XtXInv);
+    size_t n = X_c.get_rows();
 
-    // SVD
-    Eigen::BDCSVD<Eigen::MatrixXd> svd(X, Eigen::ComputeThinU | Eigen::ComputeThinV);
+    // Need X_t col major 
+    Dataframe X_t = ~X_c;           // Transpose change it to col-major
+    if (!X_c.get_storage()) X_c.change_layout_inplace();        // Need to be row_major for next operation
+    if (!XtXInv.get_storage()) XtXInv.is_symmetric();  // Need to be row_major for next operation
 
-    // Singular Values desc
-    Eigen::VectorXd singular_values = svd.singularValues();
-    std::vector<double> sv(singular_values.data(), singular_values.data() + singular_values.size());
+    // Calculate H matrix
+    Dataframe H =  X_c * (XtXInv * X_t);  
 
-    // Calculate df
+    // Getting effectiv_df
     double df = 0.0;
-    for (size_t i = 0; i < sv.size(); i++) {
-        df += sv[i]*sv[i] / (sv[i]*sv[i] + lambda_);
+    for (size_t i = 0; i < n; i++) {
+        df += H.at(i * n + i);
     }
     return df;
+}
+
+std::unique_ptr<RegressionBase> RidgeRegression::create(const std::vector<double>& params) {
+    return std::make_unique<RidgeRegression>(params[0]);
+}
+
+void RidgeRegression::compute_stats(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) {
+    
+    RegressionBase::compute_stats_penalized(
+        x, x_c, XtXinv, y,
+        [this](Dataframe &a, Dataframe &b) {
+            return effective_df(a, b);
+    });
+}
+
+void RidgeRegression::summary(bool detailled) const {
+    RegressionBase::summary_penalized(lambda_, detailled);
 }
 }

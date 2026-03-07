@@ -9,11 +9,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if(MSVC)
     add_compile_options(
         /W4         # /W4 to get warnings
-        #/O2         # /02 opti-max for balance size/speed
+        #/bigobj     # Eigen generates too many sections
+        /O2         # /02 opti-max for balance size/speed
         /wd4127     # Constant conditionnal expression
         /wd4267     # size_t to int
         /wd4244     # double to int
         /wd4714     # Warning boost
+        /wd4701     # Variable potentialy non init
         /wd5054)    # operator& between enums (Eigen) 
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 else()
@@ -129,11 +131,17 @@ set(LIB_SOURCES
     src/Models/Supervised/Regression/RegBase.cpp
     src/Models/Supervised/Regression/LinearReg.cpp
     src/Models/Supervised/Regression/RidgeReg.cpp
+    src/Models/Supervised/Regression/LassoReg.cpp
+    src/Models/Supervised/Regression/ElasticNetReg.cpp
+    src/Models/Supervised/Regression/StepwiseReg.cpp
 
     # Preprocessing
     src/Preprocessing/Scaling.cpp
     src/Preprocessing/Imputation.cpp
     src/Preprocessing/TrainTestSplit.cpp
+
+    # Validation
+    src/Validation/Validation.cpp
 
     # Stats
     src/Stats/stats_reg.cpp
@@ -224,12 +232,14 @@ if(BUILD_TEST)
     add_executable(test_reg
         tests/regression/tests_main.cpp
         tests/regression/tests_OLS.cpp
+        tests/regression/tests_Reg.cpp
     )
     target_link_libraries(test_reg PRIVATE 
         linalg_full
         test_utils
     )
     add_test(NAME TestOLS COMMAND test_reg OLS)
+    add_test(NAME TestReg COMMAND test_reg Reg)
 endif()
 
 
