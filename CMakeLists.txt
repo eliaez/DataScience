@@ -10,7 +10,7 @@ if(MSVC)
     add_compile_options(
         /W4         # /W4 to get warnings
         #/bigobj     # Eigen generates too many sections
-        #/O2         # /02 opti-max for balance size/speed
+        /O2         # /02 opti-max for balance size/speed
         /wd4127     # Constant conditionnal expression
         /wd4267     # size_t to int
         /wd4244     # double to int

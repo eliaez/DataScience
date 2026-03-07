@@ -132,4 +132,4 @@ std::vector<double> vif = Stats::OLS::VIF(X, omega);
 - [**stats.cpp**](/src/Stats/stats_reg.cpp)
 - [**Test folder**](/tests/)
 
-To read the next part: [**V - Preprocessing & Validation**](/docs/V_preprocess_valid.md).
+To read the next part: [**V - Preprocessing**](/docs/V_preprocessing.md).
