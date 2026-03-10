@@ -51,6 +51,12 @@ namespace Utils {
     template<typename T>
     double Lnorm(const std::vector<const T*>& v, int p, int pow = 1);
 
+    template<typename T>
+    double Lnorm(const std::vector<T>& v, const std::vector<T>& v1, int p, int pow = 1, char op = '+');
+
+    template<typename T>
+    double Lnorm(const std::vector<const T*>& v, const std::vector<T>& v1, int p, int pow = 1, char op = '+');
+
     // Utils
     template<typename T>
     std::vector<T> rangeExcept(T max, T exclude);
@@ -148,11 +154,43 @@ std::vector<T> sub(const std::vector<T>& v, const std::vector<T>& v1) {
 }
 
 template<typename T>
+double Lnorm(const std::vector<T>& v, const std::vector<T>& v1, int p, int pow, char op) {
+
+    double sum = 0.0;
+    if (op == '-')
+        for (size_t i = 0; i < v.size(); i++) {
+            sum += std::pow(std::abs(v[i] - v1[i]), p);
+        }
+    else if (op == '+') {
+        for (size_t i = 0; i < v.size(); i++) {
+            sum += std::pow(std::abs(v[i] + v1[i]), p);
+        }
+    }
+    return std::pow(sum, (1 / p) * pow);
+}
+
+template<typename T>
+double Lnorm(const std::vector<const T*>& v, const std::vector<T>& v1, int p, int pow, char op) {
+
+    double sum = 0.0;
+    if (op == '-')
+        for (size_t i = 0; i < v.size(); i++) {
+            sum += std::pow(std::abs((*v[i]) - v1[i]), p);
+        }
+    else if (op == '+') {
+        for (size_t i = 0; i < v.size(); i++) {
+            sum += std::pow(std::abs((*v[i]) + v1[i]), p);
+        }
+    }
+    return std::pow(sum, (1 / p) * pow);
+}
+
+template<typename T>
 double Lnorm(const std::vector<T>& v, int p, int pow) {
 
     double sum = 0.0;
     for (size_t i = 0; i < v.size(); i++) {
-        sum += std::pow(abs(v[i]), p);
+        sum += std::pow(std::abs(v[i]), p);
     }
     return std::pow(sum, (1 / p) * pow);
 }
@@ -162,7 +200,7 @@ double Lnorm(const std::vector<const T*>& v, int p, int pow) {
 
     double sum = 0.0;
     for (size_t i = 0; i < v.size(); i++) {
-        sum += std::pow(abs((*v[i])), p);
+        sum += std::pow(std::abs((*v[i])), p);
     }
     return std::pow(sum, (1 / p) * pow);
 }

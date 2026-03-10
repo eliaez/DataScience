@@ -72,7 +72,7 @@ std::pair<Dataframe, Dataframe> ElasticRegression::fit_without_stats(const Dataf
         for (size_t i = 0; i < diff.size(); i++) {
 
             // Threshold 1e-4
-            if (abs(diff[i]) > 1e-4) {
+            if (std::abs(diff[i]) > 1e-4) {
                 keep_cond = true;
                 break;
             } 
