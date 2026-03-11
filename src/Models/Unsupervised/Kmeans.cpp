@@ -1,5 +1,4 @@
 #include <cmath>
-#include <random>
 #include <numeric>
 #include <algorithm>
 #include <stdexcept>
@@ -15,8 +14,12 @@ void Kmeans::select_optimal_k(const Dataframe& x) {
     std::vector<double> inertia_v;
     for (size_t i = min_max_auto.first; i < min_max_auto.second; i++) {
         k_ = i;
-        fit_predict(x);
+        fit_predict(x, false);
         inertia_v.push_back(inertia_);
+
+        if (i % 1 == 0 || i == (min_max_auto.second - 1)) {
+            std::cout << "Progress to select optimal k: " << (i+1-min_max_auto.first) << "/" << (min_max_auto.second-min_max_auto.first) << " (" << (100 * (i+1-min_max_auto.first) / (min_max_auto.second-min_max_auto.first)) << "%)\n" << std::flush;
+        }   
     }
 
     // Getting best one
@@ -56,9 +59,8 @@ std::vector<int> Kmeans::predict(const Dataframe& x) {
     return labels_;
 }
 
-std::vector<int> Kmeans::fit_predict(const Dataframe& x) {
+std::vector<int> Kmeans::fit_predict(const Dataframe& x, bool show_progression) {
     size_t n = x.get_rows();
-    size_t p = x.get_cols();
 
     if (k_ == -1) select_optimal_k(x);
 
@@ -88,7 +90,7 @@ std::vector<int> Kmeans::fit_predict(const Dataframe& x) {
         std::vector<int> labels;
         std::vector<std::vector<double>> clusters;
         if (method_ == "kmeans") {
-            std::tie(labels, clusters) = batch_kmeans(X_i, indices, rng);
+            std::tie(labels, clusters) = batch_kmeans(X_i, rng);
         }
         else if (method_ == "minibatch") {
             std::tie(labels, clusters) = minibatch_kmeans(X_i, indices, rng);
@@ -104,7 +106,15 @@ std::vector<int> Kmeans::fit_predict(const Dataframe& x) {
         }
         all_labels.push_back(std::move(labels));
         all_clusters.push_back(std::move(clusters));
+
+        // Show progression
+        if (show_progression) {
+            if (k % 1 == 0 || k == (n_init_ - 1)) {
+                std::cout << "Progress: " << (k+1) << "/" << n_init_ << " (" << (100 * (k+1) / n_init_) << "%)\n" << std::flush;
+            }
+        }    
     }
+    std::cout << std::endl;
 
     // Keeping the best one
     auto it = std::min_element(inertia_v.begin(), inertia_v.end());
@@ -116,7 +126,7 @@ std::vector<int> Kmeans::fit_predict(const Dataframe& x) {
     return labels_;
 }
 
-std::vector<std::vector<double>> Kmeans::kmeans_plusplus(const std::vector<std::vector<const double*>>& X_i, const std::mt19937& rng) {
+std::vector<std::vector<double>> Kmeans::kmeans_plusplus(const std::vector<std::vector<const double*>>& X_i, std::mt19937& rng) {
     
     size_t n = X_i.size();
     size_t p = X_i[0].size();
@@ -128,7 +138,7 @@ std::vector<std::vector<double>> Kmeans::kmeans_plusplus(const std::vector<std::
     clusters.reserve(k_);
     for (size_t i = 0; i < k_; i++) {
 
-        int chosen;
+        size_t chosen;
         if (i == 0) 
             chosen = dist(rng);  // First centroid
         else {
@@ -149,7 +159,8 @@ std::vector<std::vector<double>> Kmeans::kmeans_plusplus(const std::vector<std::
                 cdf[j] = cdf[j-1] + min_D[j];
 
             // Draw a random value in [0, total_sum]
-            double r = (static_cast<double>(rand()) / RAND_MAX) * cdf[n-1];
+            std::uniform_real_distribution<double> real_dist(0.0, cdf[n-1]);
+            double r = real_dist(rng);
 
             // Find the corresponding point
             chosen = lower_bound(cdf.begin(), cdf.end(), r) - cdf.begin();
@@ -162,6 +173,7 @@ std::vector<std::vector<double>> Kmeans::kmeans_plusplus(const std::vector<std::
         }
         clusters.push_back(std::move(chosen_point));
     }
+    return clusters;
 }
 
 std::pair<std::vector<int>, std::vector<std::vector<double>>> Kmeans::online_kmeans(
@@ -180,7 +192,8 @@ std::pair<std::vector<int>, std::vector<std::vector<double>>> Kmeans::online_kme
     std::vector<std::vector<double>> old_clusters(k_);
     while (keep_cond && idx < max_iter_) {
 
-        // Reset count
+        // Reset count and update old_clusters
+        old_clusters = clusters;
         std::fill(count_clusters.begin(), count_clusters.end(), 0);
         
         // For each obs calculate it's euclidian distance from each centroid
@@ -190,11 +203,9 @@ std::pair<std::vector<int>, std::vector<std::vector<double>>> Kmeans::online_kme
             // Assigning a cluster to obs i 
             std::vector<double> center_dist(k_);
             for (size_t j = 0; j < k_; j++) 
-                center_dist[j] = Lnorm(X_i[i], clusters[j], 2, 1, '-');
+                center_dist[j] = Lnorm(X_i[i], clusters[j], 2, 2, '-');
 
-            int it = std::min_element(center_dist.begin(), center_dist.end()) - center_dist.begin();
-            int old_idx = labels[i];
-            labels[i] = it;
+            labels[i] = std::min_element(center_dist.begin(), center_dist.end()) - center_dist.begin();
 
             // Updating cluster
             count_clusters[labels[i]]++;
@@ -206,20 +217,19 @@ std::pair<std::vector<int>, std::vector<std::vector<double>>> Kmeans::online_kme
         if (idx >= 1) {
             keep_cond = false;
             for (size_t j = 0; j < k_; j++) {
-                if (Lnorm(clusters[j], old_clusters[j], 2, 1, '-') > 1e-4) {
+                if (Lnorm(clusters[j], old_clusters[j], 2, 2, '-') > 1e-4) {
                     keep_cond = true;
                     break;
                 }
             }
         }
-        old_clusters = clusters;
         idx++;
     }
     return {labels, clusters};
 }
 
 std::pair<std::vector<int>, std::vector<std::vector<double>>> Kmeans::batch_kmeans(
-    const std::vector<std::vector<const double*>>& X_i, std::vector<size_t>& indices, std::mt19937& rng) {
+    const std::vector<std::vector<const double*>>& X_i, std::mt19937& rng) {
     
     // Init
     size_t n = X_i.size();
@@ -234,8 +244,9 @@ std::pair<std::vector<int>, std::vector<std::vector<double>>> Kmeans::batch_kmea
     std::vector<std::vector<double>> old_clusters(k_);
     while (keep_cond && idx < max_iter_) {
 
-        // Reset count and centroid
-        for (auto& c : clusters) std::fill(c.begin(), c.end(), 0.0);
+        // Reset new and update old clusters
+        old_clusters = clusters;
+        std::vector<std::vector<double>> new_clusters(k_, std::vector<double>(p, 0.0));
         std::fill(count_clusters.begin(), count_clusters.end(), 0);
         
         // For each obs calculate it's euclidian distance from each centroid
@@ -244,7 +255,7 @@ std::pair<std::vector<int>, std::vector<std::vector<double>>> Kmeans::batch_kmea
             // Assigning a cluster to obs i 
             std::vector<double> center_dist(k_);
             for (size_t j = 0; j < k_; j++) 
-                center_dist[j] = Lnorm(X_i[i], clusters[j], 2, 1, '-');
+                center_dist[j] = Lnorm(X_i[i], old_clusters[j], 2, 2, '-');
 
             labels[i] = std::min_element(center_dist.begin(), center_dist.end()) - center_dist.begin();
         }
@@ -254,20 +265,20 @@ std::pair<std::vector<int>, std::vector<std::vector<double>>> Kmeans::batch_kmea
             
             count_clusters[labels[i]]++;
             for (size_t j = 0; j < p; j++)
-                clusters[labels[i]][j] += (*X_i[i][j] - clusters[labels[i]][j]) / count_clusters[labels[i]];
+                new_clusters[labels[i]][j] += (*X_i[i][j] - new_clusters[labels[i]][j]) / count_clusters[labels[i]];
         }
+        clusters = new_clusters;
 
         // Check Cv
         if (idx >= 1) {
             keep_cond = false;
             for (size_t j = 0; j < k_; j++) {
-                if (Lnorm(clusters[j], old_clusters[j], 2, 1, '-') > 1e-4) {
+                if (Lnorm(clusters[j], old_clusters[j], 2, 2, '-') > 1e-4) {
                     keep_cond = true;
                     break;
                 }
             }
         }
-        old_clusters = clusters;
         idx++;
     }
     return {labels, clusters};
@@ -289,7 +300,8 @@ std::pair<std::vector<int>, std::vector<std::vector<double>>> Kmeans::minibatch_
     std::vector<std::vector<double>> old_clusters(k_);
     while (keep_cond && idx < max_iter_) {
 
-        // Reset count
+        // Reset count and update old clusters
+        old_clusters = clusters;
         std::fill(count_clusters.begin(), count_clusters.end(), 0);
         
         // For each obs calculate it's euclidian distance from each centroid
@@ -300,7 +312,7 @@ std::pair<std::vector<int>, std::vector<std::vector<double>>> Kmeans::minibatch_
             // Assigning a cluster to obs i 
             std::vector<double> center_dist(k_);
             for (size_t j = 0; j < k_; j++) 
-                center_dist[j] = Lnorm(X_i[i], clusters[j], 2, 1, '-');
+                center_dist[j] = Lnorm(X_i[i], clusters[j], 2, 2, '-');
 
             labels[i] = std::min_element(center_dist.begin(), center_dist.end()) - center_dist.begin();
         }
@@ -316,13 +328,12 @@ std::pair<std::vector<int>, std::vector<std::vector<double>>> Kmeans::minibatch_
         if (idx >= 1) {
             keep_cond = false;
             for (size_t j = 0; j < k_; j++) {
-                if (Lnorm(clusters[j], old_clusters[j], 2, 1, '-') > 1e-4) {
+                if (Lnorm(clusters[j], old_clusters[j], 2, 2, '-') > 1e-4) {
                     keep_cond = true;
                     break;
                 }
             }
         }
-        old_clusters = clusters;
         idx++;
     }
 
@@ -331,7 +342,7 @@ std::pair<std::vector<int>, std::vector<std::vector<double>>> Kmeans::minibatch_
 
         std::vector<double> center_dist(k_);
         for (size_t j = 0; j < k_; j++) {
-            center_dist[j] = Lnorm(X_i[i], clusters[j], 2, 1, '-');
+            center_dist[j] = Lnorm(X_i[i], clusters[j], 2, 2, '-');
         }
         labels[i] = std::min_element(center_dist.begin(), center_dist.end()) - center_dist.begin();
     }

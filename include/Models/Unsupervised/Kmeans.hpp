@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <string>
+#include <random>
 
 class Dataframe;
 
@@ -20,7 +21,7 @@ class Kmeans {
         void select_optimal_k(const Dataframe& x);
 
         // Function for the init k-means++
-        std::vector<std::vector<double>> kmeans_plusplus(const std::vector<std::vector<const double*>>& X_i, const std::mt19937& rng);
+        std::vector<std::vector<double>> kmeans_plusplus(const std::vector<std::vector<const double*>>& X_i, std::mt19937& rng);
 
         // Function to run Online Kmeans (centroid are updated after each point)
         std::pair<std::vector<int>, std::vector<std::vector<double>>> online_kmeans(
@@ -31,8 +32,7 @@ class Kmeans {
 
         // Function to run Batch Kmeans (default one) (centroid are updated after N points)
         std::pair<std::vector<int>, std::vector<std::vector<double>>> batch_kmeans(
-            const std::vector<std::vector<const double*>>& X_i, 
-            std::vector<size_t>& indices,
+            const std::vector<std::vector<const double*>>& X_i,
             std::mt19937& rng
         );
 
@@ -55,7 +55,7 @@ class Kmeans {
         std::vector<int> predict(const Dataframe& x);
 
         // Kmeans function using initialisation "Kmeans++" to have a better start and results
-        std::vector<int> fit_predict(const Dataframe& x);
+        std::vector<int> fit_predict(const Dataframe& x, bool show_progression = true);
 
         // Setter
         void set_n_init(int n_init) { n_init_ = n_init; }

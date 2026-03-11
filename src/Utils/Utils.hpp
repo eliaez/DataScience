@@ -166,7 +166,7 @@ double Lnorm(const std::vector<T>& v, const std::vector<T>& v1, int p, int pow, 
             sum += std::pow(std::abs(v[i] + v1[i]), p);
         }
     }
-    return std::pow(sum, (1 / p) * pow);
+    return std::pow(sum, (1.0 / p) * pow);
 }
 
 template<typename T>
@@ -182,7 +182,7 @@ double Lnorm(const std::vector<const T*>& v, const std::vector<T>& v1, int p, in
             sum += std::pow(std::abs((*v[i]) + v1[i]), p);
         }
     }
-    return std::pow(sum, (1 / p) * pow);
+    return std::pow(sum, (1.0 / p) * pow);
 }
 
 template<typename T>
@@ -192,7 +192,7 @@ double Lnorm(const std::vector<T>& v, int p, int pow) {
     for (size_t i = 0; i < v.size(); i++) {
         sum += std::pow(std::abs(v[i]), p);
     }
-    return std::pow(sum, (1 / p) * pow);
+    return std::pow(sum, (1.0 / p) * pow);
 }
 
 template<typename T>
@@ -202,7 +202,7 @@ double Lnorm(const std::vector<const T*>& v, int p, int pow) {
     for (size_t i = 0; i < v.size(); i++) {
         sum += std::pow(std::abs((*v[i])), p);
     }
-    return std::pow(sum, (1 / p) * pow);
+    return std::pow(sum, (1.0 / p) * pow);
 }
 
 template<typename T>

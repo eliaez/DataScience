@@ -135,6 +135,9 @@ set(LIB_SOURCES
     src/Models/Supervised/Regression/ElasticNetReg.cpp
     src/Models/Supervised/Regression/StepwiseReg.cpp
 
+    # Unsupervised
+    src/Models/Unsupervised/Kmeans.cpp
+
     # Preprocessing
     src/Preprocessing/PCA.cpp
     src/Preprocessing/Scaling.cpp
