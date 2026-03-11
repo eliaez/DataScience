@@ -21,27 +21,37 @@ class Kmeans {
         void select_optimal_k(const Dataframe& x);
 
         // Function for the init k-means++
-        std::vector<std::vector<double>> kmeans_plusplus(const std::vector<std::vector<const double*>>& X_i, std::mt19937& rng);
+        std::vector<std::vector<double>> kmeans_plusplus(
+            const std::vector<std::vector<const double*>>& X_i, 
+            std::mt19937& rng,
+            int k
+        );
 
         // Function to run Online Kmeans (centroid are updated after each point)
         std::pair<std::vector<int>, std::vector<std::vector<double>>> online_kmeans(
             const std::vector<std::vector<const double*>>& X_i, 
             std::vector<size_t>& indices,
-            std::mt19937& rng
+            std::mt19937& rng,
+            int k
         );
 
         // Function to run Batch Kmeans (default one) (centroid are updated after N points)
         std::pair<std::vector<int>, std::vector<std::vector<double>>> batch_kmeans(
             const std::vector<std::vector<const double*>>& X_i,
-            std::mt19937& rng
+            std::mt19937& rng,
+            int k
         );
 
         // Function to run MiniBatch Kmeans (default one) (centroid are updated after sqrt(N) points)
         std::pair<std::vector<int>, std::vector<std::vector<double>>> minibatch_kmeans(
             const std::vector<std::vector<const double*>>& X_i, 
             std::vector<size_t>& indices,
-            std::mt19937& rng
+            std::mt19937& rng,
+            int k
         );
+
+        // fit for threaded function
+        double fit_threaded(const Dataframe& x, int k);
 
     public:
         // If k == -1, algo will select for you the optimal nb of clusters using elbow method
