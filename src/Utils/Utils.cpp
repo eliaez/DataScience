@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "Utils/Utils.hpp"
 
 namespace Utils {
@@ -14,4 +15,10 @@ namespace Utils {
         return _mm_cvtsd_f64(sum128);
     }
 #endif
+
+bool allIntegers(const std::vector<const double*>& col) {
+    return std::all_of(col.begin(), col.end(), [](const double* v) {
+        return std::isnan(*v) || (*v == std::floor(*v));
+    });
+}
 }

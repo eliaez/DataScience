@@ -51,6 +51,7 @@ void Kmeans::select_optimal_k(const Dataframe& x) {
                 std::cout << "Progress to select optimal k: " << (i+1-min_max_auto.first) << "/" << (min_max_auto.second-min_max_auto.first) << " (" << (100 * (i+1-min_max_auto.first) / (min_max_auto.second-min_max_auto.first)) << "%)\n" << std::flush;
             }   
         }
+        std::cout << std::endl;
     }
 
     // Getting best one

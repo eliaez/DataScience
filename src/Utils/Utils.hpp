@@ -57,12 +57,19 @@ namespace Utils {
     template<typename T>
     double Lnorm(const std::vector<const T*>& v, const std::vector<T>& v1, int p, int pow = 1, char op = '+');
 
+    // Norm L**p NAN proof
+    template<typename T>
+    double Lnorm_nan(const std::vector<const T*>& v, const std::vector<const T*>& v1, int p, int pow = 1, char op = '+');
+
     // Utils
     template<typename T>
     std::vector<T> rangeExcept(T max, T exclude);
 
     template<typename T>
     T mostFrequent(const std::vector<T>& v);
+
+    // To check if a col is categorial or not
+    bool allIntegers(const std::vector<const double*>& col);
 
 // ----------------------------------Implementation----------------------------------
 
@@ -154,6 +161,26 @@ std::vector<T> sub(const std::vector<T>& v, const std::vector<T>& v1) {
 }
 
 template<typename T>
+double Lnorm(const std::vector<T>& v, int p, int pow) {
+
+    double sum = 0.0;
+    for (size_t i = 0; i < v.size(); i++) {
+        sum += std::pow(std::abs(v[i]), p);
+    }
+    return std::pow(sum, (1.0 / p) * pow);
+}
+
+template<typename T>
+double Lnorm(const std::vector<const T*>& v, int p, int pow) {
+
+    double sum = 0.0;
+    for (size_t i = 0; i < v.size(); i++) {
+        sum += std::pow(std::abs((*v[i])), p);
+    }
+    return std::pow(sum, (1.0 / p) * pow);
+}
+
+template<typename T>
 double Lnorm(const std::vector<T>& v, const std::vector<T>& v1, int p, int pow, char op) {
 
     double sum = 0.0;
@@ -186,23 +213,27 @@ double Lnorm(const std::vector<const T*>& v, const std::vector<T>& v1, int p, in
 }
 
 template<typename T>
-double Lnorm(const std::vector<T>& v, int p, int pow) {
-
+double Lnorm_nan(const std::vector<const T*>& v, const std::vector<const T*>& v1, int p, int pow, char op) {
+    
     double sum = 0.0;
-    for (size_t i = 0; i < v.size(); i++) {
-        sum += std::pow(std::abs(v[i]), p);
+    double count = 0.0;
+    if (op == '-')
+        for (size_t i = 0; i < v.size(); i++) {
+            if (!std::isnan(*v[i]) && !std::isnan(*v1[i])) {
+                sum += std::pow(std::abs((*v[i]) - (*v1[i])), p);
+                count++;
+            }
+        }
+    else if (op == '+') {
+        for (size_t i = 0; i < v.size(); i++) {
+            if (!std::isnan(*v[i]) && !std::isnan(*v1[i])) {
+                sum += std::pow(std::abs((*v[i]) + (*v1[i])), p);
+                count++;
+            }
+        }
     }
-    return std::pow(sum, (1.0 / p) * pow);
-}
-
-template<typename T>
-double Lnorm(const std::vector<const T*>& v, int p, int pow) {
-
-    double sum = 0.0;
-    for (size_t i = 0; i < v.size(); i++) {
-        sum += std::pow(std::abs((*v[i])), p);
-    }
-    return std::pow(sum, (1.0 / p) * pow);
+    if (count == 0) return NAN;
+    return std::pow(sum / count, (1.0 / p) * pow);
 }
 
 template<typename T>
@@ -234,5 +265,4 @@ T mostFrequent(const std::vector<T>& v) {
     }
     return best;
 }
-
 }

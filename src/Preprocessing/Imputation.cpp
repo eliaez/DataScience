@@ -4,6 +4,8 @@
 #include "Utils/Utils.hpp"
 #include "Preprocessing/Imputation.hpp"
 
+using namespace Utils;
+
 namespace Imputation {
 
 void imputation(Dataframe& x, size_t j, const std::string& method) {
@@ -55,7 +57,7 @@ void imputation(Dataframe& x, size_t j, const std::string& method) {
             if (!std::isnan(v)) col_j[i] = v;
         }
 
-        double most = Utils::mostFrequent(col_j);
+        double most = mostFrequent(col_j);
 
         // Change NAN of our col
         for (size_t i = 0; i < n; i++) {
@@ -140,5 +142,97 @@ void imputation(Dataframe& x, const std::string& col_name, const std::string& me
     else {
         throw std::invalid_argument(std::format("Column {} not found", col_name));
     }
+}
+
+void KNN_imputer(Dataframe& x, int K, int Lp_norm) {
+
+    size_t n = x.get_rows();
+    size_t p = x.get_cols();
+
+    if (x.get_storage()) x.change_layout_inplace();
+    Dataframe x_copy = x;
+
+    // Getting ptrs to each row
+    std::vector<std::vector<const double*>> X_i(n);
+    for (size_t i = 0; i < n; i++) {
+        X_i[i] = x_copy.getRowPtrs(i);
+    }
+
+    // Getting categorial cols
+    std::vector<bool> col_categorial(p);
+    for (size_t i = 0; i < p; i++) {
+        col_categorial[i] = allIntegers(x_copy.getColumnPtrs(i));
+    }
+
+    // Going through the whole dataframe to detect NAN
+    for (size_t j = 0; j < p; j++) {
+        for (size_t i = 0; i < n; i++) {
+            
+            // If nan then KNN
+            if (std::isnan(x.at(j * n + i))) {
+                
+                // Calculating distance
+                std::vector<std::pair<int, double>> dist_v;
+                dist_v.reserve(n-1);
+                for (size_t k = 0; k < n; k++) {
+
+                    if (std::isnan(x_copy.at(j * n + k))) continue;
+                    
+                    double dist = Lnorm_nan(X_i[i], X_i[k], Lp_norm, 1, '-');
+                    if (!std::isnan(dist)) dist_v.push_back({k, dist});
+                }
+
+                if (dist_v.empty()) continue;
+
+                // Sort our vector
+                std::sort(dist_v.begin(), dist_v.end(), [](const auto& a, const auto& b) {
+                    return a.second < b.second;
+                });
+
+                // If identical neighbor
+                if (dist_v[0].second == 0.0) {
+                    x.at(j * n + i) = x_copy.at(j * n + dist_v[0].first);
+                }
+                // Categorial col
+                else if (col_categorial[j]) {
+                    std::unordered_map<int, double> votes;
+                    size_t effective_K = std::min((size_t)K, dist_v.size());
+                    for (size_t k = 0; k < effective_K; k++) {
+                        int category = static_cast<int>(x_copy.at(j * n + dist_v[k].first));
+                        double weight = 1.0 / dist_v[k].second;
+                        votes[category] += weight;
+                    }
+
+                    // Getting best category with score
+                    int best_category = -1;
+                    double best_score = -1.0;
+                    for (auto& [category, score] : votes) {
+                        if (score > best_score) {
+                            best_score = score;
+                            best_category = category;
+                        }
+                    }
+
+                    x.at(j * n + i) = static_cast<double>(best_category);
+                }
+                // Numerical col
+                else {
+                    double sum_num = 0.0;
+                    double sum_denum = 0.0;
+                    size_t effective_K = std::min((size_t)K, dist_v.size());
+                    for (size_t k = 0; k < effective_K; k++) {
+                        sum_num += x_copy.at(j * n + dist_v[k].first) / dist_v[k].second;
+                        sum_denum += 1.0 / dist_v[k].second;
+                    }
+                    x.at(j * n + i) = sum_num / sum_denum;
+                }
+            }
+        }
+        // Show progression
+        if (j % 2 == 0 || j == (p - 1)) {
+            std::cout << "Progress: " << (j+1) << "/" << p << " (" << (100 * (j+1) / p) << "%)\n" << std::flush;
+        }
+    }
+    std::cout << std::endl;
 }
 }
