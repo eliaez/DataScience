@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include "Data/Data.hpp"
 #include "Utils/Utils.hpp"
+#include "Utils/ThreadPool.hpp"
 #include "Preprocessing/Imputation.hpp"
 
 using namespace Utils;
@@ -158,11 +159,21 @@ void KNN_imputer(Dataframe& x, int K, int Lp_norm) {
         X_i[i] = x_copy.getRowPtrs(i);
     }
 
-    // Getting categorial cols
-    std::vector<bool> col_categorial(p);
+    // Getting categorical cols
+    std::vector<bool> col_categorical(p);
     for (size_t i = 0; i < p; i++) {
-        col_categorial[i] = allIntegers(x_copy.getColumnPtrs(i));
+        col_categorical[i] = allIntegers(x_copy.getColumnPtrs(i));
     }
+
+    // Only if gower distance
+    std::vector<double> col_ranges;
+    if (Lp_norm == -1) col_ranges = compute_ranges(x.get_data(), n, p, col_categorical, x.get_storage());
+
+    // ThreadPool Variables
+    ThreadPool& pool = ThreadPool::instance();
+    size_t nb_threads = pool.nb_threads;
+    std::vector<std::future<void>> futures;
+    futures.reserve(nb_threads);
 
     // Going through the whole dataframe to detect NAN
     for (size_t j = 0; j < p; j++) {
@@ -172,14 +183,42 @@ void KNN_imputer(Dataframe& x, int K, int Lp_norm) {
             if (std::isnan(x.at(j * n + i))) {
                 
                 // Calculating distance
-                std::vector<std::pair<int, double>> dist_v;
-                dist_v.reserve(n-1);
-                for (size_t k = 0; k < n; k++) {
+                std::vector<std::pair<int, double>> dist_v(n, {-1, std::numeric_limits<double>::max()});
+                if (n >= 512) {
+                    size_t chunk = (int)(n / nb_threads);
+                    size_t start = 0, end = chunk;
+                    for (size_t nb = 0; nb < nb_threads; nb++) {
+                        if (nb+1 == nb_threads) end = n;
 
-                    if (std::isnan(x_copy.at(j * n + k))) continue;
-                    
-                    double dist = Lnorm_nan(X_i[i], X_i[k], Lp_norm, 1, '-');
-                    if (!std::isnan(dist)) dist_v.push_back({k, dist});
+                        auto fut = pool.enqueue([start, end, i, j, n, p, Lp_norm, &x_copy, &X_i, &dist_v, &col_categorical, &col_ranges] {
+                            for (size_t k = start; k < end; k++) {
+                                if (std::isnan(x_copy.at(j * n + k))) continue;
+                                
+                                double dist;
+                                if (Lp_norm == -1) dist = gower_nan(X_i[i], X_i[k], col_categorical, col_ranges);
+                                else dist = Lnorm_nan(X_i[i], X_i[k], Lp_norm, 1, '-');
+
+                                if (!std::isnan(dist)) dist_v[k] = {k, dist};
+                            }
+                        });
+                        futures.push_back(std::move(fut));
+                        start += chunk;
+                        end += chunk;
+                    }
+                    for (auto& fut : futures) fut.wait();
+                    futures.clear();
+                }
+                else {
+                    for (size_t k = 0; k < n; k++) {
+
+                        if (std::isnan(x_copy.at(j * n + k))) continue;
+                        
+                        double dist;
+                        if (Lp_norm == -1) dist = gower_nan(X_i[i], X_i[k], col_categorical, col_ranges);
+                        else dist = Lnorm_nan(X_i[i], X_i[k], Lp_norm, 1, '-');
+
+                        if (!std::isnan(dist)) dist_v[k] = {k, dist};
+                    }
                 }
 
                 if (dist_v.empty()) continue;
@@ -193,8 +232,8 @@ void KNN_imputer(Dataframe& x, int K, int Lp_norm) {
                 if (dist_v[0].second == 0.0) {
                     x.at(j * n + i) = x_copy.at(j * n + dist_v[0].first);
                 }
-                // Categorial col
-                else if (col_categorial[j]) {
+                // categorical col
+                else if (col_categorical[j]) {
                     std::unordered_map<int, double> votes;
                     size_t effective_K = std::min((size_t)K, dist_v.size());
                     for (size_t k = 0; k < effective_K; k++) {
