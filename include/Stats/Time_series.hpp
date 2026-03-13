@@ -33,8 +33,11 @@ namespace Stats_TS {
             std::vector<int> get_params() { return {p_, d_, q_, s_, seasonal_ ? 1 : 0}; }
     };
 
-    // Augmented Dickey-Fuller test with y, will return if stationarity or not
-    bool ADF_test(const std::vector<double>& y);
+    // PACF through Durbin-Levinson, will return p
+    int Pacf(const std::vector<double>& y);
+
+    // Augmented Dickey-Fuller test with y, will return adf_stat
+    double ADF_test(const std::vector<double>& y);
 
     // Necessary for ADF
     double critical_value_MacKinon(size_t n);

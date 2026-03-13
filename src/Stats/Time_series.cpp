@@ -6,17 +6,90 @@
 
 namespace Stats_TS {
 
+void ARIMA::fit(const std::vector<double>& col) {
 
+    // Detect d
+    int d = 0;
+    bool keep_cond = true;
+    std::vector<double> y = col;
+    while (keep_cond && d < 3) {
 
+        // Diff
+        if (d > 0) {
+            std::vector<double> diff;
+            diff.reserve(y.size() - 1);
+            for (size_t i = 1; i < y.size(); i++) {
+                diff.push_back(y[i] - y[i-1]);
+            }   
+            y = diff;
+        }
 
+        // ADF test
+        double adf_stat = ADF_test(y);
+        double cv = critical_value_MacKinon(y.size());
+        if (adf_stat < cv) keep_cond = false;
+        else d++;
+    }
+    d_ = d;
 
+    // Detect p (AR)
+    p_ = Pacf(y);
 
+    // Detect q (MA)
 
+}
 
+int Pacf(const std::vector<double>& y) {
 
+    size_t n = y.size();
+    double mean_y = Stats::mean(y);
+    size_t kmax = std::sqrt(n) > 40 ? 40 : std::sqrt(n);
+    std::vector<std::vector<double>> phi(kmax + 1, std::vector<double>(kmax + 1, 0.0));
 
+    // Calculate auto-covar for all k
+    double gamma_0;
+    std::vector<double> rho(kmax + 1, 0.0);
+    for (size_t k = 0; k <= kmax; k++) {
+        
+        double gamma = 0.0;
+        for (size_t i = k; i < n; i++) {
+            gamma += (y[i] - mean_y) * (y[i-k] - mean_y);
+        }   
+        gamma /= n;
+        if (k == 0) gamma_0 = gamma;
+        rho[k] = gamma / gamma_0;
+    }
 
-bool ADF_test(const std::vector<double>& y) {
+    // Durbin-Levinson
+    int p = 0;
+    phi[1][1] = rho[1];
+    double seuil = 1.96 / std::sqrt(n);
+
+    // Test 1
+    if (std::abs(phi[1][1]) > seuil) p = 1;
+
+    for (size_t k = 2; k <= kmax; k++) {
+
+        // Calculate phi_k,k
+        double sum0 = 0.0, sum1 = 0.0;
+        for (size_t j = 1; j <= k-1; j++) {
+            sum0 += phi[k-1][j] * rho[k-j];
+            sum1 += phi[k-1][j] * rho[j];
+        }
+        phi[k][k] = (rho[k] - sum0) / (1 - sum1);
+
+        // Calculate intermediary values
+        for (size_t j = 1; j <= k-1; j++) {
+            phi[k][j] = phi[k-1][j] - phi[k][k] * phi[k-1][k-j];
+        }
+
+        // Test
+        if (std::abs(phi[k][k]) > seuil) p = k;
+    }
+    return p;
+}
+
+double ADF_test(const std::vector<double>& y) {
 
     // Schwert rule
     size_t n = y.size();
@@ -63,9 +136,8 @@ bool ADF_test(const std::vector<double>& y) {
     double gamma = LinReg.get_coeffs()[2];
     double se_gamma = Stats::OLS::stderr_b(residuals, XtXinv)[2];
     double adf_stat = gamma / se_gamma;
-    double cv = critical_value_MacKinon(n);
 
-    return adf_stat < cv;
+    return adf_stat;
 }
 
 double critical_value_MacKinon(size_t n) {
