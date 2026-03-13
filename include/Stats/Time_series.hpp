@@ -33,10 +33,22 @@ namespace Stats_TS {
             std::vector<int> get_params() { return {p_, d_, q_, s_, seasonal_ ? 1 : 0}; }
     };
 
-    // PACF through Durbin-Levinson, will return p
+    // FFT (Fast Fourier Transformation)
+    int Fft(const std::vector<double>& y);
+
+    // Seasonality test Kruskal_Wallis
+    bool Kruskal_Wallis(const std::vector<double>& y, int s);
+
+    // ACF to find period (seasonality), will return s
+    int Acf_s(const std::vector<double>& y);
+
+    // ACF, will return q (MA)
+    int Acf(const std::vector<double>& y);
+
+    // PACF through Durbin-Levinson, will return p (AR)
     int Pacf(const std::vector<double>& y);
 
-    // Augmented Dickey-Fuller test with y, will return adf_stat
+    // Augmented Dickey-Fuller test with y, will return adf_stat for stationarity
     double ADF_test(const std::vector<double>& y);
 
     // Necessary for ADF

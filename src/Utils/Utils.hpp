@@ -73,6 +73,9 @@ namespace Utils {
     template<typename T>
     T mostFrequent(const std::vector<T>& v);
 
+    // To get ranks from data in a vector 
+    std::vector<double> compute_ranks(const std::vector<double>& v);
+
     // To get ranges from each cols
     std::vector<double> compute_ranges(const std::vector<double>& data, size_t n_rows, size_t n_cols, 
         const std::vector<bool>& is_categorical, bool is_row_major);

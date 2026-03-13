@@ -16,6 +16,36 @@ namespace Utils {
     }
 #endif
 
+std::vector<double> compute_ranks(const std::vector<double>& v) {
+    
+    // Getting data and idx before sorting
+    size_t n = v.size();
+    std::vector<std::pair<double, size_t>> sorted(n);
+    for (size_t i = 0; i < n; i++)
+        sorted[i] = {v[i], i};
+    
+    std::sort(sorted.begin(), sorted.end());
+    
+    std::vector<double> ranks(n);
+    size_t i = 0;
+    while (i < n) {
+
+        size_t j = i;
+        while (j < n && sorted[j].first == sorted[i].first)
+            j++;
+        
+        // Mean rank for ==
+        double avg_rank = (i + 1 + j) / 2.0;
+        
+        for (size_t k = i; k < j; k++)
+            ranks[sorted[k].second] = avg_rank;
+        
+        i = j;
+    }
+    
+    return ranks;
+}
+
 std::vector<double> compute_ranges(const std::vector<double>& data, size_t n_rows, size_t n_cols, 
     const std::vector<bool>& is_categorical, bool is_row_major) {
     

@@ -1,49 +1,240 @@
 #include <cmath>
+#include <complex>
 #include "Data/Data.hpp"
+#include "Utils/Utils.hpp"
 #include "Stats/stats_reg.hpp"
 #include "Stats/Time_series.hpp"
+#include <boost/math/distributions/chi_squared.hpp>
 #include "Models/Supervised/Regression/LinearReg.hpp"
+
+using namespace Utils;
 
 namespace Stats_TS {
 
 void ARIMA::fit(const std::vector<double>& col) {
 
-    // Detect d
-    int d = 0;
-    bool keep_cond = true;
-    std::vector<double> y = col;
-    while (keep_cond && d < 3) {
+    std::vector<double> y;
 
-        // Diff
-        if (d > 0) {
-            std::vector<double> diff;
-            diff.reserve(y.size() - 1);
-            for (size_t i = 1; i < y.size(); i++) {
-                diff.push_back(y[i] - y[i-1]);
-            }   
-            y = diff;
+    // Detect d (stationarity)
+    if (d_ == -1) {
+        int d = 0;
+        bool keep_cond = true;
+        y = col;
+        while (keep_cond && d < 3) {
+
+            // Diff
+            if (d > 0) {
+                std::vector<double> diff;
+                diff.reserve(y.size() - 1);
+                for (size_t i = 1; i < y.size(); i++) {
+                    diff.push_back(y[i] - y[i-1]);
+                }   
+                y = diff;
+            }
+
+            // ADF test
+            double adf_stat = ADF_test(y);
+            double cv = critical_value_MacKinon(y.size());
+            if (adf_stat < cv) {
+                keep_cond = false;
+            }
+            else if (d == 2) {
+                d = -2;
+                break;
+            }
+            else d++;
         }
-
-        // ADF test
-        double adf_stat = ADF_test(y);
-        double cv = critical_value_MacKinon(y.size());
-        if (adf_stat < cv) keep_cond = false;
-        else d++;
+        d_ = d;
+        if (d_ == -2) {
+            p_ = -2;
+            q_ = -2;
+        }
     }
-    d_ = d;
 
     // Detect p (AR)
-    p_ = Pacf(y);
+    if (p_ == -1) {
+
+        // If d_ from user input
+        if (y.empty()) {
+            y = col;
+            for (size_t i = 0; i < d_; i++) {
+
+                // Diff
+                std::vector<double> diff;
+                diff.reserve(y.size() - 1);
+                for (size_t i = 1; i < y.size(); i++) {
+                    diff.push_back(y[i] - y[i-1]);
+                }   
+                y = diff;
+            }
+        }
+        p_ = Pacf(y);
+    }
 
     // Detect q (MA)
+    if (q_ == -1) {
 
+        // If d_ from user input
+        if (y.empty()) {
+            y = col;
+            for (size_t i = 0; i < d_; i++) {
+
+                // Diff
+                std::vector<double> diff;
+                diff.reserve(y.size() - 1);
+                for (size_t i = 1; i < y.size(); i++) {
+                    diff.push_back(y[i] - y[i-1]);
+                }   
+                y = diff;
+            }
+        }
+        q_ = Acf(y);
+    }
+
+    // Detect a period with ACF and first approx of period s
+    s_ = Acf_s(col);
+
+    // Testing if we have or not seasonality
+    if (Kruskal_Wallis(col, s_)) {
+        s_ = Fft(col);
+    }
+    else {
+        s_ = 0;
+        seasonal_ = false;
+    }
+}
+
+int Fft(const std::vector<double>& y) {
+
+    // Init
+    size_t n = y.size();
+    size_t nb_val = std::floor(n / 2);
+    std::vector<double> P;
+    P.reserve(nb_val);
+
+    // Calculate P_f
+    double pi = acos(-1.0);
+    std::complex<double> imag(0, 1);
+    for (size_t i = 0; i < nb_val; i++) {
+        
+        double f = i / n;
+        std::complex<double> x = 0.0;
+        for (size_t j = 0; j < n; j++) {
+            x += y[j] * std::exp(-2.0 * pi * imag * (double)f * (double)j);
+        }
+        P.push_back(std::norm(x) / n);
+    }
+
+    // Getting idx of max element
+    size_t it = std::max_element(P.begin() + 1, P.end()) - P.begin();
+
+    // s
+    return static_cast<int>(it);
+}
+
+bool Kruskal_Wallis(const std::vector<double>& y, int s) {
+
+    size_t n = y.size();
+
+    // Get ranks
+    std::vector<double> ranks = compute_ranks(y);
+    
+    // Sum ranks per group and count elements
+    std::vector<double> R(s, 0.0);
+    std::vector<int> n_i(s, 0);
+    
+    for (size_t t = 0; t < n; t++) {
+        int group = t % s;
+        R[group] += ranks[t];
+        n_i[group]++;
+    }
+
+    // Calculating H 
+    double H = 0.0;
+    for (size_t i = 0; i < s; i++) H += (R[i] * R[i]) / n_i[i];
+    H *= 12 / (n *(n + 1));
+    H -= 3 * (n + 1);
+
+    boost::math::chi_squared dist(s - 1);
+    double p_value = 1.0 - boost::math::cdf(dist, H);
+    return p_value < 0.05;
+}
+
+int Acf_s(const std::vector<double>& y) {
+
+    size_t n = y.size();
+    double mean_y = Stats::mean(y);
+    size_t kmax = n / 2 > 40 ? 40 : n / 2;
+
+    // Calculate auto-covar for all k
+    double gamma_0;
+    double threshold = 1.96 / std::sqrt(n);
+    std::vector<double> rho(kmax + 1, 0.0);
+    for (size_t k = 0; k <= kmax; k++) {
+        
+        double gamma = 0.0;
+        for (size_t i = k; i < n; i++) {
+            gamma += (y[i] - mean_y) * (y[i-k] - mean_y);
+        }   
+        gamma /= n;
+        if (k == 0) gamma_0 = gamma;
+
+        // If significant 
+        double rho_ = gamma / gamma_0;
+        if (std::abs(rho_) > threshold) rho[k] = rho_;
+    }
+
+    // Finding patterns within significant acf stats
+    int s = 0;
+    for (size_t i = 4; i <= kmax; i++) {
+
+        // If significant value
+        if (std::abs(rho[i]) > 0) {
+        if (i*2 <= kmax && i*3 <= kmax)
+            if (rho[i*2] > 0 && rho[i*3] > 0 && rho[i*2] < rho[i] && rho[i*3] < rho[i*2]) {
+                s = static_cast<int>(i);
+                break;
+            }
+        }
+    }
+    return s;
+}
+
+int Acf(const std::vector<double>& y) {
+
+    size_t n = y.size();
+    double mean_y = Stats::mean(y);
+    size_t kmax = n / 4 > 40 ? 40 : n / 4;
+
+    // Calculate auto-covar for all k
+    int q = 0;
+    double rho;
+    double gamma_0;
+    double threshold = 1.96 / std::sqrt(n);
+    for (size_t k = 0; k <= kmax; k++) {
+        
+        double gamma = 0.0;
+        for (size_t i = k; i < n; i++) {
+            gamma += (y[i] - mean_y) * (y[i-k] - mean_y);
+        }   
+        gamma /= n;
+        if (k == 0) gamma_0 = gamma;
+        rho = gamma / gamma_0;
+
+        // Test
+        if ((std::abs(rho) <= threshold) && (k > 0)) {
+            q = k - 1;
+            break;
+        }
+    }
+    return q;
 }
 
 int Pacf(const std::vector<double>& y) {
 
     size_t n = y.size();
     double mean_y = Stats::mean(y);
-    size_t kmax = std::sqrt(n) > 40 ? 40 : std::sqrt(n);
+    size_t kmax = n / 4 > 40 ? 40 :  n / 4;
     std::vector<std::vector<double>> phi(kmax + 1, std::vector<double>(kmax + 1, 0.0));
 
     // Calculate auto-covar for all k
@@ -63,10 +254,10 @@ int Pacf(const std::vector<double>& y) {
     // Durbin-Levinson
     int p = 0;
     phi[1][1] = rho[1];
-    double seuil = 1.96 / std::sqrt(n);
+    double threshold = 1.96 / std::sqrt(n);
 
     // Test 1
-    if (std::abs(phi[1][1]) > seuil) p = 1;
+    if (std::abs(phi[1][1]) > threshold) p = 1;
 
     for (size_t k = 2; k <= kmax; k++) {
 
@@ -84,7 +275,10 @@ int Pacf(const std::vector<double>& y) {
         }
 
         // Test
-        if (std::abs(phi[k][k]) > seuil) p = k;
+        if (std::abs(phi[k][k]) <= threshold) {
+            p = k - 1;
+            break;
+        }
     }
     return p;
 }
