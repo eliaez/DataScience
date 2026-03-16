@@ -11,8 +11,7 @@ using namespace Utils;
 
 namespace Stats_TS {
 
-void ARIMA::fit(const std::vector<double>& col) {
-
+std::vector<int> ARIMA::detect(const std::vector<double>& col) {
     std::vector<double> y;
 
     // Detect d (stationarity)
@@ -62,8 +61,8 @@ void ARIMA::fit(const std::vector<double>& col) {
                 // Diff
                 std::vector<double> diff;
                 diff.reserve(y.size() - 1);
-                for (size_t i = 1; i < y.size(); i++) {
-                    diff.push_back(y[i] - y[i-1]);
+                for (size_t j = 1; j < y.size(); j++) {
+                    diff.push_back(y[j] - y[j-1]);
                 }   
                 y = diff;
             }
@@ -82,14 +81,72 @@ void ARIMA::fit(const std::vector<double>& col) {
                 // Diff
                 std::vector<double> diff;
                 diff.reserve(y.size() - 1);
-                for (size_t i = 1; i < y.size(); i++) {
-                    diff.push_back(y[i] - y[i-1]);
+                for (size_t j = 1; j < y.size(); j++) {
+                    diff.push_back(y[j] - y[j-1]);
                 }   
                 y = diff;
             }
         }
         q_ = Acf(y);
     }
+    y_diff = y;
+    return {p_, d_, q_};
+}
+
+void ARIMA::fit(const std::vector<double>& col) {
+
+    // To handle if not detected before (params on auto)
+    detect(col);
+    if (y_diff.empty()) {
+        std::vector<double> y = col;
+        for (size_t i = 0; i < d_; i++) {
+
+            // Diff
+            std::vector<double> diff;
+            diff.reserve(y.size() - 1);
+            for (size_t j = 1; j < y.size(); j++) {
+                diff.push_back(y[j] - y[j-1]);
+            }   
+            y = diff;
+        }
+        y_diff = y;
+    }
+
+    if (p_ > 0) {
+        int n = y_diff.size() - p_; 
+
+        // Build X and y_target
+        std::vector<double> X_v(n * p_);
+        std::vector<double> y_target(n);
+
+        for (size_t i = 0; i < n; i++) {
+
+            y_target[i] = y_diff[i + p_];
+            for (int j = 0; j < p_; j++) {
+                X_v[j * n + i] = y_diff[i + p_ - 1 - j];
+            }
+        }
+
+        // Input
+        Dataframe X = {n, p_, false, std::move(X_v)};
+        Dataframe Y = {y_target.size(), 1, false, std::move(y_target)};
+        Reg::LinearRegression Ar_reg;
+        
+        // OLS Reg
+        Ar_reg.fit_without_stats(X, Y);
+        ar_coeffs = Ar_reg.get_coeffs();
+    }
+
+    if (q_ > 0) {
+        residuals = compute_residuals(y_diff, ar_coeffs);
+        ma_coeffs = fit_MA(residuals, q_);
+    }
+
+}
+
+void SARIMA::fit(const std::vector<double>& col) {
+
+    std::vector<double> y;
 
     // Detect a period with ACF and first approx of period s
     s_ = Acf_s(col);
@@ -288,7 +345,7 @@ double ADF_test(const std::vector<double>& y) {
     // Schwert rule
     size_t n = y.size();
     int p = (int)(12 * std::pow(n / 100.0, 0.25));
-    int nb_cols = 3 + p;
+    size_t nb_cols = 3 + p;
 
     // Calculate our lags
     std::vector<double> delta_y;
