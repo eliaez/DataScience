@@ -9,7 +9,7 @@
 
 using namespace std;
 
-// Testing Other Regression with Z-score Scaling for lambda = 1.0
+// Testing Other Regression with Z-score Scaling for lambda = 1.0 (Ridge) else 0.1
 void OtherReg(Dataframe& x, const Dataframe& y, const vector<double> clean_res0,
     const vector<double>& clean_res1, const std::string& model) {
 

@@ -20,6 +20,7 @@ std::pair<Dataframe, Dataframe> LassoRegression::fit_without_stats(const Datafra
         throw std::invalid_argument("Need x col-major");
     }
 
+    size_t n = x.get_rows();
     size_t p = x.get_cols();
 
     // Center our data 
@@ -61,7 +62,7 @@ std::pair<Dataframe, Dataframe> LassoRegression::fit_without_stats(const Datafra
             // Core
             std::vector<double> r_j = add((Y_c - X_c * beta_est).get_data(), mult(X_j[j], v_beta_est[j]));
             double beta_tild = dot(X_j[j], r_j) / dot(X_j[j], X_j[j]);
-            v_beta_est[j] = soft_thres(beta_tild, lambda_ / X_j_norm[j]);
+            v_beta_est[j] = soft_thres(beta_tild, lambda_ * n / X_j_norm[j]);
             
             // Update
             beta_est = Dataframe(p, 1, false, v_beta_est);
@@ -73,7 +74,7 @@ std::pair<Dataframe, Dataframe> LassoRegression::fit_without_stats(const Datafra
         for (size_t i = 0; i < diff.size(); i++) {
 
             // Threshold 1e-4
-            if (abs(diff[i]) > 1e-6) {
+            if (std::abs(diff[i]) > 1e-4) {
                 keep_cond = true;
                 break;
             } 

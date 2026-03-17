@@ -150,4 +150,4 @@ model.summary();
 - [**Regressions cpp**](/src/Models/Supervised/Regression)
 - [**Test folder**](/tests/)
 
-To read the next part: [**VIII**].
+To read the next part: [**VIII - Clustering**](/docs/VIII_clustering.md).

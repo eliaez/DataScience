@@ -120,6 +120,7 @@ pca.get_eigen_values();        // eigenvalues
 pca.get_explained_variance();  // variance ratio per component
 pca.get_eigen_vectors();       // principal axes (col-major)
 ```
+**Note**: **`SVD`** was not implemented from scratch unlike to all others algorithms and linear algebra operations due to the complexity of the numerous steps: Bidiagonalization via Householder reflections, followed by an iterative QR algorithm with shifts (Golub-Kahan) to converge to diagonal form, all while carefully handling convergence criteria, deflation strategies, and edge cases (zero singular values,... ). Moreover, each of these steps is a potential source of floating-point instability that can silently corrupt results.
 
 **To test it yourself**, you can also check the corresponding folders:
 - [**Preprocessing hpp**](/include/Preprocessing)
