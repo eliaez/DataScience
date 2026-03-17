@@ -53,17 +53,19 @@ Once the model is estimated, we need tools to assess its reliability and quality
 - **Goodness-of-fit metrics** including R², MAE, MSE and RMSE
 - **Hypothesis testing** through Fisher, Student, Durbin-Watson and Breusch-Pagan tests
 - **Multicollinearity and model selection** via VIF and AIC/BIC
+- **Time series analysis** through ARIMA/SARIMA automatic parameter detection via stationarity testing, seasonality detection and autocorrelation analysis
 
 For further details, see [**IV - Statistical Functions**](/docs/IV_stats.md).
 
 ## V - Preprocessing
 
-Before training a model, raw data rarely comes in a form suitable for direct use: features may live on incompatible scales, distributions can be heavily skewed and missing values corrupt otherwise clean datasets. The preprocessing utilities address these concerns by providing column-wise scaling, distribution transforms and imputation strategies:
+Before training a model, raw data rarely comes in a form suitable for direct use: features may live on incompatible scales, distributions can be heavily skewed, missing values corrupt otherwise clean datasets and the sheer number of features can slow down training or lead to overfitting. The preprocessing utilities address these concerns by providing column-wise scaling, distribution transforms, imputation strategies and dimensionality reduction::
 
 - **Scaling** the data with different methods (`z-score`, `mean-centering`, `min-max`, `percentile`)
 - **Distribution transformation** (`log`, `Box-Cox`, `Yeo-Johnson` and `power`)
-- **Imputation** (`mean`, `median`, `mode` or `forward`/`backward`)
+- **Imputation** (`mean`, `median`, `mode`, `forward`/`backward` or `KNN`)
 - **Train/Test split** methods with random and stratified splits options
+- **Dimensionality reduction** via PCA with automatic or manual component selection
 
 For further details, see [**V - Preprocessing**](/docs/V_preprocessing.md).
 

@@ -63,12 +63,12 @@ std::vector<int> detect_SARIMA(const std::vector<double>& col) {
 
     bool seasonal = true;
     std::vector<double> y = col;
-
+    std::vector<double> y_det = linear_detrend(y);
+    
     // Detect a period with ACF and first approx of period s
-    int s = Acf_s(y);
+    int s = Acf_s(y_det);
 
     // Testing if we have or not seasonality
-    std::vector<double> y_det = linear_detrend(y);
     if (Kruskal_Wallis(y_det, s) && s != 0) {
         s = Fft(y_det);
     }
