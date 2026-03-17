@@ -16,6 +16,7 @@ namespace Reg {
             std::string cov_type_;
             std::vector<int> cluster_ids_;
             std::unique_ptr<Dataframe> Omega_;
+            bool constant_;
 
         protected:
             // Calculate Stats after fit function
@@ -27,10 +28,12 @@ namespace Reg {
             LinearRegression(
                 std::string cov_type = "classical", 
                 std::vector<int> cluster_ids = {},
-                std::unique_ptr<Dataframe> Omega = nullptr
+                std::unique_ptr<Dataframe> Omega = nullptr,
+                bool constant = true
             ) : cov_type_(cov_type),
                 cluster_ids_(std::move(cluster_ids)),
-                Omega_(std::move(Omega)) {};
+                Omega_(std::move(Omega)),
+                constant_(constant) {};
 
             // Training OLS / GLS (WLS, FGLS) with x col-major
             std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;

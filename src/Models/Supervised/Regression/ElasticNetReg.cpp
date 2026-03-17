@@ -17,9 +17,10 @@ std::pair<Dataframe, Dataframe> ElasticRegression::fit_without_stats(const Dataf
         throw std::invalid_argument("Need x col-major");
     }
 
+    size_t n = x.get_rows();
     size_t p = x.get_cols();
-    double lambda1 = alpha_ * l1_ratio_;
-    double lambda2 = alpha_ * (1 - l1_ratio_);
+    double lambda1 = alpha_ * n * l1_ratio_;
+    double lambda2 = alpha_ * n * (1 - l1_ratio_);
 
     // Center our data 
     auto [X_c, Y_c, x_mean] = center_data(x, y);
@@ -72,7 +73,7 @@ std::pair<Dataframe, Dataframe> ElasticRegression::fit_without_stats(const Dataf
         for (size_t i = 0; i < diff.size(); i++) {
 
             // Threshold 1e-4
-            if (abs(diff[i]) > 1e-6) {
+            if (std::abs(diff[i]) > 1e-4) {
                 keep_cond = true;
                 break;
             } 

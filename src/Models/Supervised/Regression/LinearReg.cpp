@@ -37,8 +37,10 @@ std::pair<Dataframe, Dataframe> LinearRegression::fit_without_stats(const Datafr
     std::vector<double> x_v = x.get_data();
     
     // Insert an unit col to get intercept value
-    for (size_t i = 0; i < n; i++) {
-        x_v.insert(x_v.begin(), 1.0);
+    if (constant_) {
+        for (size_t i = 0; i < n; i++) {
+            x_v.insert(x_v.begin(), 1.0);
+        }
     }
 
     // Need X col-major (for mult ops)

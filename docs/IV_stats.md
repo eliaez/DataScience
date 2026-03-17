@@ -1,8 +1,8 @@
 # VI - Statistical Functions
 
-Statistical toolkit for regression analysis, model validation, and inference. Provides both basic descriptive statistics (`mean`, `var`, `cov`, ...) and advanced diagnostic tests with optimized backends (`Naive` and `AVX2` by default). All the following functions are automatically called during the regression pipeline but can also be used as standalone utilities.
+Statistical toolkit for regression analysis, model validation, and inference. Provides both basic descriptive statistics (`mean`, `var`, `cov`, ...) and advanced diagnostic tests with optimized backends (`Naive` and `AVX2` by default). The module also extends to time series analysis through `Stats_TS` by enabling automatic `ARIMA` and `SARIMA` parameters identification. All the following functions are automatically called during the regression pipeline but can also be used as standalone utilities.
 
-## Regression Diagnostics
+## 1 - Regression Diagnostics
 Once the model is estimated, assessing its reliability and quality is essential. This section covers the functions implemented to evaluate both the statistical validity of the estimators and the overall goodness-of-fit of the model.
 
 ### Covariance Matrix
@@ -74,7 +74,7 @@ double bic = Stats::Regularized::BIC(effective_df, loglikehood, n);
 
 **Interpretation:** Both `AIC` and `BIC` compare models by balancing goodness-of-fit against complexity. A lower score indicates a better trade-off between the two. The key difference lies in how strongly each penalizes complexity: `BIC` tends to select more parsimonious models than `AIC` for large `n`.
 
-## Hypothesis Testing
+## 2 - Hypothesis Testing
 
 ### Fisher Test
 Tests global model significance under H₀: all coefficients equal zero. A low p-value rejects H₀, indicating that the model as a whole explains a statistically significant portion of variance. Supports robust covariance types (HC3, HAC, cluster) via a Wald test alternative.
@@ -125,11 +125,65 @@ std::vector<double> vif = Stats::OLS::VIF(X);
 // or with GLS
 std::vector<double> vif = Stats::OLS::VIF(X, omega);
 ```
+
+## 3 -  Time Series -  `ARIMA`/`SARIMA` Parameters Detection
+
+Beyond static regression, the `Stats_TS` module extends the toolkit to time series analysis by automating the identification of `ARIMA` and `SARIMA` model orders through a combination of classical statistical tests:
+
+```cpp
+std::vector<int> params = Stats_TS::detect_ARIMA(y);
+// Returns { p, d, q }
+
+std::vector<int> params = Stats_TS::detect_SARIMA(y);
+// Returns { p, d, q, P, D, Q, s, seasonality} (0 or 1 for false/true for seasonality)
+```
+
+**Interpretation**:
+- `p`, `d`, `q`: AR order, differencing order and MA order
+- `P`, `D`, `Q`: their seasonal counterparts
+- `s`: detected seasonality period (12 for monthly data, 4 for quarterly)
+
+### Detection process 
+#### 1 - Stationarity
+
+The first step in any `ARIMA` pipeline is to assess stationarity. **`ADF_test()`** checks whether the series needs to be differenced by testing for the presence of a unit root. The result is then compared against a threshold computed by **`critical_value_MacKinon()`**:
+
+```cpp
+double adf_stat = Stats_TS::ADF_test(y);
+double cv       = Stats_TS::critical_value_MacKinon(y.size());
+// adf_stat < cv → series is stationary -> d = 0
+// adf_stat >= cv → differencing required -> d += 1
+```
+
+#### 2 - Seasonality Detection
+
+Then, the seasonality is investigated through **`Acf_s()`** to identify the dominant seasonal period `s` which is then validated by **`Kruskal_Wallis()`** to confirm statistically significant seasonal differences across groups. **`Fft()`** subsequently refines this estimate by analyzing the frequency domain, all on the detrended series:
+
+```cpp
+std::vector<double> y_detrend = Stats_TS::linear_detrend(y);
+
+int  s           = Stats_TS::Acf_s(y_detrend);
+bool is_seasonal = Stats_TS::Kruskal_Wallis(y_detrend, s);
+int  s_refined   = Stats_TS::Fft(y_detrend);
+```
+
+#### 3 - ACF & PACF
+
+With stationarity and seasonality established, the remaining orders are identified through autocorrelation analysis. `Acf()` determines `q` from the cutoff lag, `Pacf()` determines `p` via the Durbin-Levinson algorithm (seasonal counterparts exist for `P`, `Q`):
+
+```cpp
+int q = Stats_TS::Acf(y);
+int p = Stats_TS::Pacf(y);
+```
+
+**Note**: a grid search over (p, q) minimizing AIC/BIC would be more exhaustive at the cost of higher computational overhead.
 <br>
 
-**To test it yourself**, you can also check the corresponding files: 
+**To test it yourself**, you can also check the corresponding files:
 - [**stats.hpp**](/include/Stats/stats_reg.hpp)
 - [**stats.cpp**](/src/Stats/stats_reg.cpp)
+- [**Time_series.hpp**](/include/Stats/Time_series.hpp)
+- [**Time_series.cpp**](/src/Stats/Time_series.cpp)
 - [**Test folder**](/tests/)
 
 To read the next part: [**V - Preprocessing**](/docs/V_preprocessing.md).

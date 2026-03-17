@@ -51,12 +51,37 @@ namespace Utils {
     template<typename T>
     double Lnorm(const std::vector<const T*>& v, int p, int pow = 1);
 
+    template<typename T>
+    double Lnorm(const std::vector<T>& v, const std::vector<T>& v1, int p, int pow = 1, char op = '+');
+
+    template<typename T>
+    double Lnorm(const std::vector<const T*>& v, const std::vector<T>& v1, int p, int pow = 1, char op = '+');
+
+    // Norm L**p NAN proof
+    template<typename T>
+    double Lnorm_nan(const std::vector<const T*>& v, const std::vector<const T*>& v1, int p, int pow = 1, char op = '+');
+
+    // Gower distance NAN proof
+    template<typename T>
+    double gower_nan(const std::vector<const T*>& v, const std::vector<const T*>& v1,
+        const std::vector<bool>& is_categorical, const std::vector<double>& ranges);
+
     // Utils
     template<typename T>
     std::vector<T> rangeExcept(T max, T exclude);
 
     template<typename T>
     T mostFrequent(const std::vector<T>& v);
+
+    // To get ranks from data in a vector 
+    std::vector<double> compute_ranks(const std::vector<double>& v);
+
+    // To get ranges from each cols
+    std::vector<double> compute_ranges(const std::vector<double>& data, size_t n_rows, size_t n_cols, 
+        const std::vector<bool>& is_categorical, bool is_row_major);
+
+    // To check if a col is categorical or not
+    bool allIntegers(const std::vector<const double*>& col);
 
 // ----------------------------------Implementation----------------------------------
 
@@ -152,9 +177,9 @@ double Lnorm(const std::vector<T>& v, int p, int pow) {
 
     double sum = 0.0;
     for (size_t i = 0; i < v.size(); i++) {
-        sum += std::pow(abs(v[i]), p);
+        sum += std::pow(std::abs(v[i]), p);
     }
-    return std::pow(sum, (1 / p) * pow);
+    return std::pow(sum, (1.0 / p) * pow);
 }
 
 template<typename T>
@@ -162,9 +187,89 @@ double Lnorm(const std::vector<const T*>& v, int p, int pow) {
 
     double sum = 0.0;
     for (size_t i = 0; i < v.size(); i++) {
-        sum += std::pow(abs((*v[i])), p);
+        sum += std::pow(std::abs((*v[i])), p);
     }
-    return std::pow(sum, (1 / p) * pow);
+    return std::pow(sum, (1.0 / p) * pow);
+}
+
+template<typename T>
+double Lnorm(const std::vector<T>& v, const std::vector<T>& v1, int p, int pow, char op) {
+
+    double sum = 0.0;
+    if (op == '-')
+        for (size_t i = 0; i < v.size(); i++) {
+            sum += std::pow(std::abs(v[i] - v1[i]), p);
+        }
+    else if (op == '+') {
+        for (size_t i = 0; i < v.size(); i++) {
+            sum += std::pow(std::abs(v[i] + v1[i]), p);
+        }
+    }
+    return std::pow(sum, (1.0 / p) * pow);
+}
+
+template<typename T>
+double Lnorm(const std::vector<const T*>& v, const std::vector<T>& v1, int p, int pow, char op) {
+
+    double sum = 0.0;
+    if (op == '-')
+        for (size_t i = 0; i < v.size(); i++) {
+            sum += std::pow(std::abs((*v[i]) - v1[i]), p);
+        }
+    else if (op == '+') {
+        for (size_t i = 0; i < v.size(); i++) {
+            sum += std::pow(std::abs((*v[i]) + v1[i]), p);
+        }
+    }
+    return std::pow(sum, (1.0 / p) * pow);
+}
+
+template<typename T>
+double Lnorm_nan(const std::vector<const T*>& v, const std::vector<const T*>& v1, int p, int pow, char op) {
+    
+    double sum = 0.0;
+    double count = 0.0;
+    if (op == '-')
+        for (size_t i = 0; i < v.size(); i++) {
+            if (!std::isnan(*v[i]) && !std::isnan(*v1[i])) {
+                sum += std::pow(std::abs((*v[i]) - (*v1[i])), p);
+                count++;
+            }
+        }
+    else if (op == '+') {
+        for (size_t i = 0; i < v.size(); i++) {
+            if (!std::isnan(*v[i]) && !std::isnan(*v1[i])) {
+                sum += std::pow(std::abs((*v[i]) + (*v1[i])), p);
+                count++;
+            }
+        }
+    }
+    if (count == 0) return NAN;
+    return std::pow(sum / count, (1.0 / p) * pow);
+}
+
+template<typename T>
+double gower_nan(const std::vector<const T*>& v, const std::vector<const T*>& v1,
+    const std::vector<bool>& is_categorical,  // true = categorical, false = numerical
+    const std::vector<double>& ranges          // range per feature (for numerical ones)
+    ) {
+
+    double sum = 0.0;
+    double count = 0.0;
+    for (size_t i = 0; i < v.size(); i++) {
+        if (std::isnan(*v[i]) || std::isnan(*v1[i])) continue;
+
+        if (is_categorical[i]) {
+            sum += (*v[i] != *v1[i]) ? 1.0 : 0.0;  // Categorical : 0 if identical, 1 if different
+        } 
+        else {
+            if (ranges[i] > 0.0) sum += std::abs(*v[i] - *v1[i]) / ranges[i];
+        }
+        count++;
+    }
+
+    if (count == 0) return NAN;
+    return sum / count;
 }
 
 template<typename T>
@@ -196,5 +301,4 @@ T mostFrequent(const std::vector<T>& v) {
     }
     return best;
 }
-
 }

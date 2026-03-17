@@ -30,7 +30,7 @@ Before implementing any ML and regression algorithms, we need fundamental linear
 
 Moreover, to enable backend selection and operation dispatching, the **`Linalg`** namespace was created to provide a unified interface. This abstraction layer enables transparent backend switching without altering function signatures.
 
-**To test it yourself**, you can check the [**Tests folder**](/tests/) or **the following document** to have an idea of how to use the various backends and their functions. For further details, see [**II - Linear Algebra**](/docs/II_linalg.md).
+**To test it yourself**, you can check the [**Tests folder**](/tests/backend) or **the following document** to have an idea of how to use the various backends and their functions. For further details, see [**II - Linear Algebra**](/docs/II_linalg.md).
 
 ## III - Linear Algebra Benchmark
 Comparison between backends using Google Benchmark across 4 operations:
@@ -53,17 +53,19 @@ Once the model is estimated, we need tools to assess its reliability and quality
 - **Goodness-of-fit metrics** including R², MAE, MSE and RMSE
 - **Hypothesis testing** through Fisher, Student, Durbin-Watson and Breusch-Pagan tests
 - **Multicollinearity and model selection** via VIF and AIC/BIC
+- **Time series analysis** through ARIMA/SARIMA automatic parameter detection via stationarity testing, seasonality detection and autocorrelation analysis
 
 For further details, see [**IV - Statistical Functions**](/docs/IV_stats.md).
 
 ## V - Preprocessing
 
-Before training a model, raw data rarely comes in a form suitable for direct use: features may live on incompatible scales, distributions can be heavily skewed and missing values corrupt otherwise clean datasets. The preprocessing utilities address these concerns by providing column-wise scaling, distribution transforms and imputation strategies:
+Before training a model, raw data rarely comes in a form suitable for direct use: features may live on incompatible scales, distributions can be heavily skewed, missing values corrupt otherwise clean datasets and the sheer number of features can slow down training or lead to overfitting. The preprocessing utilities address these concerns by providing column-wise scaling, distribution transforms, imputation strategies and dimensionality reduction::
 
 - **Scaling** the data with different methods (`z-score`, `mean-centering`, `min-max`, `percentile`)
 - **Distribution transformation** (`log`, `Box-Cox`, `Yeo-Johnson` and `power`)
-- **Imputation** (`mean`, `median`, `mode` or `forward`/`backward`)
+- **Imputation** (`mean`, `median`, `mode`, `forward`/`backward` or `KNN`)
 - **Train/Test split** methods with random and stratified splits options
+- **Dimensionality reduction** via PCA with automatic or manual component selection
 
 For further details, see [**V - Preprocessing**](/docs/V_preprocessing.md).
 
@@ -74,7 +76,7 @@ Furthermore, once the model is trained, evaluating it requires more than a singl
 - **Cross-validation** through k-fold evaluation
 - **Grid Search & Random Search CV** for hyperparameter tuning and are both relying on cross-validation
 
-For further details, see [**VI - Validation**](/docs/VI_validdation.md).
+For further details, see [**VI - Validation**](/docs/VI_validation.md).
 
 ## VII - Regressions
 
@@ -90,6 +92,16 @@ All models share a common interface through `Reg::RegressionBase`, which standar
 
 **To test it yourself**, you can check the corresponding [**Test folder**](/tests/regression) or **the following document** to have an idea of how to use the various functions, see [**VII - Regressions**](/docs/VII_regressions.md).
 
-## VIII - 
+## VIII - Clustering
+
+For unsupervised learning, we introduce a **K-Means** clustering algorithm that partitions data into `k` groups by minimizing intra-cluster variance. 
+
+The implementation relies on **`K-Means++`** initialization for better convergence, runs multiple times to keep the best result and supports three algorithmic variants: `batch`, `mini-batch` and `online`. 
+
+Moreover, when the number of clusters is unknown, the algorithm can automatically select the optimal `k` using the **elbow method**.
+
+For further details, see [**VIII - Clustering**](/docs/VIII_clustering.md).
+
+## IX -
 
 **In progress...**

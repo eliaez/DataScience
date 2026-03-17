@@ -279,13 +279,13 @@ std::vector<const double*> Dataframe::getColumnPtrs(const std::string& col_name)
 
 std::vector<const double*> Dataframe::getRowPtrs(size_t i) const {
     
-    std::vector<const double*> row(rows);
+    std::vector<const double*> row(cols);
     if (is_row_major) {
-        for (size_t j = 0; j < rows; j++)
+        for (size_t j = 0; j < cols; j++)
             row[j] = &data[i * cols + j];
     }
     else {
-        for (size_t j = 0; j < rows; j++)
+        for (size_t j = 0; j < cols; j++)
             row[j] = &data[j * rows + i];
     }
     return row;
