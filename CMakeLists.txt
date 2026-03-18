@@ -149,6 +149,7 @@ set(LIB_SOURCES
 
     # Stats
     src/Stats/stats_reg.cpp
+    src/Stats/stats_class.cpp
     src/Stats/Time_series.cpp
 
     # Utils
