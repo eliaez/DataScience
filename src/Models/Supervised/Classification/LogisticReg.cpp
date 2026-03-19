@@ -1,14 +1,17 @@
 #include <iomanip>
 #include <iostream>
-#include <stdexcept>
 #include "Data/Data.hpp"
+#include "Utils/Utils.hpp"
 #include "Stats/stats_reg.hpp"
-#include "Models/Supervised/Regression/LinearReg.hpp"
+#include "Stats/stats_class.hpp"
+#include "Validation/Validation.hpp"
+#include "Models/Supervised/Classification/LogisticReg.hpp"
 
+using namespace Utils;
 
-namespace Reg {
+namespace Class {
 
-std::pair<Dataframe, Dataframe> LinearRegression::fit_without_stats(const Dataframe& x, const Dataframe& y) {
+std::pair<Dataframe, Dataframe> LogisticRegression::fit_without_stats(const Dataframe& x, const Dataframe& y) {
     
     // Tests
     basic_verif(x);
@@ -17,69 +20,119 @@ std::pair<Dataframe, Dataframe> LinearRegression::fit_without_stats(const Datafr
         throw std::invalid_argument("Need x col-major");
     }
 
+    nb_categories(y);
+    if (y.get_cols() != nb_cats && nb_cats > 2 && y.get_cols() != 1) {
+        throw std::invalid_argument("For Y, either input Y col major with nb of cols = nb of categories or only one col");
+    }
+    else if (y.get_cols() == nb_cats && nb_cats > 2 && y.get_storage()) {
+        throw std::invalid_argument("For Y, if you input Y with nb of cols = nb of categories then Y need to be col major");
+    }
+
     size_t n = x.get_rows();
     size_t p = x.get_cols();
-
-    // In case of GLS
-    Dataframe Om;
-    bool is_gls = false; 
-    if (Omega_ != nullptr && !Omega_->get_data().empty()) {
-        is_gls = true;
-        basic_verif((*Omega_));
-        
-        if (Omega_->get_cols() != n) {
-            throw std::invalid_argument("Omega need to have n rows and cols with n = x.rows");
-        }
-        Om = Omega_->inv();
-    }
 
     // Copy our data 
     std::vector<double> x_v = x.get_data();
     
     // Insert an unit col to get intercept value
-    if (constant_) {
-    x_v.insert(x_v.begin(), n, 1.0);
+    for (size_t i = 0; i < n; i++) {
+        x_v.insert(x_v.begin(), 1.0);
     }
-
-    // Need X col-major (for mult ops)
+    
+    // Need X
     Dataframe X = {n, p+1, false, std::move(x_v)};
+    Dataframe X_T = ~X;
+    X_T.change_layout_inplace();
 
-    // Need X_t row-major (for mult ops)
-    Dataframe X_t = ~X;  // Transpose change it to col-major
-    X_t.change_layout_inplace();
+    // Our vector W
+    std::vector<double> w(p+1, 0.0);
+    Dataframe W = {nb_cats, p+1, false, std::move(w)};
 
-    // Calculate Beta (our estimator) for GLS or classical OLS
-    Dataframe XtXInv;
-    Dataframe beta_est;
-    if (is_gls) {
-        Dataframe XtOmega = X_t * Om;
-        XtOmega.change_layout_inplace();
-        XtXInv =  (XtOmega * X).inv();
-        XtXInv.is_symmetric();    
-        beta_est =  XtXInv * (XtOmega * y);
-    }
-    else {
-        XtXInv = (X_t*X).inv();
-        XtXInv.is_symmetric(); 
-        beta_est =  XtXInv * (X_t * y);  
+    // Gradient Descent
+    int idx = 0;
+    Dataframe Y_ = y;
+    double loss = 0.0;
+    bool keep_cond = true;
+    double old_loss = -1.0;
+    if (nb_cats > 2 && y.get_cols() == 1) Y_.OneHot(0);
+    while (keep_cond && idx < max_iter_) {
+
+        // Softmax
+        std::vector<double> y_v = softmax(X, W);
+        Y_ = Dataframe(n, nb_cats, false, std::move(y_v));
+
+        // Cost function 
+        loss = Stats_class::cat_logloss(y.get_data(), Y_.get_data(), nb_cats);
+
+        if (penality_ == 1.0) {
+            for (size_t i = 0; i < (p+1)*nb_cats; i++) {
+
+                // To exclude w0
+                if (i % (p+1) == 0) continue;
+                loss += std::abs(W.at(i)) / C_;
+            }
+        }
+        else if (penality_ == 2.0) {
+            for (size_t i = 0; i < (p+1)*nb_cats; i++) {
+
+                // To exclude w0
+                if (i % (p+1) == 0) continue;
+                loss += W.at(i) * W.at(i) / (2 * C_);
+            }
+        }
+        else {
+            throw std::invalid_argument("Unknown penality: " + std::to_string(penality_));
+        }
+
+        // Calculate our gradient
+        std::vector<double> gradient_v = (X_T * (Y_ - y)).get_data();
+        gradient_v = mult(gradient_v, learning_r_ / n);
+        Dataframe gradient = {p+1, nb_cats, false, std::move(gradient_v)};
+
+        // Update our W
+        W = W - gradient;
+
+        // Testing convergence of cost
+        if (std::abs(loss - old_loss) < tol_) { // Threshold
+            break;
+        }
+        old_loss = loss;
+        idx++;
     }
 
     // Results
-    coeffs = beta_est.get_data();
+    coeffs = W.get_data();
     is_fitted = true;
 
-    return {X, XtXInv};
+    return {X, X_T};
 }
 
-void LinearRegression::compute_stats(const Dataframe& x, Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) {
+/*
+void LogisticRegression::optimal_lambda(double start, double end, int nb, const Dataframe& x, const Dataframe& y) {
+    std::vector<double> path(nb);
+    double log_min = log(start);
+    double log_max = log(end);
+    double step = (log_max - log_min) / (nb - 1);
+
+    for (int i = 0; i < nb; i++) {
+        path[i] = exp(log_min + i * step);
+    }
+
+    std::vector<std::vector<double>> param_grid = {path};
+    Validation::GSres res = Validation::GSearchCV(this, x, y, param_grid);
+
+    lambda_ = res.best_params[0];
+}*/
+
+std::unique_ptr<ClassificationBase> LogisticRegression::create(const std::vector<double>& params) {
+    return std::make_unique<LogisticRegression>(params[0], params[1]);
+}
+
+void LogisticRegression::compute_stats(const Dataframe& x, Dataframe& x_const, const Dataframe& X_T, const Dataframe& y) {
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();
     
-    // Degree of liberty
-    int df1 = p;
-    int df2 = n - df1 - 1;
-
     // Predict 
     std::vector<double> y_pred = predict(x);
 
@@ -110,12 +163,6 @@ void LinearRegression::compute_stats(const Dataframe& x, Dataframe& x_const, Dat
 
     std::vector<double> resid_stats = Stats::residuals_stats(residuals);
     for (size_t i = 0; i < resid_stats.size(); i++) gen_stats.push_back(resid_stats[i]); 
-
-    if (p > 1) {
-        std::vector<double> vif = Omega_ == nullptr ? Stats::OLS::VIF(x) : Stats::OLS::VIF(x, (*Omega_));
-        gen_stats.push_back(NAN);
-        for (size_t i = 0; i < vif.size(); i++) gen_stats.push_back(vif[i]); 
-    }
 
     // The t-distribution approaches the standard normal distribution for n > 30 
     std::vector<double> p_value;
@@ -161,7 +208,7 @@ void LinearRegression::compute_stats(const Dataframe& x, Dataframe& x_const, Dat
     }
 }
 
-void LinearRegression::summary(bool detailled) const {
+void LogisticRegression::summary(bool detailled) const {
     std::cout << "\n=== REGRESSION SUMMARY ===\n\n";
     
     std::cout << "R2 = " << gen_stats[0] << "\n";
@@ -192,7 +239,7 @@ void LinearRegression::summary(bool detailled) const {
                   << std::right << std::fixed << std::setprecision(4)
                   << std::setw(15) << stat.beta
                   << std::setw(15) << stat.stderr_beta
-                  << std::setw(15) << stat.t_stat
+                  << std::setw(15) << stat.z_stat
                   << std::setw(15) << stat.p_value
                   << "  " << stat.significance()
                   << std::setw(15);

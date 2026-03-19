@@ -372,9 +372,7 @@ std::vector<double> StepwiseRegression::backward_reg(const Dataframe& x, const D
     std::vector<double> features_kept = rangeExcept(static_cast<double>(p), static_cast<double>(p));
     
     // Insert an unit col to get intercept value
-    for (size_t i = 0; i < n; i++) {
-        x_v.insert(x_v.begin(), 1.0);
-    }
+    x_v.insert(x_v.begin(), n, 1.0);
 
     // Need to do a linear reg for aic and bic to get calculate them
     Dataframe X_try = {n, p + 1, false, x_v};

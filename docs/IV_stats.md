@@ -39,7 +39,7 @@ Computes standard goodness-of-fit and prediction error metrics to evaluate model
 
 - **`mae()`, `mse()`, `rmse()`**: The **Mean Absolute Error** is used to measure the average prediction error (robust to outliers), the **Mean Squared Error** to penalize large errors more heavily and the **Root Mean Squared Error** for an easier interpretation
 
-- **`logLikehood()`**: Computes the log-likelihood of the model, used for information criteria and model comparison. Supports both regression ("Reg") and classification ("Clf") modes
+- **`logLikehood()`**: Computes the log-likelihood of the model, used for information criteria and model comparison.
 
 ```cpp
 // Goodness-of-fit
@@ -52,7 +52,7 @@ double mse  = Stats::mse(y, y_pred);
 double rmse = Stats::rmse(y, y_pred);
 
 // Log-likelihood
-double ll = Stats::logLikehood(y, y_pred, "Reg");
+double ll = Stats::logLikehood(y, y_pred);
 ```
 
 **Interpretation**:

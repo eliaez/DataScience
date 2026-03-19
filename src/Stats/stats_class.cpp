@@ -1,4 +1,5 @@
 #include <cmath>
+#include <string>
 #include <numeric>
 #include <stdexcept>
 #include <algorithm>
@@ -111,22 +112,35 @@ double mcc(const std::vector<double>& conf_matrix) {
     return mcc(conf_matrix[0], conf_matrix[1], conf_matrix[2], conf_matrix[3]);
 }
 
-double logloss(const std::vector<double>& y, const std::vector<double>& prob) {
+double cat_logloss(const std::vector<double>& y, const std::vector<double>& prob, int K) {
+    if (K < 2) throw std::invalid_argument("Invalid K:" + std::to_string(K));
     if (y.empty()) {
         throw std::invalid_argument("Cannot calculate Confusion matrix of empty vector");
     }
 
-    size_t n = y.size();
-    if (n != prob.size()) {
-        throw std::invalid_argument("Y and prob need to have the same length");
+    size_t n = y.size(); // N * K
+    size_t N = n / K;
+    if (n != prob.size() || n % K != 0) {
+        throw std::invalid_argument("Incompatible sizes");
     }
+
+    double max_y = *std::max_element(y.begin(), y.end());
+    if (max_y > 1)
+        throw std::invalid_argument("y should be one-hot encoded");
 
     // Log loss
     double sum = 0.0;
     for (size_t i = 0; i < n; i++) {
-        sum += y[i] * std::log(prob[i]) + (1 - y[i]) *  std::log(1 - prob[i]);
+        if (y[i] == 1)
+            sum += y[i] * std::log(prob[i] + 1e-15);
     }
-    return - sum / n;
+    return - sum / N;
+}
+
+double logLikehood(const std::vector<double>& y, const std::vector<double>& prob, int K) {
+    size_t n = y.size(); // N * K
+    size_t N = n / K;
+    return - cat_logloss(y, prob, K) * N;
 }
 
 }

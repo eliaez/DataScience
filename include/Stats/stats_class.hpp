@@ -23,6 +23,10 @@ namespace Stats_class {
     // Matthews Correlation Coefficient
     double mcc(const std::vector<double>& conf_matrix);
     double mcc(double TP, double FN, double FP, double TN);
+    
+    // Log loss for mutliple categories with y (one hot encoded) and prob col major 
+    double cat_logloss(const std::vector<double>& y, const std::vector<double>& prob, int K);
 
-    double logloss(const std::vector<double>& y, const std::vector<double>& prob);
+    // Log likehood for mutliple categories with y (one hot encoded) and prob col major 
+    double logLikehood(const std::vector<double>& y, const std::vector<double>& prob, int K);
 }

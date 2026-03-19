@@ -229,28 +229,14 @@ double normal_cdf(double x) {
     return 0.5 * (1.0 + std::erf(x / std::sqrt(2.0)));
 }
 
-double logLikehood(const std::vector<double>& y, const std::vector<double>& y_pred, const std::string& type) {
+double logLikehood(const std::vector<double>& y, const std::vector<double>& y_pred) {
 
     double n = y.size();
-    if (type != "Reg") {
+    double sigma2 = mse(y, y_pred);
+    double rss = sigma2 * n;
+    const double M_PI = 3.14159265358979323846;
 
-        // To avoid log(0)
-        double ll = 0.0;
-        const double eps = 1e-15; 
-        
-        for (int i = 0; i < n; i++) {
-            double p = std::max(eps, std::min(y_pred[i], 1.0 - eps));
-            ll += y[i] * log(p) + (1.0 - y[i]) * log(1.0 - p);
-        }
-        return ll;
-    }
-    else {
-        double sigma2 = mse(y, y_pred);
-        double rss = sigma2 * n;
-        const double M_PI = 3.14159265358979323846;
-
-        return -n / 2.0 * log(2 * M_PI * sigma2) - rss / (2 * sigma2);
-    }
+    return -n / 2.0 * log(2 * M_PI * sigma2) - rss / (2 * sigma2);
 }
 
 std::vector<double> get_residuals(const std::vector<double>& y, const std::vector<double>& y_pred) {

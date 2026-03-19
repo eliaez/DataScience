@@ -51,10 +51,11 @@ std::pair<Dataframe, Dataframe> LassoRegression::fit_without_stats(const Datafra
     };
 
     // Coordinate descent 
+    int idx = 0;
     bool keep_cond = true; 
     std::vector<double> v_beta_est(p, 0.0);
     Dataframe beta_est = {p, 1, false, v_beta_est};
-    while (keep_cond) {
+    while (keep_cond && idx < 1000) {
 
         std::vector<double> beta_old = v_beta_est;
         for (size_t j = 0; j < p; j++) {
@@ -79,6 +80,7 @@ std::pair<Dataframe, Dataframe> LassoRegression::fit_without_stats(const Datafra
                 break;
             } 
         }
+        idx++;
     }
 
     // Results

@@ -128,12 +128,17 @@ set(LIB_SOURCES
 
     # Models
     # Supervised
+    # Regressions
     src/Models/Supervised/Regression/RegBase.cpp
     src/Models/Supervised/Regression/LinearReg.cpp
     src/Models/Supervised/Regression/RidgeReg.cpp
     src/Models/Supervised/Regression/LassoReg.cpp
     src/Models/Supervised/Regression/ElasticNetReg.cpp
     src/Models/Supervised/Regression/StepwiseReg.cpp
+
+    # Classifications
+    src/Models/Supervised/Classification/ClassBase.cpp
+    src/Models/Supervised/Classification/LogisticReg.cpp
 
     # Unsupervised
     src/Models/Unsupervised/Kmeans.cpp
