@@ -37,12 +37,14 @@ std::pair<Dataframe, Dataframe> LinearRegression::fit_without_stats(const Datafr
     std::vector<double> x_v = x.get_data();
     
     // Insert an unit col to get intercept value
+    size_t p_const = p;
     if (constant_) {
-    x_v.insert(x_v.begin(), n, 1.0);
+        x_v.insert(x_v.begin(), n, 1.0);
+        p_const++;
     }
 
     // Need X col-major (for mult ops)
-    Dataframe X = {n, p+1, false, std::move(x_v)};
+    Dataframe X = {n, p_const, false, std::move(x_v)};
 
     // Need X_t row-major (for mult ops)
     Dataframe X_t = ~X;  // Transpose change it to col-major
@@ -75,6 +77,7 @@ void LinearRegression::compute_stats(const Dataframe& x, Dataframe& x_const, Dat
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();
+    size_t p_const = constant_ ? p+1 : p;
     
     // Degree of liberty
     int df1 = p;
@@ -119,26 +122,27 @@ void LinearRegression::compute_stats(const Dataframe& x, Dataframe& x_const, Dat
 
     // The t-distribution approaches the standard normal distribution for n > 30 
     std::vector<double> p_value;
-    std::vector<double> t_stats(p+1, 0.0);
+    std::vector<double> t_stats(p_const, 0.0);
     if (n > 30) {
-        for (size_t i = 0; i < p+1; i++) t_stats[i] = coeffs[i] / stderr_b[i];
+        for (size_t i = 0; i < p_const; i++) t_stats[i] = coeffs[i] / stderr_b[i];
         p_value = Stats::OLS::student_pvalue(t_stats);
     }
 
     // If we have not the cols name
-    std::vector<std::string> headers(p+1, "");
-    headers[0] = "Intercept";
+    std::vector<std::string> headers(p_const, "");
+    if (constant_) headers[0] = "Intercept";
     if (x.get_headers().empty()) {
-        for (size_t i = 1; i < p+1; i++) headers[i] = "c" + std::to_string(i);
+        for (size_t i = 1; i < p_const; i++) headers[i] = "c" + std::to_string(i);
     }
     else {
-        headers = {"Intercept"};
+        if (constant_) headers = {"Intercept"};
+        else headers = {};
         headers.insert(headers.end(), x.get_headers().begin(), x.get_headers().end());
     }
 
     // Save our stats
     CoeffStats c;
-    for (size_t i = 0; i < p+1; i++) {
+    for (size_t i = 0; i < p_const; i++) {
         if (n > 30) {
             c = {
                 headers[i],

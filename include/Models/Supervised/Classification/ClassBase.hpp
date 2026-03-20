@@ -16,14 +16,16 @@ class Dataframe;
 
 namespace Class {
     struct CoeffStats {
-        std::string name;        
-        double beta;             
-        double stderr_beta;        
-        double z_stat;           
-        double p_value;          
+        std::string category;
+        std::vector<std::string> name;        
+        std::vector<double> beta;       
+        std::vector<double> odds_ratio;      
+        std::vector<double> stderr_beta;        
+        std::vector<double> z_stat;           
+        std::vector<double> p_value;          
 
         // Stars for significance of p values
-        std::string significance() const;
+        std::string significance(double p_val) const;
     };
 
     class ClassificationBase {

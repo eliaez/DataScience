@@ -134,7 +134,52 @@ void LogisticRegression::compute_stats(const Dataframe& x, Dataframe& x_const, c
     size_t p = x.get_cols();
     
     // Predict 
-    std::vector<double> y_pred = predict(x);
+    std::vector<double> y_pred = predict_proba(x);
+    Dataframe Y_pred = {n, nb_cats, false, std::move(y_pred)};
+
+    // Getting covariance matrix
+    Dataframe fisher = Stats_class::fisher_mat(x, Y_pred);
+    Dataframe cov_mat = Stats_class::cov_mat(fisher);
+
+    // If we have not the cols name
+    std::vector<std::string> headers(p+1, "");
+    headers[0] = "Intercept";
+    if (x.get_headers().empty()) {
+        for (size_t i = 1; i < p+1; i++) headers[i] = "c" + std::to_string(i);
+    }
+    else {
+        headers = {"Intercept"};
+        headers.insert(headers.end(), x.get_headers().begin(), x.get_headers().end());
+    }
+
+    // For each category
+    std::vector<double> f1;
+    std::vector<double> recall;
+    std::vector<double> roc_auc;
+    std::vector<double> precision;
+    std::vector<double> specificity;
+    f1.reserve(nb_cats - 1);
+    recall.reserve(nb_cats - 1);
+    roc_auc.reserve(nb_cats - 1);
+    precision.reserve(nb_cats - 1);
+    specificity.reserve(nb_cats - 1);
+    for (auto cat : rangeExcept(nb_cats - 1, ref_class_)) {
+        
+        // Save our stats
+        CoeffStats c;
+        c.category = "Class " + std::to_string(cat) + " vs Class " +  std::to_string(ref_class_);
+        c.stderr_beta = Stats_class::stderr_coeff(cov_mat, cat);
+        for (size_t i = 0; i < p+1; i++) {
+            c.name.push_back(headers[i]);
+
+            double displayed_beta = coeffs[cat * (p+1) + i] - coeffs[ref_class_ * (p+1) + i];
+            c.beta.push_back(displayed_beta);
+            c.odds_ratio.push_back(std::exp(displayed_beta));
+            c.z_stat.push_back(displayed_beta / c.stderr_beta[i]);
+            c.p_value.push_back(Stats::normal_cdf(c.z_stat[i]));
+        }
+        coeff_stats.push_back(c);
+    } 
 
     // -------------------------------------Calculate stats----------------------------------------
     double r2 = Stats::rsquared(y.get_data(), y_pred);
@@ -170,41 +215,6 @@ void LogisticRegression::compute_stats(const Dataframe& x, Dataframe& x_const, c
     if (n > 30) {
         for (size_t i = 0; i < p+1; i++) t_stats[i] = coeffs[i] / stderr_b[i];
         p_value = Stats::OLS::student_pvalue(t_stats);
-    }
-
-    // If we have not the cols name
-    std::vector<std::string> headers(p+1, "");
-    headers[0] = "Intercept";
-    if (x.get_headers().empty()) {
-        for (size_t i = 1; i < p+1; i++) headers[i] = "c" + std::to_string(i);
-    }
-    else {
-        headers = {"Intercept"};
-        headers.insert(headers.end(), x.get_headers().begin(), x.get_headers().end());
-    }
-
-    // Save our stats
-    CoeffStats c;
-    for (size_t i = 0; i < p+1; i++) {
-        if (n > 30) {
-            c = {
-                headers[i],
-                coeffs[i],
-                stderr_b[i],
-                t_stats[i],
-                p_value[i]
-            };
-        }
-        else {
-            c = {
-                headers[i],
-                coeffs[i],
-                stderr_b[i],
-                NAN,
-                NAN
-            };
-        }
-        coeff_stats.push_back(c);
     }
 }
 

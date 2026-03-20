@@ -9,11 +9,11 @@ using namespace Utils;
 
 namespace Class {
 
-std::string CoeffStats::significance() const {
-    if (p_value < 0.001) return "***";
-    if (p_value < 0.01)  return "** ";
-    if (p_value < 0.05)  return "*  ";
-    if (p_value < 0.10)  return ".  ";
+std::string CoeffStats::significance(double p_val) const {
+    if (p_val < 0.001) return "***";
+    if (p_val < 0.01)  return "** ";
+    if (p_val < 0.05)  return "*  ";
+    if (p_val < 0.10)  return ".  ";
     return "   ";
 }
 
