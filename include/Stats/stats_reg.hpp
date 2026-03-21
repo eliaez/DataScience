@@ -41,8 +41,8 @@ namespace Stats {
     // Cumulative distribution function of standard normal distribution
     double normal_cdf(double x);
 
-    // Log Likehood for Regression
-    double logLikehood(const std::vector<double>& y, const std::vector<double>& y_pred);
+    // Log Likelihood for Regression
+    double logLikelihood(const std::vector<double>& y, const std::vector<double>& y_pred);
 
     // Residuals
     std::vector<double> get_residuals(const std::vector<double>& y, const std::vector<double>& y_pred);

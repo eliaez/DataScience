@@ -17,12 +17,15 @@ class Dataframe;
 namespace Class {
     struct CoeffStats {
         std::string category;
+
         std::vector<std::string> name;        
         std::vector<double> beta;       
         std::vector<double> odds_ratio;      
         std::vector<double> stderr_beta;        
         std::vector<double> z_stat;           
-        std::vector<double> p_value;          
+        std::vector<double> p_value;    
+        
+        std::vector<double> gen_stats; // precision, recall, specificity, f1, roc_auc
 
         // Stars for significance of p values
         std::string significance(double p_val) const;
@@ -44,7 +47,7 @@ namespace Class {
             void basic_verif(const Dataframe& x) const;
 
             // Calculate Stats after fit function
-            virtual void compute_stats(const Dataframe& x, Dataframe& x_const, const Dataframe& X_T, const Dataframe& y) = 0;
+            virtual void compute_stats(const Dataframe& x, Dataframe& x_const, const Dataframe& y) = 0;
             
             // Function to handle Softmax in case of multi classes
             std::vector<double> softmax(const Dataframe& X) const;
@@ -59,7 +62,7 @@ namespace Class {
             virtual ~ClassificationBase() = default;
 
             virtual void fit(const Dataframe& x, const Dataframe& y);
-            virtual std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) = 0;
+            virtual Dataframe fit_without_stats(const Dataframe& x, const Dataframe& y) = 0;
       
             // Prediction
             virtual std::vector<double> predict(const Dataframe& x) const;

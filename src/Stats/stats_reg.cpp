@@ -229,7 +229,7 @@ double normal_cdf(double x) {
     return 0.5 * (1.0 + std::erf(x / std::sqrt(2.0)));
 }
 
-double logLikehood(const std::vector<double>& y, const std::vector<double>& y_pred) {
+double logLikelihood(const std::vector<double>& y, const std::vector<double>& y_pred) {
 
     double n = y.size();
     double sigma2 = mse(y, y_pred);

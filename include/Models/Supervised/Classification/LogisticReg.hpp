@@ -19,14 +19,14 @@ namespace Class {
 
         protected:
             // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, Dataframe& x_const, const Dataframe& X_T, const Dataframe& y) override;
+            void compute_stats(const Dataframe& x, Dataframe& x_const, const Dataframe& y) override;
         
         public:
             // C = 1/lambda, penality = 1 for L1 or 2 for L2 
             LogisticRegression(double C = 1.0, double penality = 2.0) : C_(C), penality_(penality) {};
 
             // Training Lasso Regression with x col-major
-            std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;
+            Dataframe fit_without_stats(const Dataframe& x, const Dataframe& y) override;
 
             // Display stats after training
             void summary(bool detailled = false) const override;

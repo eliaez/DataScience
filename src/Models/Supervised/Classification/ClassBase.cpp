@@ -87,8 +87,8 @@ void ClassificationBase::nb_categories(const Dataframe& Y) {
 
 void ClassificationBase::fit(const Dataframe& x, const Dataframe& y) {
 
-    auto [X_const, X_T] = fit_without_stats(x, y);
-    compute_stats(x, X_const, X_T, y);
+    Dataframe X_const = fit_without_stats(x, y);
+    compute_stats(x, X_const, y);
 }
 
 std::vector<double> ClassificationBase::predict_proba(const Dataframe& x) const {
@@ -109,7 +109,15 @@ std::vector<double> ClassificationBase::predict_proba(const Dataframe& x) const 
     x_v.insert(x_v.begin(), n, 1.0);
     
     Dataframe X = {n, p+1, false, std::move(x_v)};
-    return softmax(X);
+    std::vector<double> proba = softmax(X);
+
+    if (nb_cats == 2) {
+        std::vector<double> res(n);
+        for (size_t i = 0; i < n; i++)
+            res[i] = proba[i * 2 + 1];
+        return res;
+    }
+    return proba;
 }
 
 std::vector<double> ClassificationBase::predict(const Dataframe& x) const {

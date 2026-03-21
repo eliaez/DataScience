@@ -71,6 +71,9 @@ namespace Utils {
     std::vector<T> rangeExcept(T max, T exclude);
 
     template<typename T>
+    T mean(const std::vector<T>& v);
+
+    template<typename T>
     T mostFrequent(const std::vector<T>& v);
 
     // To get ranks from data in a vector 
@@ -281,6 +284,11 @@ std::vector<T> rangeExcept(T max, T exclude) {
         }
     }
     return result;
+}
+
+template<typename T>
+T mean(const std::vector<T>& v) {
+    return std::accumulate(v.begin(), v.end(), 0.0) / v.size();
 }
 
 template <typename T>

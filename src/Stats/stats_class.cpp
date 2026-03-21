@@ -6,12 +6,13 @@
 #include "Data/Data.hpp"
 #include "Utils/Utils.hpp"
 #include "Stats/stats_class.hpp"
+#include <boost/math/distributions/chi_squared.hpp>
 
 using namespace Utils;
 
 namespace Stats_class {
 
-std::vector<double> confusion_matrix(const std::vector<double>& y, const std::vector<double>& y_pred) {
+std::vector<double> conf_matrix(const std::vector<double>& y, const std::vector<double>& y_pred) {
     if (y.empty()) {
         throw std::invalid_argument("Cannot calculate Confusion matrix of empty vector");
     }
@@ -102,7 +103,6 @@ double roc_auc(const std::vector<double>& y, const std::vector<double>& prob) {
         auc += dFPR * avgTPR;
     }
     return auc;
-
 }
 
 double mcc(double TP, double FN, double FP, double TN) {
@@ -113,55 +113,24 @@ double mcc(const std::vector<double>& conf_matrix) {
     return mcc(conf_matrix[0], conf_matrix[1], conf_matrix[2], conf_matrix[3]);
 }
 
-double cat_logloss(const std::vector<double>& y, const std::vector<double>& prob, int K) {
-    if (K < 2) throw std::invalid_argument("Invalid K:" + std::to_string(K));
-    if (y.empty()) {
-        throw std::invalid_argument("Cannot calculate Confusion matrix of empty vector");
-    }
-
-    size_t n = y.size(); // N * K
-    size_t N = n / K;
-    if (n != prob.size() || n % K != 0) {
-        throw std::invalid_argument("Incompatible sizes");
-    }
-
-    double max_y = *std::max_element(y.begin(), y.end());
-    if (max_y > 1)
-        throw std::invalid_argument("y should be one-hot encoded");
-
-    // Log loss
-    double sum = 0.0;
-    for (size_t i = 0; i < n; i++) {
-        if (y[i] == 1)
-            sum += y[i] * std::log(prob[i] + 1e-15);
-    }
-    return - sum / N;
+double logLikelihood(const std::vector<double>& y, const Dataframe& prob) {
+    size_t N = y.size();
+    return - Mult::logloss_mult(y, prob) * N;
 }
 
-double logLikehood(const std::vector<double>& y, const std::vector<double>& prob, int K) {
-    size_t n = y.size(); // N * K
-    size_t N = n / K;
-    return - cat_logloss(y, prob, K) * N;
-}
+double logLikelihood_null(const std::vector<double>& y, int K) {
+    size_t N = y.size();
 
-double logLikehood_null(const std::vector<double>& y, int K) {
-    size_t n = y.size();
-    size_t N = n / K;
-    
     // Count nk for each class
     std::vector<double> nk(K, 0.0);
-    for (size_t i = 0; i < N; i++) {
-        for (int k = 0; k < K; k++) {
-            nk[k] += y[i * K + k];  // thanks to one-hot
-        }
-    }
-    
+    for (size_t i = 0; i < N; i++)
+        nk[static_cast<int>(y[i])]++;
+
     double ll = 0.0;
-    for (int k = 0; k < K; k++) {
+    for (size_t k = 0; k < K; k++)
         if (nk[k] > 0)
             ll += nk[k] * std::log(nk[k] / N);
-    }
-    return ll;  
+    return ll;
 }
 
 Dataframe fisher_mat(const Dataframe& x, const Dataframe& y_pred) {
@@ -178,7 +147,8 @@ Dataframe fisher_mat(const Dataframe& x, const Dataframe& y_pred) {
     size_t dim = (K-1) * m;
     std::vector<double> F(dim * dim, 0.0);
 
-    if (K == 2) {
+    // For K = 2 we reduce to one col
+    if (K == 1) {
 
         std::vector<double> sum(m, 0.0);
         for (size_t j1 = 0; j1 < m; j1++) {
@@ -186,7 +156,7 @@ Dataframe fisher_mat(const Dataframe& x, const Dataframe& y_pred) {
             std::fill(sum.begin(), sum.end(), 0.0);
             for (size_t i = 0; i < n; i++) {
                 
-                double p_i = y_pred.at(i * K);
+                double p_i = y_pred.at(i);
                 double d   = p_i * (1.0 - p_i);
                 double xid = x.at(j1*n + i) * d;
                 for (size_t j2 = 0; j2 < m; j2++)
@@ -273,4 +243,143 @@ std::vector<double> stderr_coeff(Dataframe& fisher, int K) {
     return stderr_coeff(cov, K);
 }
 
+double mc_fadden(double loglikehood_model, double loglikehood_null) {
+    return 1 - loglikehood_model / loglikehood_null;
+}
+
+double chi2_pval(double loglikehood_model, double loglikehood_null, double df) {
+    boost::math::chi_squared dist(df);
+    double chi2_stat =  -2 * (loglikehood_null - loglikehood_model);
+    return 1 - boost::math::cdf(dist, chi2_stat);
+}
+
+namespace Mult {
+    std::vector<double> conf_matrix_mult(const std::vector<double>& y, const Dataframe& y_pred) {
+        if (y.empty()) throw std::invalid_argument("Cannot calculate Confusion matrix of empty vector");
+        if (y_pred.get_storage()) throw std::invalid_argument("Y_proba need to be col major");
+
+        size_t n = y.size();
+        if (n != y_pred.get_rows()) throw std::invalid_argument("Y and Y_pred need to have the same length");
+
+        // Calc confusion matrix
+        size_t K = y_pred.get_cols();
+        std::vector<double> cm(K * K, 0.0);
+        for (size_t i = 0; i < n; i++) {
+            int true_class = static_cast<int>(y[i]);
+            int pred_class = static_cast<int>(y_pred.at(i));
+            cm[true_class * K + pred_class]++;
+        }
+        return cm;
+    }
+
+    double logloss_mult(const std::vector<double>& y, const Dataframe& prob) {
+        
+        // Tests
+        size_t N = y.size();
+        size_t K = prob.size() / N;
+        if (prob.size() % K != 0) throw std::invalid_argument("Incompatible sizes");
+        if (K < 2) throw std::invalid_argument("Invalid K:" + std::to_string(K));
+        if (y.empty()) throw std::invalid_argument("Cannot calculate LogLoss of empty vector");
+        if (prob.get_storage()) throw std::invalid_argument("Y_pred need to be col major");
+
+        double sum = 0.0;
+        for (size_t i = 0; i < N; i++) {
+            int label = static_cast<int>(y[i]);
+            sum += std::log(prob.at(label * N + i) + 1e-15);
+        }
+        return -sum / N;
+    }
+
+    std::vector<double> roc_auc_mult(const std::vector<double>& y, const Dataframe& prob) {
+        if (prob.get_storage()) throw std::invalid_argument("Y_proba need to be col major");
+
+        size_t n = y.size();
+        size_t K = prob.get_cols();
+        std::vector<double> aucs(K);
+        for (int k = 0; k < K; k++) {
+            
+            std::vector<double> y_(n);
+            std::vector<double> prob_k(n);
+            for (size_t i = 0; i < n; i++) {
+                y_[i] = (y[i] == k) ? 1.0 : 0.0;
+                prob_k[i] = prob.at(k * n + i);
+            }
+            aucs[k] = roc_auc(y_, prob_k);
+        }
+        return aucs;
+    }
+
+    double mcc_mult(const std::vector<double>& conf_matrix, int n, int K) {
+        double sum_diag = 0;
+        double dot_rc = 0;
+        double sum_r2 = 0, sum_c2 = 0;
+        for (size_t k = 0; k < K; k++) {
+
+            sum_diag += conf_matrix[k * K + k];
+            double rk = 0, ck = 0;
+            for (size_t j = 0; j < K; j++) {
+                rk += conf_matrix[k * K + j];
+                ck += conf_matrix[j * K + k];
+            }
+
+            dot_rc += rk * ck;
+            sum_r2 += rk * rk;
+            sum_c2 += ck * ck;
+        }
+        double mcc_num = n * sum_diag - dot_rc;
+        double mcc_den = std::sqrt((n*n - sum_r2) * (n*n - sum_c2));
+        return (mcc_den == 0) ? 0.0 : mcc_num / mcc_den;
+    }
+}
+
+namespace OneHot {
+    double logloss_mult_onehot(const Dataframe& y, const Dataframe& prob) {
+        if (y.get_storage()) throw std::invalid_argument("Y need to be col major");
+        if (prob.get_storage()) throw std::invalid_argument("Y_pred need to be col major");
+
+        size_t N = y.get_rows();
+        size_t K = y.get_cols();
+        size_t n = N * K;
+        if (K < 2) throw std::invalid_argument("Invalid K:" + std::to_string(K));
+        if (N != prob.get_rows()) throw std::invalid_argument("Incompatible sizes");
+
+        double max_y = *std::max_element(y.get_data().begin(), y.get_data().end());
+        if (max_y > 1) throw std::invalid_argument("y should be one-hot encoded");
+
+        // Log loss
+        double sum = 0.0;
+        for (size_t i = 0; i < n; i++) {
+            if (y.at(i) == 1)
+                sum += y.at(i) * std::log(prob.at(i) + 1e-15);
+        }
+        return - sum / N;
+    }
+
+    double logLikelihood_onehot(const Dataframe& y, const Dataframe& prob) {
+        size_t N = y.get_rows();
+        size_t K = y.get_cols();
+        return - logloss_mult_onehot(y, prob) * N;
+    }
+
+    double logLikelihood_null_onehot(const Dataframe& y) {
+        size_t N = y.get_rows();
+        size_t K = y.get_cols();
+        if (y.get_storage()) throw std::invalid_argument("Y need to be col major");
+        
+        // Count nk for each class
+        std::vector<double> nk(K, 0.0);
+        for (size_t i = 0; i < N; i++) {
+            for (size_t k = 0; k < K; k++) {
+                nk[k] += y.at(k * N + i);  // One-hot
+            }
+        }
+        
+        double ll = 0.0;
+        for (size_t k = 0; k < K; k++) {
+            if (nk[k] > 0)
+                ll += nk[k] * std::log(nk[k] / N);
+        }
+        return ll;  
+    }
+}
 }

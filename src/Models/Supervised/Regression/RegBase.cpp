@@ -201,7 +201,7 @@ void RegressionBase::compute_stats_penalized(const Dataframe& x, Dataframe& x_c,
     double mse = Stats::mse(y.get_data(), y_pred);
     std::vector<double> residuals = Stats::get_residuals(y.get_data(), y_pred);
     double df = effective_df(x_c, XtXinv);
-    double loglikehood = Stats::logLikehood(y.get_data(), y_pred);
+    double loglikehood = Stats::logLikelihood(y.get_data(), y_pred);
 
 
     // Add them to our vector of stats
