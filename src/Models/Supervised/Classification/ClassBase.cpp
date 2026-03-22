@@ -31,7 +31,6 @@ std::vector<double> ClassificationBase::softmax(const Dataframe& X) const {
 std::vector<double> ClassificationBase::softmax(const Dataframe& X, const Dataframe& W) const {
 
     size_t n = X.get_rows();
-    size_t p = X.get_cols();
 
     // Getting ptrs to elem of each col
     std::vector<std::vector<const double*>> W_j(nb_cats);
@@ -81,8 +80,8 @@ void ClassificationBase::nb_categories(const Dataframe& Y) {
         if (x == std::floor(x))
             unique_int.insert(static_cast<int>(x));
     }
-    nb_cats = static_cast<int>(unique_int.size());
-    ref_class_ = nb_cats - 1; // Last one by default
+    nb_cats = unique_int.size();
+    ref_class_ = static_cast<int>(nb_cats) - 1; // Last one by default
 }
 
 void ClassificationBase::fit(const Dataframe& x, const Dataframe& y) {
@@ -109,15 +108,7 @@ std::vector<double> ClassificationBase::predict_proba(const Dataframe& x) const 
     x_v.insert(x_v.begin(), n, 1.0);
     
     Dataframe X = {n, p+1, false, std::move(x_v)};
-    std::vector<double> proba = softmax(X);
-
-    if (nb_cats == 2) {
-        std::vector<double> res(n);
-        for (size_t i = 0; i < n; i++)
-            res[i] = proba[i * 2 + 1];
-        return res;
-    }
-    return proba;
+    return softmax(X);
 }
 
 std::vector<double> ClassificationBase::predict(const Dataframe& x) const {
@@ -125,6 +116,7 @@ std::vector<double> ClassificationBase::predict(const Dataframe& x) const {
     size_t n = x.get_rows();
     std::vector<double> y_pred(n, 0.0);
     std::vector<double> proba = predict_proba(x);
+
     for (size_t i = 0; i < n; i++) {
         double max_proba = -1.0;
         size_t best_class = 0;

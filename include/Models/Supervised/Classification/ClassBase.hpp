@@ -33,10 +33,10 @@ namespace Class {
 
     class ClassificationBase {
         protected:
-            int nb_cats;
             double tol_;                                   
             int ref_class_;                             // Last one by default
             bool is_fitted;
+            size_t nb_cats;
             double max_iter_;
             double learning_r_;
             std::vector<double> coeffs;
@@ -58,7 +58,7 @@ namespace Class {
 
         public:
             // Constructor 
-            ClassificationBase() : is_fitted(false), nb_cats(-1), ref_class_(-1), tol_(1e-4), max_iter_(1000), learning_r_(0.1) {}; // Init to get col major or warn user 
+            ClassificationBase() : is_fitted(false), nb_cats(-1.0), ref_class_(-1), tol_(1e-4), max_iter_(100000), learning_r_(0.1) {}; // Init to get col major or warn user 
             virtual ~ClassificationBase() = default;
 
             virtual void fit(const Dataframe& x, const Dataframe& y);

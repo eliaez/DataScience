@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <vector>
+#include <numeric>
 #include <stdexcept>
 #include <unordered_map>
 

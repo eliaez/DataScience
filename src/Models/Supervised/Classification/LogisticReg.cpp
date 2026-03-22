@@ -35,41 +35,46 @@ Dataframe LogisticRegression::fit_without_stats(const Dataframe& x, const Datafr
     std::vector<double> x_v = x.get_data();
     
     // Insert an unit col to get intercept value
-    for (size_t i = 0; i < n; i++) {
-        x_v.insert(x_v.begin(), 1.0);
-    }
-    
+    x_v.insert(x_v.begin(), n, 1.0);
+
     // Need X
     Dataframe X = {n, p+1, false, std::move(x_v)};
     Dataframe X_T = ~X;
     X_T.change_layout_inplace();
 
     // Our vector W
-    std::vector<double> w(p+1, 0.0);
-    Dataframe W = {nb_cats, p+1, false, std::move(w)};
+    std::vector<double> w((p+1) * nb_cats, 0.0);
+    Dataframe W = {p+1, nb_cats, false, std::move(w)};
 
     // Gradient Descent
     int idx = 0;
     Dataframe Y_ = y;
-    double loss = 0.0;
     bool keep_cond = true;
-    double old_loss = -1.0;
-    if (nb_cats > 2 && y.get_cols() == 1) Y_.OneHot(0);
+    if (nb_cats > 1 && y.get_cols() == 1) Y_.OneHot(0);
+    double loss = std::numeric_limits<double>::infinity();
+    double old_loss = std::numeric_limits<double>::infinity();
     while (keep_cond && idx < max_iter_) {
 
         // Softmax
         std::vector<double> y_v = softmax(X, W);
         Dataframe Y_pred = Dataframe(n, nb_cats, false, std::move(y_v));
 
+        // Calculate our gradient
+        std::vector<double> gradient_v = (X_T * (Y_pred - Y_)).get_data();
+        gradient_v = mult(gradient_v, 1.0 / n);
+
         // Cost function 
+        old_loss = loss;
         loss = Stats_class::OneHot::logloss_mult_onehot(Y_, Y_pred);
 
+        // Add penality to our loss and gradient
         if (penality_ == 1.0) {
             for (size_t i = 0; i < (p+1)*nb_cats; i++) {
 
                 // To exclude w0
                 if (i % (p+1) == 0) continue;
                 loss += std::abs(W.at(i)) / C_;
+                gradient_v[i] += (W.at(i) > 0 ? 1.0 : -1.0) / C_;
             }
         }
         else if (penality_ == 2.0) {
@@ -78,27 +83,39 @@ Dataframe LogisticRegression::fit_without_stats(const Dataframe& x, const Datafr
                 // To exclude w0
                 if (i % (p+1) == 0) continue;
                 loss += W.at(i) * W.at(i) / (2 * C_);
+                gradient_v[i] += W.at(i) / C_;
             }
         }
+        else if (penality_ == 1.5) {
+            for (size_t i = 0; i < (p+1)*nb_cats; i++) {
+                
+                // To exclude w0
+                if (i % (p+1) == 0) continue;
+                double w_i = W.at(i);
+                loss += (l1_ratio_ * std::abs(w_i) + (1.0 - l1_ratio_) / 2.0 * w_i * w_i) / C_;
+                gradient_v[i] += (l1_ratio_ * (w_i > 0 ? 1.0 : -1.0) + (1.0 - l1_ratio_) * w_i) / C_;
+            }
+        } 
+        else if (penality_ == 0.0) {}
         else {
             throw std::invalid_argument("Unknown penality: " + std::to_string(penality_));
         }
 
-        // Calculate our gradient
-        std::vector<double> gradient_v = (X_T * (Y_pred - Y_)).get_data();
-        gradient_v = mult(gradient_v, learning_r_ / n);
+        // Finishing calculating our gradient
+        gradient_v = mult(gradient_v, learning_r_);
         Dataframe gradient = {p+1, nb_cats, false, std::move(gradient_v)};
-
-        // Update our W
+        
+        // Updating our W
         W = W - gradient;
 
         // Testing convergence of cost
-        if (std::abs(loss - old_loss) < tol_) { // Threshold
+        if (std::abs(loss - old_loss) / (std::abs(old_loss) + 1e-10) < tol_) { // Threshold
             break;
         }
-        old_loss = loss;
         idx++;
     }
+    if (max_iter_ == idx) 
+        std::cout << "Max_iter reached, you might need to change learning_rate or scale your data\n" << std::endl;
 
     // Results
     coeffs = W.get_data();
@@ -132,14 +149,14 @@ void LogisticRegression::compute_stats(const Dataframe& x, Dataframe& x_const, c
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();
-    int K = nb_cats == 2 ? 1 : nb_cats;
+    size_t K = nb_cats == 2 ? 1.0 : nb_cats;
     
     // Predict 
     std::vector<double> y_proba = predict_proba(x);
-    Dataframe Y_proba = {n, K, false, std::move(y_proba)};
+    Dataframe Y_proba = {n, nb_cats, false, std::move(y_proba)};
 
-    std::vector<double> y_pred = predict_proba(x);
-    Dataframe Y_pred = {n, K, false, std::move(y_pred)};
+    std::vector<double> y_pred = predict(x);
+    Dataframe Y_pred = {n, 1.0, false, std::move(y_pred)};
 
     // Covariance matrix
     Dataframe fisher = Stats_class::fisher_mat(x_const, Y_proba);
@@ -170,7 +187,7 @@ void LogisticRegression::compute_stats(const Dataframe& x, Dataframe& x_const, c
         // Coeff stats
         CoeffStats c;
         c.category = "Class 0 vs Class 1";
-        c.stderr_beta = Stats_class::stderr_coeff(cov_mat, 0);
+        c.stderr_beta = Stats_class::stderr_coeff(cov_mat, 0, p+1);
         for (size_t i = 0; i < p+1; i++) {
             c.name.push_back(headers[i]);
             double beta = coeffs[i];
@@ -226,7 +243,7 @@ void LogisticRegression::compute_stats(const Dataframe& x, Dataframe& x_const, c
             // Save our stats
             CoeffStats c;
             c.category = "Class " + std::to_string(cat) + " vs Class " +  std::to_string(ref_class_);
-            c.stderr_beta = Stats_class::stderr_coeff(cov_mat, cat);
+            c.stderr_beta = Stats_class::stderr_coeff(cov_mat, cat, p+1);
             for (size_t i = 0; i < p+1; i++) {
                 c.name.push_back(headers[i]);
 

@@ -147,53 +147,35 @@ Dataframe fisher_mat(const Dataframe& x, const Dataframe& y_pred) {
     size_t dim = (K-1) * m;
     std::vector<double> F(dim * dim, 0.0);
 
-    // For K = 2 we reduce to one col
-    if (K == 1) {
-
-        std::vector<double> sum(m, 0.0);
-        for (size_t j1 = 0; j1 < m; j1++) {
-
-            std::fill(sum.begin(), sum.end(), 0.0);
-            for (size_t i = 0; i < n; i++) {
-                
-                double p_i = y_pred.at(i);
-                double d   = p_i * (1.0 - p_i);
-                double xid = x.at(j1*n + i) * d;
-                for (size_t j2 = 0; j2 < m; j2++)
-                    sum[j2] += xid * x.at(j2*n + i);
-            }
-            
-            // F col-major, dim = m
-            for (size_t j2 = 0; j2 < m; j2++)
-                F[j2*m + j1] = sum[j2];
-        }
-        return {dim, dim, false, std::move(F)};
-    }
-
-    for (int k = 0; k < K-1; k++) {
-        for (int l = k; l < K-1; l++) {
+    for (size_t k = 0; k < K-1; k++) {
+        for (size_t l = k; l < K-1; l++) {
 
             // Block (k,l) : m x m
             std::vector<double> block(m * m, 0.0);
 
-            for (int j1 = 0; j1 < m; j1++) {
+            for (size_t j1 = 0; j1 < m; j1++) {
                 std::vector<double> sum(m, 0.0);
 
-                for (int i = 0; i < n; i++) {
+                for (size_t i = 0; i < n; i++) {
+
                     double p_ik = y_pred.at(k*n + i);
                     double p_il = y_pred.at(l*n + i);
-                    double d    = (k == l) ? p_ik*(1.0 - p_ik) : -p_ik*p_il;
-                    double xid  = x.at(j1*n + i) * d;
+                    double d = (k == l) ? p_ik*(1.0 - p_ik) : -p_ik * p_il;
+                    double x_j1_i = (j1 < p) ? x.at(j1*n + i) : 1.0;
+                    for (size_t j2 = 0; j2 < m; j2++) {
 
-                    for (int j2 = 0; j2 < m; j2++)
-                        sum[j2] += xid * x.at(j2*n + i);
+                        double x_j2_i = (j2 < p) ? x.at(j2*n + i) : 1.0;
+                        sum[j2] += x_j1_i * d * x_j2_i;
+                    }
                 }
 
-                // F col-major
-                for (int j2 = 0; j2 < m; j2++) {
+                // F col major
+                for (size_t j2 = 0; j2 < m; j2++) {
                     F[(l*m + j2)*dim + (k*m + j1)] = sum[j2];
-                    if (k != l)
+
+                    if (k != l) {
                         F[(k*m + j1)*dim + (l*m + j2)] = sum[j2];
+                    }
                 }
             }
         }
@@ -221,26 +203,27 @@ std::vector<double> stderr_coeff(const Dataframe& x, const Dataframe& y_pred, in
         double fisher = 0.0;
         for (size_t i = 0; i < n; i++) {
             double p_ik = y_pred.at(K * n + i);
-            double xij  = x.at(j * n + i);
+            double xij = (j == 0) ? 1.0 : x.at((j - 1) * n + i);
             fisher += p_ik * (1.0 - p_ik) * xij * xij;
         }
-        se[j] = std::sqrt(1.0 / fisher);
+        se[j] = (fisher > 0.0) ? std::sqrt(1.0 / fisher) : 0.0;
     }
     return se;
 }
 
-std::vector<double> stderr_coeff(const Dataframe& cov, int K) {
-    size_t p = cov.get_cols();
+std::vector<double> stderr_coeff(const Dataframe& cov, int K, int p) {
+    size_t tot_cols  = cov.get_cols();
     std::vector<double> se(p);
     for (size_t i = 0; i < p; i++) {
-        se[i] = std::sqrt(cov.at(i * p + i));
+        size_t idx = K * p + i;
+        se[i] = std::sqrt(cov.at(idx * tot_cols  + idx));
     }
     return se;
 }
 
-std::vector<double> stderr_coeff(Dataframe& fisher, int K) {
-    Dataframe cov = cov_mat(fisher);
-    return stderr_coeff(cov, K);
+std::vector<double> stderr_coeff(Dataframe& fisher, int K, int p) {
+    const Dataframe cov = cov_mat(fisher);
+    return stderr_coeff(cov, K, p);
 }
 
 double mc_fadden(double loglikehood_model, double loglikehood_null) {
@@ -357,7 +340,6 @@ namespace OneHot {
 
     double logLikelihood_onehot(const Dataframe& y, const Dataframe& prob) {
         size_t N = y.get_rows();
-        size_t K = y.get_cols();
         return - logloss_mult_onehot(y, prob) * N;
     }
 

@@ -208,32 +208,54 @@ void Dataframe::OneHot(size_t j) {
     if (is_row_major) this->change_layout_inplace();
 
     // Get label_encoder of the col which is by default encoded
+    std::vector<double> onehot_data;
     std::unordered_map<int, std::unordered_map<std::string, int>> label_encoder_y;
     if (label_encoder.find(static_cast<int>(j)) != label_encoder.end()) {
-        label_encoder_y[0] = label_encoder[static_cast<int>(j)]; 
+        label_encoder_y[0] = label_encoder[static_cast<int>(j)];
+        
+        // Get data of the col 
+        std::vector<double> to_convert = this->popup(j);
+
+        // Create a new col for each category and data for each rows
+        size_t idx = 0;
+        onehot_data.resize(rows * label_encoder_y[0].size());
+        for (auto& [str, val] : label_encoder_y[0]) {
+
+            // To avoid NAN col
+            if (str != "") {
+                headers.push_back(str);
+                for (size_t k = 0; k < rows; k++) {
+                    onehot_data[rows * idx + k] = (to_convert[k] == val) ? 1.0 : 0.0;
+                }
+                idx++;
+                cols++;
+            }
+        }
+    }
+    // If col not encoded and by categories by default (0, 1, 2,...)
+    else if (label_encoder.empty()) {
+
+        // Get data of the col 
+        std::vector<double> to_convert = this->popup(j);
+
+        // Build label_encoder from values
+        size_t nb_cats = static_cast<size_t>(*std::max_element(to_convert.begin(), to_convert.end())) + 1;
+
+        // Headers et one-hot data
+        onehot_data.resize(rows * nb_cats);
+        for (size_t i = 0; i < nb_cats; i++) {
+
+            headers.push_back("Class " + std::to_string(i));
+            for (size_t k = 0; k < rows; k++) {
+                onehot_data[rows * i + k] = (to_convert[k] == static_cast<double>(i)) ? 1.0 : 0.0;
+            }
+            cols++;
+        }
     }
     else {
         throw std::invalid_argument(std::format("Column {} not found in label encoder", j));
     }
 
-    // Get data of the col 
-    std::vector<double> to_convert = this->popup(j);
-
-    // Create a new col for each category and data for each rows
-    size_t idx = 0;
-    std::vector<double> onehot_data(rows * label_encoder_y[0].size());
-    for (auto& [str, val] : label_encoder_y[0]) {
-
-        // To avoid NAN col
-        if (str != "") {
-            headers.push_back(str);
-            for (size_t k = 0; k < rows; k++) {
-                onehot_data[rows * idx + k] = (to_convert[k] == val) ? 1.0 : 0.0;
-            }
-            idx++;
-            cols++;
-        }
-    }
     onehot_data.shrink_to_fit();
 
     // Insert our new data at the end
@@ -836,7 +858,7 @@ std::vector<double> Dataframe::transpose_avx2_th(size_t rows_, size_t cols_,
     std::vector<std::future<void>> futures;
     futures.reserve(nb_threads);
 
-    size_t chunk = (int)(vec_sizei / nb_threads);
+    size_t chunk = (vec_sizei / nb_threads / NB_DB) * NB_DB;
     size_t start_i = 0, end_i = chunk;
     
     for (size_t n = 0; n < nb_threads; n++) {

@@ -37,9 +37,9 @@ namespace Stats_class {
 
     Dataframe cov_mat(Dataframe& fisher);
 
-    // Function to get stderr vector with K for idx of category
-    std::vector<double> stderr_coeff(Dataframe& fisher, int K);
-    std::vector<double> stderr_coeff(const Dataframe& cov, int K);
+    // Function to get stderr vector with K for idx of category, p nb of features (with intercept)
+    std::vector<double> stderr_coeff(Dataframe& fisher, int K, int p);
+    std::vector<double> stderr_coeff(const Dataframe& cov, int K, int p);
 
     // Function to get stderr vector with x col major (with const), y_pred from predict_proba col major with K for idx of category
     std::vector<double> stderr_coeff(const Dataframe& x, const Dataframe& y_pred, int K);

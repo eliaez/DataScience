@@ -14,7 +14,8 @@ namespace Class {
     class LogisticRegression : public ClassificationBase {
         private:
             double C_;         // 1 / lambda
-            double penality_;  //  1 (L1) or 2 (L2)
+            double penality_;  // 0 (no penality), 1 (L1), 1.5 (Elastic Net) or 2 (L2)
+            double l1_ratio_;  // Used only if elastic net
             
 
         protected:
@@ -22,8 +23,10 @@ namespace Class {
             void compute_stats(const Dataframe& x, Dataframe& x_const, const Dataframe& y) override;
         
         public:
-            // C = 1/lambda, penality = 1 for L1 or 2 for L2 
-            LogisticRegression(double C = 1.0, double penality = 2.0) : C_(C), penality_(penality) {};
+            // C = 1/lambda, penality = 0 (no penality), 1 (L1), 1.5 (Elastic Net) or 2 (L2)
+            // l1_ratio used only if elastic net
+            LogisticRegression(double C = 1.0, double penality = 2.0, double l1_ratio = 0.5) 
+                : C_(C), penality_(penality), l1_ratio_(l1_ratio) {};
 
             // Training Lasso Regression with x col-major
             Dataframe fit_without_stats(const Dataframe& x, const Dataframe& y) override;
@@ -42,9 +45,11 @@ namespace Class {
             // Getter
             double get_c() const { return C_; }
             double get_penality() const { return penality_; }
+            double get_l1_ratio() const { return l1_ratio_; }
 
             // Setter
             void set_c(double C) { C_ = C; }
             void set_penality(double penality) { penality_ = penality; }
+            void set_l1_ratio(double l1_ratio) { l1_ratio_ = l1_ratio; }
     };
 }
