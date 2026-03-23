@@ -32,8 +32,8 @@ namespace Stats_class {
     // Log Likelihood null for multiple categories
     double logLikelihood_null(const std::vector<double>& y, int K);
 
-    // Fisher matrix (symmetrical) with x col major (with const) and y_pred from predict_proba col major  
-    Dataframe fisher_mat(const Dataframe& x, const Dataframe& y_pred);
+    // Fisher matrix (symmetrical) with x_const col major (with const) and y_proba from predict_proba col major  
+    Dataframe fisher_mat(const Dataframe& x_const, const Dataframe& y_proba);
 
     Dataframe cov_mat(Dataframe& fisher);
 

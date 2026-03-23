@@ -156,20 +156,52 @@ void LogisticRegression::compute_stats(const Dataframe& x, Dataframe& x_const, c
     Dataframe Y_proba = {n, nb_cats, false, std::move(y_proba)};
 
     std::vector<double> y_pred = predict(x);
-    Dataframe Y_pred = {n, 1.0, false, std::move(y_pred)};
+    Dataframe Y_pred = {n, K, false, std::move(y_pred)};
+
+    //auto save_vec = [](const std::string& path, const std::vector<double>& v) {
+    //    std::ofstream f(path);
+    //    for (auto& x : v) f << std::setprecision(10) << x << "\n";
+    //};
+    //
+    //save_vec("C:/Users/romai/y_pred.csv", Y_proba.get_data());
+
+    // Fisher matrix
+    Dataframe fisher = Stats_class::fisher_mat(x_const, Y_proba);
+
+    auto data = fisher.get_data();
+    bool is_null = std::all_of(data.begin(), data.end(), [](double v){ return std::abs(v) < 1e-10; });
+    if (is_null) {
+        std::cout << "Fisher matrix is null"
+                << "stderr and z-stats unavailable. "
+                << "Consider regularization or checking class balance.\n";
+    }
 
     // Covariance matrix
-    Dataframe fisher = Stats_class::fisher_mat(x_const, Y_proba);
-    Dataframe cov_mat = Stats_class::cov_mat(fisher);
+
+    Dataframe cov_mat;
+    try {
+        cov_mat = Stats_class::cov_mat(fisher);
+    }
+    catch (const std::exception& e) {
+        std::cout << "Fisher matrix is singular, stderr and z-stats unavailable. "
+                << "Consider regularization or checking class balance.\n"
+                << "Details: " << e.what() << std::endl;
+        std::vector<double> vect_null((nb_cats - 1) * (p + 1) * (nb_cats - 1) * (p + 1), 0.0);
+        cov_mat = {(nb_cats - 1) * (p + 1), (nb_cats - 1) * (p + 1), false, std::move(vect_null)};
+    }
+    
 
     // Confusion matrix
     std::vector<double> conf_matrix;
-    if (nb_cats == 2) conf_matrix = Stats_class::conf_matrix(y.get_data(), y_pred);
+    if (nb_cats == 2) conf_matrix = Stats_class::conf_matrix(y.get_data(), Y_pred.get_data());
     else conf_matrix = Stats_class::Mult::conf_matrix_mult(y.get_data(), Y_pred);
 
     // Roc Auc 
+    std::vector<double> y_proba_bin(n);
+    for (int i = 0; i < n; i++)
+        y_proba_bin[i] = y_proba[i * 2 + 1];
     std::vector<double> roc_auc;
-    if (nb_cats == 2) roc_auc.push_back(Stats_class::roc_auc(y.get_data(), y_proba));
+    if (nb_cats == 2) roc_auc.push_back(Stats_class::roc_auc(y.get_data(), y_proba_bin));
     else roc_auc = Stats_class::Mult::roc_auc_mult(y.get_data(), Y_proba);
 
     // If we have not the cols name
@@ -193,7 +225,7 @@ void LogisticRegression::compute_stats(const Dataframe& x, Dataframe& x_const, c
             double beta = coeffs[i];
             c.beta.push_back(beta);
             c.odds_ratio.push_back(std::exp(beta));
-            c.z_stat.push_back(beta / c.stderr_beta[i]);
+            c.z_stat.push_back(c.stderr_beta[i] ==  0.0 ? NAN : beta / c.stderr_beta[i]);
             c.p_value.push_back(Stats::normal_cdf(c.z_stat.back()));
         }
 
@@ -250,7 +282,7 @@ void LogisticRegression::compute_stats(const Dataframe& x, Dataframe& x_const, c
                 double displayed_beta = coeffs[cat * (p+1) + i] - coeffs[ref_class_ * (p+1) + i];
                 c.beta.push_back(displayed_beta);
                 c.odds_ratio.push_back(std::exp(displayed_beta));
-                c.z_stat.push_back(displayed_beta / c.stderr_beta[i]);
+                c.z_stat.push_back(c.stderr_beta[i] ==  0.0 ? NAN : displayed_beta / c.stderr_beta[i]);
                 c.p_value.push_back(Stats::normal_cdf(c.z_stat[i]));
             }
 

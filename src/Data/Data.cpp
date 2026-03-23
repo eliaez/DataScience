@@ -859,10 +859,11 @@ std::vector<double> Dataframe::transpose_avx2_th(size_t rows_, size_t cols_,
     futures.reserve(nb_threads);
 
     size_t chunk = (vec_sizei / nb_threads / NB_DB) * NB_DB;
-    size_t start_i = 0, end_i = chunk;
+    size_t start_i = 0;
     
     for (size_t n = 0; n < nb_threads; n++) {
-        if (n+1 == nb_threads) end_i = vec_sizei;
+        size_t end_i = (n + 1 == nb_threads) ? vec_sizei : start_i + chunk;
+        end_i = std::min(end_i, vec_sizei);
 
         auto fut = pool.enqueue([start_i, end_i, rows_, cols_, vec_sizej, &df, &new_data] {
             for (size_t i = start_i; i < end_i; i += NB_DB) {
@@ -916,7 +917,6 @@ std::vector<double> Dataframe::transpose_avx2_th(size_t rows_, size_t cols_,
 
         futures.push_back(std::move(fut));
         start_i += chunk;
-        end_i += chunk;
     }
 
     for (auto& fut : futures) {

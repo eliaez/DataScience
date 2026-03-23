@@ -19,7 +19,7 @@ std::vector<double> conf_matrix(const std::vector<double>& y, const std::vector<
 
     size_t n = y.size();
     if (n != y_pred.size()) {
-        throw std::invalid_argument("Y and Ypred need to have the same length");
+        throw std::invalid_argument("Y and Y_pred need to have the same length");
     }
 
     // Calc confusion matrix
@@ -133,53 +133,64 @@ double logLikelihood_null(const std::vector<double>& y, int K) {
     return ll;
 }
 
-Dataframe fisher_mat(const Dataframe& x, const Dataframe& y_pred) {
+Dataframe fisher_mat(const Dataframe& x_const, const Dataframe& y_proba) {
 
-    if (x.get_storage())
+    if (x_const.get_storage())
         throw std::invalid_argument("X must be col major");
-    if (y_pred.get_storage())
+    if (y_proba.get_storage())
         throw std::invalid_argument("Y_pred must be col major");
 
-    size_t n = x.get_rows();
-    size_t p = x.get_cols();
-    size_t K = y_pred.get_cols();
-    size_t m = p + 1;
-    size_t dim = (K-1) * m;
+    size_t n = x_const.get_rows();
+    size_t p = x_const.get_cols();
+    size_t K = y_proba.get_cols();
+    size_t m   = p + 1; 
+    size_t K_ = K - 1;
+    size_t dim  = K_ * m;
+
     std::vector<double> F(dim * dim, 0.0);
+    for (size_t k = 0; k < K_; k++) {
+        for (size_t l = k; l < K_; l++) {
 
-    for (size_t k = 0; k < K-1; k++) {
-        for (size_t l = k; l < K-1; l++) {
+            // Accumulate Block k,l : X^T * D_kl * X
+            std::vector<double> block(m * m, 0.0); 
+            for (size_t i = 0; i < n; i++) {
+                double p_ik = y_proba.at(k*n + i);
+                double p_il = y_proba.at(l*n + i);
 
-            // Block (k,l) : m x m
-            std::vector<double> block(m * m, 0.0);
+                // Diagonal weight
+                double d   = (k == l) ? p_ik*(1.0 - p_ik) : -p_ik*p_il;
+                if (d < 1e-10 ) d = 0.0;
 
-            for (size_t j1 = 0; j1 < m; j1++) {
-                std::vector<double> sum(m, 0.0);
+                // Upper triangle of the outer product
+                for (size_t j1 = 0; j1 < m; j1++) {
 
-                for (size_t i = 0; i < n; i++) {
+                    double xj1 = (j1 < p) ? x_const.at(j1*n + i) : 1.0;
+                    for (size_t j2 = j1; j2 < m; j2++) {
 
-                    double p_ik = y_pred.at(k*n + i);
-                    double p_il = y_pred.at(l*n + i);
-                    double d = (k == l) ? p_ik*(1.0 - p_ik) : -p_ik * p_il;
-                    double x_j1_i = (j1 < p) ? x.at(j1*n + i) : 1.0;
-                    for (size_t j2 = 0; j2 < m; j2++) {
-
-                        double x_j2_i = (j2 < p) ? x.at(j2*n + i) : 1.0;
-                        sum[j2] += x_j1_i * d * x_j2_i;
+                        double xj2 = (j2 < p) ? x_const.at(j2*n + i) : 1.0;
+                        block[j1*m + j2] += xj1 * d * xj2;
                     }
                 }
+            }
 
-                // F col major
-                for (size_t j2 = 0; j2 < m; j2++) {
-                    F[(l*m + j2)*dim + (k*m + j1)] = sum[j2];
+            // Write block (k,l) and its symmetric counterparts into F (col-major)
+            for (size_t j1 = 0; j1 < m; j1++) {
+                for (size_t j2 = j1; j2 < m; j2++) {
+                    
+                    double val = block[j1*m + j2] / n;
+                    F[(l*m + j2)*dim + (k*m + j1)] = val;
+                    F[(k*m + j1)*dim + (l*m + j2)] = val;
 
                     if (k != l) {
-                        F[(k*m + j1)*dim + (l*m + j2)] = sum[j2];
+                        F[(k*m + j2)*dim + (l*m + j1)] = val;
+                        F[(l*m + j1)*dim + (k*m + j2)] = val;
                     }
                 }
             }
         }
     }
+    for (size_t i = 0; i < dim * dim; i++)
+        F[i] += 1e-8;
     return {dim, dim, false, std::move(F)};
 }
 
