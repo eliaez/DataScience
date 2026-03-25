@@ -81,7 +81,9 @@ void ClassificationBase::nb_categories(const Dataframe& Y) {
             unique_int.insert(static_cast<int>(x));
     }
     nb_cats = unique_int.size();
-    ref_class_ = static_cast<int>(nb_cats) - 1; // Last one by default
+
+    // Last one by default and 0 for binary classification
+    ref_class_ = (nb_cats == 2) ? 0 : static_cast<int>(nb_cats) - 1;
 }
 
 void ClassificationBase::fit(const Dataframe& x, const Dataframe& y) {

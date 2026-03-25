@@ -73,8 +73,8 @@ Dataframe LogisticRegression::fit_without_stats(const Dataframe& x, const Datafr
 
                 // To exclude w0
                 if (i % (p+1) == 0) continue;
-                loss += std::abs(W.at(i)) / C_;
-                gradient_v[i] += (W.at(i) > 0 ? 1.0 : -1.0) / C_;
+                double w_i = W.at(i);
+                loss += std::abs(w_i) / C_;
             }
         }
         else if (penality_ == 2.0) {
@@ -82,8 +82,9 @@ Dataframe LogisticRegression::fit_without_stats(const Dataframe& x, const Datafr
 
                 // To exclude w0
                 if (i % (p+1) == 0) continue;
-                loss += W.at(i) * W.at(i) / (2 * C_);
-                gradient_v[i] += W.at(i) / C_;
+                double w_i = W.at(i);
+                loss += w_i * w_i / (2 * C_);
+                gradient_v[i] += w_i / C_;
             }
         }
         else if (penality_ == 1.5) {
@@ -92,8 +93,9 @@ Dataframe LogisticRegression::fit_without_stats(const Dataframe& x, const Datafr
                 // To exclude w0
                 if (i % (p+1) == 0) continue;
                 double w_i = W.at(i);
+
                 loss += (l1_ratio_ * std::abs(w_i) + (1.0 - l1_ratio_) / 2.0 * w_i * w_i) / C_;
-                gradient_v[i] += (l1_ratio_ * (w_i > 0 ? 1.0 : -1.0) + (1.0 - l1_ratio_) * w_i) / C_;
+                gradient_v[i] += (1.0 - l1_ratio_) * w_i / C_;
             }
         } 
         else if (penality_ == 0.0) {}
@@ -107,6 +109,20 @@ Dataframe LogisticRegression::fit_without_stats(const Dataframe& x, const Datafr
         
         // Updating our W
         W = W - gradient;
+
+        // Soft Thresholding for L1 penality
+        if (penality_ == 1.0 || penality_ == 1.5) {
+
+            std::vector<double> w_data = W.get_data();
+            double threshold = learning_r_ * (penality_ == 1.0 ? 1.0 : l1_ratio_) / C_;
+            for (size_t i = 0; i < (p+1)*nb_cats; i++) {
+
+                if (i % (p+1) == 0) continue;  // Intercept
+                double w_i = w_data[i];
+                w_data[i] = std::copysign(std::max(std::abs(w_i) - threshold, 0.0), w_i);
+            }
+            W = {p+1, nb_cats, false, std::move(w_data)};
+        }
 
         // Testing convergence of cost
         if (std::abs(loss - old_loss) / (std::abs(old_loss) + 1e-10) < tol_) { // Threshold
@@ -158,15 +174,8 @@ void LogisticRegression::compute_stats(const Dataframe& x, Dataframe& x_const, c
     std::vector<double> y_pred = predict(x);
     Dataframe Y_pred = {n, K, false, std::move(y_pred)};
 
-    //auto save_vec = [](const std::string& path, const std::vector<double>& v) {
-    //    std::ofstream f(path);
-    //    for (auto& x : v) f << std::setprecision(10) << x << "\n";
-    //};
-    //
-    //save_vec("C:/Users/romai/y_pred.csv", Y_proba.get_data());
-
     // Fisher matrix
-    Dataframe fisher = Stats_class::fisher_mat(x_const, Y_proba);
+    Dataframe fisher = Stats_class::fisher_mat(x_const, Y_proba, ref_class_);
 
     auto data = fisher.get_data();
     bool is_null = std::all_of(data.begin(), data.end(), [](double v){ return std::abs(v) < 1e-10; });
@@ -190,18 +199,20 @@ void LogisticRegression::compute_stats(const Dataframe& x, Dataframe& x_const, c
         cov_mat = {(nb_cats - 1) * (p + 1), (nb_cats - 1) * (p + 1), false, std::move(vect_null)};
     }
     
-
     // Confusion matrix
     std::vector<double> conf_matrix;
     if (nb_cats == 2) conf_matrix = Stats_class::conf_matrix(y.get_data(), Y_pred.get_data());
     else conf_matrix = Stats_class::Mult::conf_matrix_mult(y.get_data(), Y_pred);
 
     // Roc Auc 
-    std::vector<double> y_proba_bin(n);
-    for (int i = 0; i < n; i++)
-        y_proba_bin[i] = y_proba[i * 2 + 1];
     std::vector<double> roc_auc;
-    if (nb_cats == 2) roc_auc.push_back(Stats_class::roc_auc(y.get_data(), y_proba_bin));
+    if (nb_cats == 2) {
+        std::vector<double> y_proba_bin(n);
+        for (size_t i = 0; i < n; i++)
+            y_proba_bin[i] = Y_proba.at(K * n + i);
+        
+        roc_auc.push_back(Stats_class::roc_auc(y.get_data(), y_proba_bin));
+    }
     else roc_auc = Stats_class::Mult::roc_auc_mult(y.get_data(), Y_proba);
 
     // If we have not the cols name
@@ -218,15 +229,16 @@ void LogisticRegression::compute_stats(const Dataframe& x, Dataframe& x_const, c
     if (nb_cats == 2) {
         // Coeff stats
         CoeffStats c;
-        c.category = "Class 0 vs Class 1";
+        c.category = "Class 1 vs Class 0";
         c.stderr_beta = Stats_class::stderr_coeff(cov_mat, 0, p+1);
         for (size_t i = 0; i < p+1; i++) {
+
             c.name.push_back(headers[i]);
-            double beta = coeffs[i];
+            double beta = coeffs[p+1 + i];
             c.beta.push_back(beta);
             c.odds_ratio.push_back(std::exp(beta));
             c.z_stat.push_back(c.stderr_beta[i] ==  0.0 ? NAN : beta / c.stderr_beta[i]);
-            c.p_value.push_back(Stats::normal_cdf(c.z_stat.back()));
+            c.p_value.push_back(Stats_class::normal_pval(c.z_stat.back()));
         }
 
         double TP = conf_matrix[0];
@@ -275,15 +287,18 @@ void LogisticRegression::compute_stats(const Dataframe& x, Dataframe& x_const, c
             // Save our stats
             CoeffStats c;
             c.category = "Class " + std::to_string(cat) + " vs Class " +  std::to_string(ref_class_);
-            c.stderr_beta = Stats_class::stderr_coeff(cov_mat, cat, p+1);
+            
+            // To match fisher matrix order
+            int pos = (cat >= ref_class_) ? cat - 1 : cat; 
+            c.stderr_beta = Stats_class::stderr_coeff(cov_mat, pos, p+1);
             for (size_t i = 0; i < p+1; i++) {
+                
                 c.name.push_back(headers[i]);
-
                 double displayed_beta = coeffs[cat * (p+1) + i] - coeffs[ref_class_ * (p+1) + i];
                 c.beta.push_back(displayed_beta);
                 c.odds_ratio.push_back(std::exp(displayed_beta));
                 c.z_stat.push_back(c.stderr_beta[i] ==  0.0 ? NAN : displayed_beta / c.stderr_beta[i]);
-                c.p_value.push_back(Stats::normal_cdf(c.z_stat[i]));
+                c.p_value.push_back(Stats_class::normal_pval(c.z_stat[i]));
             }
 
             double TP = conf_matrix[cat * K + cat];
@@ -347,49 +362,51 @@ void LogisticRegression::summary(bool detailled) const {
     std::cout << "Accuracy       = " << gen_stats[6] << "\n\n";
 
     if (detailled) {
-        std::cout << "  Precision  = " << gen_stats[7] << "\n";
-        std::cout << "  Recall     = " << gen_stats[8] << "\n";
-        std::cout << "  Specificity= " << gen_stats[9] << "\n";
-        std::cout << "  F1         = " << gen_stats[10] << "\n";
-        std::cout << "  ROC AUC    = " << gen_stats[11] << "\n\n";
+        std::cout << "Precision      = " << gen_stats[7] << "\n";
+        std::cout << "Recall         = " << gen_stats[8] << "\n";
+        std::cout << "Specificity    = " << gen_stats[9] << "\n";
+        std::cout << "F1             = " << gen_stats[10] << "\n";
+        std::cout << "ROC AUC        = " << gen_stats[11] << "\n\n";
     }
 
-    // For each class
+    // For each class appart from ref
+    int idx = 0;
     for (const auto& stat : coeff_stats) {
+        if (idx == ref_class_) continue;
 
         std::cout << "--- " << stat.category << " ---\n";
 
         // Metrics
-        std::cout << "  Precision=" << std::fixed << std::setprecision(4) << stat.gen_stats[0]
-                  << "  Recall="    << stat.gen_stats[1]
-                  << "  Specificity=" << stat.gen_stats[2]
-                  << "  F1="        << stat.gen_stats[3]
-                  << "  ROC AUC="   << stat.gen_stats[4] << "\n\n";
+        std::cout << "Precision = " << std::fixed << std::setprecision(4) << stat.gen_stats[0]
+                  << "  Recall = "    << stat.gen_stats[1]
+                  << "  Specificity = " << stat.gen_stats[2]
+                  << "  F1 = "        << stat.gen_stats[3]
+                  << "  ROC AUC = "   << stat.gen_stats[4] << "\n\n";
 
         // Coefficients table
-        std::cout << std::left  << std::setw(15) << "Coefficient"
+        std::cout << std::left  << std::setw(25) << "Coefficient"
                   << std::right << std::setw(12) << "Beta"
                   << std::setw(12) << "Odds Ratio"
                   << std::setw(12) << "Stderr"
                   << std::setw(12) << "z-stat"
                   << std::setw(12) << "p-value"
                   << std::setw(5)  << "Sig" << "\n";
-        std::cout << std::string(85, '-') << "\n";
+        std::cout << std::string(95, '-') << "\n";
 
         for (size_t i = 0; i < stat.name.size(); i++) {
-            std::cout << std::left  << std::setw(15) << stat.name[i]
+            std::cout << std::left  << std::setw(25) << stat.name[i]
                       << std::right << std::fixed << std::setprecision(4)
                       << std::setw(12) << stat.beta[i]
                       << std::setw(12) << stat.odds_ratio[i]
                       << std::setw(12) << stat.stderr_beta[i]
                       << std::setw(12) << stat.z_stat[i]
                       << std::setw(12) << stat.p_value[i]
-                      << "  " << stat.significance(i) << "\n";
+                      << "  " << stat.significance(stat.p_value[i]) << "\n";
         }
         std::cout << "\n";
+        idx++;
     }
 
-    std::cout << "Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1\n\n";
-    std::cout << std::endl;
+    std::cout << "\nSignif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1" << std::endl;
 }
 }

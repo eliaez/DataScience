@@ -26,6 +26,8 @@ namespace Stats_class {
     double mcc(const std::vector<double>& conf_matrix);
     double mcc(double TP, double FN, double FP, double TN);
 
+    double normal_pval(double z);
+
     // Log Likelihood for multiple categories with prob col major 
     double logLikelihood(const std::vector<double>& y, const Dataframe& prob);
 
@@ -33,22 +35,21 @@ namespace Stats_class {
     double logLikelihood_null(const std::vector<double>& y, int K);
 
     // Fisher matrix (symmetrical) with x_const col major (with const) and y_proba from predict_proba col major  
-    Dataframe fisher_mat(const Dataframe& x_const, const Dataframe& y_proba);
+    Dataframe fisher_mat(const Dataframe& x_const, const Dataframe& y_proba, size_t ref_class);
 
     Dataframe cov_mat(Dataframe& fisher);
 
     // Function to get stderr vector with K for idx of category, p nb of features (with intercept)
-    std::vector<double> stderr_coeff(Dataframe& fisher, int K, int p);
     std::vector<double> stderr_coeff(const Dataframe& cov, int K, int p);
 
     // Function to get stderr vector with x col major (with const), y_pred from predict_proba col major with K for idx of category
     std::vector<double> stderr_coeff(const Dataframe& x, const Dataframe& y_pred, int K);
     
     // R2 McFadden
-    double mc_fadden(double loglikehood_model, double loglikehood_null);
+    double mc_fadden(double loglikelihood_model, double loglikelihood_null);
 
     // Chi**2 p value with df = (K-1) * p without intercept
-    double chi2_pval(double loglikehood_model, double loglikehood_null, double df);
+    double chi2_pval(double loglikelihood_model, double loglikelihood_null, double df);
 
     namespace Mult {
         // Confusion matrix multi categories (row major), will vector K*K, row major with conf_mat[i*K + j] = "predict j, true i"

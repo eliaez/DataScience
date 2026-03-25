@@ -240,17 +240,19 @@ if(BUILD_TEST)
     endif()
 
     # ------------------- Tests on Regressions --------------------
-    add_executable(test_reg
+    add_executable(test_models
         tests/regression/tests_main.cpp
         tests/regression/tests_OLS.cpp
         tests/regression/tests_Reg.cpp
+        tests/regression/tests_Class.cpp
     )
-    target_link_libraries(test_reg PRIVATE 
+    target_link_libraries(test_models PRIVATE 
         linalg_full
         test_utils
     )
-    add_test(NAME TestOLS COMMAND test_reg OLS)
-    add_test(NAME TestReg COMMAND test_reg Reg)
+    add_test(NAME TestOLS COMMAND test_models OLS)
+    add_test(NAME TestReg COMMAND test_models Reg)
+    add_test(NAME TestClass COMMAND test_models Class)
 endif()
 
 

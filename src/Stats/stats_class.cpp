@@ -67,41 +67,38 @@ double roc_auc(const std::vector<double>& y, const std::vector<double>& prob) {
         throw std::invalid_argument("Y and prob need to have the same length");
     }
 
-    // Calculate roc points
-    std::vector<std::pair<double, double>> rocPoints;
-    rocPoints.reserve(101);
-    for (double threshold = 0.0; threshold <= 1.0; threshold += 0.01) {
-        double TP = 0, FP = 0, TN = 0, FN = 0;
+   // Sort
+    std::vector<size_t> idx(n);
+    std::iota(idx.begin(), idx.end(), 0);
+    std::sort(idx.begin(), idx.end(), [&](size_t a, size_t b) {
+        return prob[a] > prob[b];
+    });
 
-        for (size_t i = 0; i < prob.size(); i++) {
-            double predicted = (prob[i] >= threshold) ? 1 : 0;
+    double totalPos = std::count(y.begin(), y.end(), 1.0);
+    double totalNeg = n - totalPos;
 
-            if (predicted == 1 && y[i] == 1) TP++;
-            else if (predicted == 1 && y[i] == 0) FP++;
-            else if (predicted == 0 && y[i] == 0) TN++;
-            else if (predicted == 0 && y[i] == 1) FN++;
+    double tp = 0, fp = 0, auc = 0;
+    double prevFpr = 0, prevTpr = 0;
+    double prevScore = -1;
+
+    for (size_t i = 0; i < n; ++i) {
+        if (prob[idx[i]] != prevScore && i > 0) {
+            double fpr = fp / totalNeg;
+            double tpr = tp / totalPos;
+            auc += (fpr - prevFpr) * (tpr + prevTpr) / 2.0;
+            prevFpr = fpr;
+            prevTpr = tpr;
         }
 
-        double tpr = (TP + FN > 0) ? TP / (TP + FN) : 0.0;
-        double fpr = (FP + TN > 0) ? FP / (FP + TN) : 0.0;
-
-        rocPoints.push_back({tpr, fpr});
+        prevScore = prob[idx[i]];
+        if (y[idx[i]] == 1.0) tp++; else fp++;
     }
 
-    // Sort by FPR
-    std::sort(rocPoints.begin(), rocPoints.end(), 
-        [](const std::pair<double, double>& a, const std::pair<double, double>& b) {
-            return a.second < b.second;
-        }
-    );
+    // Last point
+    double fpr = fp / totalNeg;
+    double tpr = tp / totalPos;
+    auc += (fpr - prevFpr) * (tpr + prevTpr) / 2.0;
 
-    // Calc AUC
-    double auc = 0.0;
-    for (size_t i = 1; i < rocPoints.size(); ++i) {
-        double dFPR = rocPoints[i].second - rocPoints[i-1].second;
-        double avgTPR = (rocPoints[i].first + rocPoints[i-1].first) / 2.0;
-        auc += dFPR * avgTPR;
-    }
     return auc;
 }
 
@@ -111,6 +108,11 @@ double mcc(double TP, double FN, double FP, double TN) {
 
 double mcc(const std::vector<double>& conf_matrix) {
     return mcc(conf_matrix[0], conf_matrix[1], conf_matrix[2], conf_matrix[3]);
+}
+
+double normal_pval(double z) {
+    double cdf = 0.5 * (1.0 + std::erf(std::abs(z) / std::sqrt(2.0)));
+    return 2.0 * (1.0 - cdf);
 }
 
 double logLikelihood(const std::vector<double>& y, const Dataframe& prob) {
@@ -133,7 +135,7 @@ double logLikelihood_null(const std::vector<double>& y, int K) {
     return ll;
 }
 
-Dataframe fisher_mat(const Dataframe& x_const, const Dataframe& y_proba) {
+Dataframe fisher_mat(const Dataframe& x_const, const Dataframe& y_proba, size_t ref_class) {
 
     if (x_const.get_storage())
         throw std::invalid_argument("X must be col major");
@@ -143,54 +145,65 @@ Dataframe fisher_mat(const Dataframe& x_const, const Dataframe& y_proba) {
     size_t n = x_const.get_rows();
     size_t p = x_const.get_cols();
     size_t K = y_proba.get_cols();
-    size_t m   = p + 1; 
     size_t K_ = K - 1;
-    size_t dim  = K_ * m;
+    size_t dim  = K_ * p;
+
+    // Only for non ref categories
+    std::vector<size_t> cats;
+    cats.reserve(K_);
+    for (size_t k = 0; k < K; k++)
+        if (k != ref_class) cats.push_back(k);
 
     std::vector<double> F(dim * dim, 0.0);
-    for (size_t k = 0; k < K_; k++) {
-        for (size_t l = k; l < K_; l++) {
+    for (size_t i = 0; i < K_; i++) {
+        for (size_t l = i; l < K_; l++) {
 
-            // Accumulate Block k,l : X^T * D_kl * X
-            std::vector<double> block(m * m, 0.0); 
-            for (size_t i = 0; i < n; i++) {
-                double p_ik = y_proba.at(k*n + i);
-                double p_il = y_proba.at(l*n + i);
+            size_t ki = cats[i];
+            size_t kl = cats[l];
+
+            // Accumulate Block i,l : X^T * D_il * X
+            std::vector<double> block(p * p, 0.0); 
+            for (size_t obs = 0; obs < n; obs++) {
+                double p_ik = y_proba.at(ki * n + obs);
+                double p_il = y_proba.at(kl * n + obs);
 
                 // Diagonal weight
-                double d   = (k == l) ? p_ik*(1.0 - p_ik) : -p_ik*p_il;
-                if (d < 1e-10 ) d = 0.0;
+                double d;
+                if (ki == kl) {
+                    d = p_ik * (1.0 - p_ik);
+                    if (d < 1e-10) d = 0.0;
+                } 
+                else d = -p_ik * p_il;
 
                 // Upper triangle of the outer product
-                for (size_t j1 = 0; j1 < m; j1++) {
+                for (size_t j1 = 0; j1 < p; j1++) {
 
-                    double xj1 = (j1 < p) ? x_const.at(j1*n + i) : 1.0;
-                    for (size_t j2 = j1; j2 < m; j2++) {
+                    double xj1 = (j1 < p) ? x_const.at(j1*n + obs) : 1.0;
+                    for (size_t j2 = j1; j2 < p; j2++) {
 
-                        double xj2 = (j2 < p) ? x_const.at(j2*n + i) : 1.0;
-                        block[j1*m + j2] += xj1 * d * xj2;
+                        double xj2 = (j2 < p) ? x_const.at(j2*n + obs) : 1.0;
+                        block[j1*p + j2] += xj1 * d * xj2;
                     }
                 }
             }
 
-            // Write block (k,l) and its symmetric counterparts into F (col-major)
-            for (size_t j1 = 0; j1 < m; j1++) {
-                for (size_t j2 = j1; j2 < m; j2++) {
+            // Write block (i,l) and its symmetric counterparts into F (col-major)
+            for (size_t j1 = 0; j1 < p; j1++) {
+                for (size_t j2 = j1; j2 < p; j2++) {
                     
-                    double val = block[j1*m + j2] / n;
-                    F[(l*m + j2)*dim + (k*m + j1)] = val;
-                    F[(k*m + j1)*dim + (l*m + j2)] = val;
+                    double val = block[j1*p + j2];
+                    F[(l*p + j2)*dim + (i*p + j1)] = val;
+                    F[(i*p + j1)*dim + (l*p + j2)] = val;
 
-                    if (k != l) {
-                        F[(k*m + j2)*dim + (l*m + j1)] = val;
-                        F[(l*m + j1)*dim + (k*m + j2)] = val;
+                    if (i != l) {
+                        F[(i*p + j2)*dim + (l*p + j1)] = val;
+                        F[(l*p + j1)*dim + (i*p + j2)] = val;
                     }
                 }
             }
         }
     }
-    for (size_t i = 0; i < dim * dim; i++)
-        F[i] += 1e-8;
+    for (size_t i = 0; i < dim; i++) F[i*dim + i] += 1e-8;
     return {dim, dim, false, std::move(F)};
 }
 
@@ -207,9 +220,8 @@ std::vector<double> stderr_coeff(const Dataframe& x, const Dataframe& y_pred, in
 
     size_t n = x.get_rows();
     size_t p = x.get_cols();
-    size_t m = p + 1;
-    std::vector<double> se(m);
-    for (size_t j = 0; j < m; j++) {
+    std::vector<double> se(p);
+    for (size_t j = 0; j < p; j++) {
 
         double fisher = 0.0;
         for (size_t i = 0; i < n; i++) {
@@ -232,19 +244,23 @@ std::vector<double> stderr_coeff(const Dataframe& cov, int K, int p) {
     return se;
 }
 
-std::vector<double> stderr_coeff(Dataframe& fisher, int K, int p) {
-    const Dataframe cov = cov_mat(fisher);
-    return stderr_coeff(cov, K, p);
+double mc_fadden(double loglikelihood_model, double loglikelihood_null) {
+    return 1 - loglikelihood_model / loglikelihood_null;
 }
 
-double mc_fadden(double loglikehood_model, double loglikehood_null) {
-    return 1 - loglikehood_model / loglikehood_null;
-}
-
-double chi2_pval(double loglikehood_model, double loglikehood_null, double df) {
+double chi2_pval(double loglikelihood_model, double loglikelihood_null, double df) {
     boost::math::chi_squared dist(df);
-    double chi2_stat =  -2 * (loglikehood_null - loglikehood_model);
-    return 1 - boost::math::cdf(dist, chi2_stat);
+    double chi2_stat =  -2 * (loglikelihood_null - loglikelihood_model);
+
+    double pval = NAN;
+    try {
+        pval = 1 - boost::math::cdf(dist, chi2_stat);
+    }
+    catch (const std::exception& e) {
+        std::cout << "LogLikelihood null > LogLikelihood model"
+                << "Details: " << e.what() << std::endl;
+    }
+    return pval;
 }
 
 namespace Mult {
