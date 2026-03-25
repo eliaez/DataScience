@@ -140,8 +140,8 @@ Dataframe LogisticRegression::fit_without_stats(const Dataframe& x, const Datafr
     return X;
 }
 
-/*
-void LogisticRegression::optimal_lambda(double start, double end, int nb, const Dataframe& x, const Dataframe& y) {
+
+void LogisticRegression::optimal_c(double start, double end, int nb, const Dataframe& x, const Dataframe& y) {
     std::vector<double> path(nb);
     double log_min = log(start);
     double log_max = log(end);
@@ -151,11 +151,11 @@ void LogisticRegression::optimal_lambda(double start, double end, int nb, const 
         path[i] = exp(log_min + i * step);
     }
 
-    std::vector<std::vector<double>> param_grid = {path};
+    std::vector<std::vector<double>> param_grid = {path, {penality_}};
     Validation::GSres res = Validation::GSearchCV(this, x, y, param_grid);
 
-    lambda_ = res.best_params[0];
-}*/
+    C_ = res.best_params[0];
+}
 
 std::unique_ptr<ClassificationBase> LogisticRegression::create(const std::vector<double>& params) {
     return std::make_unique<LogisticRegression>(params[0], params[1]);

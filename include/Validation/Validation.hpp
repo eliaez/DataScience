@@ -4,6 +4,7 @@
 #include <vector>
 #include <optional>
 #include "Models/Supervised/Regression/RegBase.hpp"
+#include "Models/Supervised/Classification/ClassBase.hpp"
 
 class Dataframe;
 
@@ -25,6 +26,18 @@ namespace Validation {
         int k = 5,
         const std::string& metric = "mse",
         bool shuffle = true,
+        bool show_progression = true
+    );
+
+    // metric = "f1" (by default) / "accuracy" / "roc_auc"
+    CVres cross_validation(
+        Class::ClassificationBase* model,
+        const Dataframe& x, 
+        const Dataframe& y,
+        int k = 5,
+        const std::string& metric = "f1",
+        bool shuffle = true,
+        bool stratified = true,
         bool show_progression = true
     );
 
@@ -50,6 +63,18 @@ namespace Validation {
         bool shuffle = true
     );
 
+    // metric = "f1" (by default) / "accuracy" / "roc_auc"
+    GSres GSearchCV(
+        Class::ClassificationBase* model,
+        const Dataframe& x, 
+        const Dataframe& y,
+        const std::vector<std::vector<double>>& param_grid,
+        int k = 5,
+        const std::string& metric = "f1",
+        bool shuffle = true,
+        bool stratified = true
+    );
+
     // Random Search method by using CV
     // metric = "mse" (by default) / "mae" / "r2"
     // nb_iter corresponding to nb of iteration
@@ -66,6 +91,19 @@ namespace Validation {
         const std::string& metric = "mse",
         int nb_iter = 50,
         bool shuffle = true
+    );
+
+    // metric = "f1" (by default) / "accuracy" / "roc_auc"
+    GSres RSearchCV(
+        Class::ClassificationBase* model,
+        const Dataframe& x, 
+        const Dataframe& y,
+        const std::vector<std::pair<std::vector<double>, bool>>& range_grid,
+        int k = 5,
+        const std::string& metric = "f1",
+        int nb_iter = 50,
+        bool shuffle = true,
+        bool stratified = true
     );
 
 
