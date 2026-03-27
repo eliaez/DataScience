@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <utility>
+#include <variant>
 #include <functional>
 
 // ---------------Forward Declaration----------------
@@ -63,7 +64,7 @@ namespace Reg {
             virtual void summary(bool detailled = false) const = 0;
 
             // Function to create new model 
-            virtual std::unique_ptr<RegressionBase> create(const std::vector<double>& params);
+            virtual std::unique_ptr<RegressionBase> create(const std::vector<std::variant<double, std::string>>& params);
 
             // Function to clean params from RegressionBase
             void clean_params();

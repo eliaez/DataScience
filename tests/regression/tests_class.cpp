@@ -9,7 +9,7 @@
 using namespace std;
 
 // Testing Logistic Regression with corresponding stats
-void LogReg(const Dataframe& x, const Dataframe& y, double penality, 
+void LogReg(const Dataframe& x, const Dataframe& y, const std::string& penality, 
     const vector<double> clean_res0, const vector<double>& clean_res1) {
 
     // Through implemented code
@@ -105,12 +105,12 @@ void tests_Class() {
     TestSuite::Tests tests_Class;
 
     tests_Class.add_test(
-        bind(LogReg, iris, y, 0, clean_res0, clean_res1), 
+        bind(LogReg, iris, y, "", clean_res0, clean_res1), 
         "Logistic Regression without penality"
     );
 
     tests_Class.add_test(
-        bind(LogReg, iris, y, 1.5, clean_res2, clean_res3), 
+        bind(LogReg, iris, y, "elasticnet", clean_res2, clean_res3), 
         "Logistic Regression with Elastic Net penality"
     );
 

@@ -135,7 +135,7 @@ std::vector<double> ClassificationBase::predict(const Dataframe& x) const {
     return y_pred;
 }
 
-std::unique_ptr<ClassificationBase> ClassificationBase::create(const std::vector<double>& /*params*/) {
+std::unique_ptr<ClassificationBase> ClassificationBase::create(const std::vector<std::variant<double, std::string>>& /*params*/) {
     throw std::logic_error("GridSearch not supported for this model");
 }
 

@@ -37,7 +37,7 @@ namespace Reg {
             double effective_df() const;
 
             // Function to create new model
-            std::unique_ptr<RegressionBase> create(const std::vector<double>& params) override;
+            std::unique_ptr<RegressionBase> create(const std::vector<std::variant<double, std::string>>& params) override;
 
             // Getter
             double get_lambda() const { return lambda_; }

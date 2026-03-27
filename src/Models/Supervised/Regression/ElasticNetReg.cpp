@@ -136,8 +136,11 @@ double ElasticRegression::effective_df(Dataframe& X_c) const {
     return df;
 }
 
-std::unique_ptr<RegressionBase> ElasticRegression::create(const std::vector<double>& params) {
-    return std::make_unique<ElasticRegression>(params[0], params[1]);
+std::unique_ptr<RegressionBase> ElasticRegression::create(const std::vector<std::variant<double, std::string>>& params) {
+    return std::make_unique<ElasticRegression>(
+        std::get<double>(params[0]),
+        std::get<double>(params[1])
+    );
 }
 
 void ElasticRegression::compute_stats(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) {

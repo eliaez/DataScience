@@ -68,7 +68,7 @@ Dataframe LogisticRegression::fit_without_stats(const Dataframe& x, const Datafr
         loss = Stats_class::OneHot::logloss_mult_onehot(Y_, Y_pred);
 
         // Add penality to our loss and gradient
-        if (penality_ == 1.0) {
+        if (penality_ == "l1") {
             for (size_t i = 0; i < (p+1)*nb_cats; i++) {
 
                 // To exclude w0
@@ -77,7 +77,7 @@ Dataframe LogisticRegression::fit_without_stats(const Dataframe& x, const Datafr
                 loss += std::abs(w_i) / C_;
             }
         }
-        else if (penality_ == 2.0) {
+        else if (penality_ == "l2") {
             for (size_t i = 0; i < (p+1)*nb_cats; i++) {
 
                 // To exclude w0
@@ -87,7 +87,7 @@ Dataframe LogisticRegression::fit_without_stats(const Dataframe& x, const Datafr
                 gradient_v[i] += w_i / C_;
             }
         }
-        else if (penality_ == 1.5) {
+        else if (penality_ == "elasticnet") {
             for (size_t i = 0; i < (p+1)*nb_cats; i++) {
                 
                 // To exclude w0
@@ -98,9 +98,9 @@ Dataframe LogisticRegression::fit_without_stats(const Dataframe& x, const Datafr
                 gradient_v[i] += (1.0 - l1_ratio_) * w_i / C_;
             }
         } 
-        else if (penality_ == 0.0) {}
+        else if (penality_ == "") {}
         else {
-            throw std::invalid_argument("Unknown penality: " + std::to_string(penality_));
+            throw std::invalid_argument("Unknown penality: " + penality_);
         }
 
         // Finishing calculating our gradient
@@ -111,10 +111,10 @@ Dataframe LogisticRegression::fit_without_stats(const Dataframe& x, const Datafr
         W = W - gradient;
 
         // Soft Thresholding for L1 penality
-        if (penality_ == 1.0 || penality_ == 1.5) {
+        if (penality_ == "l1" || penality_ == "elasticnet") {
 
             std::vector<double> w_data = W.get_data();
-            double threshold = learning_r_ * (penality_ == 1.0 ? 1.0 : l1_ratio_) / C_;
+            double threshold = learning_r_ * (penality_ == "l1" ? 1.0 : l1_ratio_) / C_;
             for (size_t i = 0; i < (p+1)*nb_cats; i++) {
 
                 if (i % (p+1) == 0) continue;  // Intercept
@@ -151,14 +151,19 @@ void LogisticRegression::optimal_c(double start, double end, int nb, const Dataf
         path[i] = exp(log_min + i * step);
     }
 
-    std::vector<std::vector<double>> param_grid = {path, {penality_}};
+    std::vector<std::vector<std::variant<double, std::string>>> param_grid = {
+        {path.begin(), path.end()},
+        {penality_}
+    };
     Validation::GSres res = Validation::GSearchCV(this, x, y, param_grid);
-
-    C_ = res.best_params[0];
+    C_ = std::get<double>(res.best_params[0]);
 }
 
-std::unique_ptr<ClassificationBase> LogisticRegression::create(const std::vector<double>& params) {
-    return std::make_unique<LogisticRegression>(params[0], params[1]);
+std::unique_ptr<ClassificationBase> LogisticRegression::create(const std::vector<std::variant<double, std::string>>& params) {
+    return std::make_unique<LogisticRegression>(
+        std::get<double>(params[0]), 
+        std::get<std::string>(params[1])
+    );
 }
 
 void LogisticRegression::compute_stats(const Dataframe& x, Dataframe& x_const, const Dataframe& y) {

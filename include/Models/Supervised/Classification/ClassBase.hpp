@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <variant>
 #include <utility>
 #include <functional>
 
@@ -72,7 +73,7 @@ namespace Class {
             virtual void summary(bool detailled = false) const = 0;
 
             // Function to create new model 
-            virtual std::unique_ptr<ClassificationBase> create(const std::vector<double>& params);
+            virtual std::unique_ptr<ClassificationBase> create(const std::vector<std::variant<double, std::string>>& params);
 
             // Function to clean params from ClassificationBase
             void clean_params();

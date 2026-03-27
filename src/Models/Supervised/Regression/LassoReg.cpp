@@ -107,7 +107,7 @@ void LassoRegression::optimal_lambda(double start, double end, int nb, const Dat
     std::vector<std::vector<double>> param_grid = {path};
     Validation::GSres res = Validation::GSearchCV(this, x, y, param_grid);
 
-    lambda_ = res.best_params[0];
+    lambda_ = std::get<double>(res.best_params[0]);
 }
 
 double LassoRegression::effective_df() const {
@@ -118,8 +118,8 @@ double LassoRegression::effective_df() const {
     return df;
 }
 
-std::unique_ptr<RegressionBase> LassoRegression::create(const std::vector<double>& params) {
-    return std::make_unique<LassoRegression>(params[0]);
+std::unique_ptr<RegressionBase> LassoRegression::create(const std::vector<std::variant<double, std::string>>& params) {
+    return std::make_unique<LassoRegression>(std::get<double>(params[0]));
 }
 
 void LassoRegression::compute_stats(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) {

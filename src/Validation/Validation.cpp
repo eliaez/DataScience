@@ -125,7 +125,7 @@ CVres cross_validation(Reg::RegressionBase* model, const Dataframe& x, const Dat
 }
 
 GSres GSearchCV(Reg::RegressionBase* model, const Dataframe& x, const Dataframe& y, 
-    const std::vector<std::vector<double>>& param_grid, int k, const std::string& metric, bool shuffle) {
+    const std::vector<std::vector<ParamValue>>& param_grid, int k, const std::string& metric, bool shuffle) {
     
     // Tests
     if (param_grid.empty()) {
@@ -146,9 +146,9 @@ GSres GSearchCV(Reg::RegressionBase* model, const Dataframe& x, const Dataframe&
     res.all_results.reserve(total);
 
     // Getting all possible combinations
-    std::vector<std::vector<double>> all_combi;
+    std::vector<std::vector<ParamValue>> all_combi;
     all_combi.reserve(total);
-    std::vector<double> current;
+    std::vector<ParamValue> current;
     detail::generate_recurCombi(all_combi, current, param_grid);
 
     // Calculating result on each one
@@ -189,7 +189,7 @@ GSres GSearchCV(Reg::RegressionBase* model, const Dataframe& x, const Dataframe&
 }
 
 GSres RSearchCV(Reg::RegressionBase* model, const Dataframe& x,  const Dataframe& y, 
-    const std::vector<std::pair<std::vector<double>, bool>>& range_grid, int k, const std::string& metric, int nb_iter, bool shuffle) {
+    const std::vector<std::pair<std::vector<ParamValue>, bool>>& range_grid, int k, const std::string& metric, int nb_iter, bool shuffle) {
 
     // Tests
     if (range_grid.empty()) {
@@ -209,40 +209,57 @@ GSres RSearchCV(Reg::RegressionBase* model, const Dataframe& x,  const Dataframe
     std::mt19937 gen(rd());
 
     // Let's create a dist for each param
+    std::vector<bool> vect_is_string(n);
     std::vector<std::uniform_real_distribution<>> vect_r_dist(n);
     std::vector<std::uniform_int_distribution<>> vect_z_dist(n);
     for (size_t i = 0; i < n; i++){
 
+        // To test if std::string or not 
+        bool is_string = std::holds_alternative<std::string>(range_grid[i].first[0]);
+        vect_is_string[i] = is_string;
+
         // If log distribution, then create one with min and max
-        if (range_grid[i].second && range_grid[i].first.size() > 1) {
-            double min_val = std::log10(range_grid[i].first[0]);
-            double max_val = std::log10(range_grid[i].first[1]);
+        if (range_grid[i].second && range_grid[i].first.size() > 1 && !is_string) {
+            double min_val = std::log10(std::get<double>(range_grid[i].first[0]));
+            double max_val = std::log10(std::get<double>(range_grid[i].first[1]));
             
             vect_r_dist[i].param(
                 std::uniform_real_distribution<>::param_type(min_val, max_val)
             );
         }
-        else if (range_grid[i].first.size() > 1) {
-            int min_val = range_grid[i].first[0];
-            int max_val = range_grid[i].first[1];
+        // Integer dist
+        else if (range_grid[i].first.size() > 1 && !is_string) {
+            int min_val = std::get<double>(range_grid[i].first[0]);
+            int max_val = std::get<double>(range_grid[i].first[1]);
 
             vect_z_dist[i].param(
                 std::uniform_int_distribution<>::param_type(min_val, max_val)
             );
         }
+        // Integer dist for std::string
+        else if (range_grid[i].first.size() > 1 && is_string) {
+            vect_z_dist[i].param(
+                std::uniform_int_distribution<>::param_type(0, range_grid[i].first.size() - 1)
+            );
+        }
     }
 
     // Calculating result on each one
-    std::vector<double> grid_to_test(n);
+    std::vector<ParamValue> grid_to_test(n);
     for (size_t i = 0; i < nb_iter; i++) {
 
         // Let's create our grid_to_test
         for (size_t j = 0; j < n; j++) {
 
-            if (range_grid[j].first.size() > 1) {
+            // If double and not fixed param
+            if (range_grid[j].first.size() > 1 && !vect_is_string[j]) {
                 grid_to_test[j] = range_grid[j].second ? 
                     std::pow(10, vect_r_dist[j](gen)) : 
                     static_cast<double>(vect_z_dist[j](gen));
+            }
+            // If string not fixed
+            else if (range_grid[j].first.size() > 1 && vect_is_string[j]) {
+                grid_to_test[j] = range_grid[j].first[vect_z_dist[j](gen)];
             }
             // If fixed parameter
             else {
@@ -486,7 +503,7 @@ CVres cross_validation(Class::ClassificationBase* model, const Dataframe& x, con
 }
 
 GSres GSearchCV(Class::ClassificationBase* model, const Dataframe& x, const Dataframe& y, 
-    const std::vector<std::vector<double>>& param_grid, int k, const std::string& metric, 
+    const std::vector<std::vector<ParamValue>>& param_grid, int k, const std::string& metric, 
     bool shuffle, bool stratified) {
     
     // Tests
@@ -505,9 +522,9 @@ GSres GSearchCV(Class::ClassificationBase* model, const Dataframe& x, const Data
     res.all_results.reserve(total);
 
     // Getting all possible combinations
-    std::vector<std::vector<double>> all_combi;
+    std::vector<std::vector<ParamValue>> all_combi;
     all_combi.reserve(total);
-    std::vector<double> current;
+    std::vector<ParamValue> current;
     detail::generate_recurCombi(all_combi, current, param_grid);
 
     // Calculating result on each one
@@ -540,7 +557,7 @@ GSres GSearchCV(Class::ClassificationBase* model, const Dataframe& x, const Data
 }
 
 GSres RSearchCV(Class::ClassificationBase* model, const Dataframe& x,  const Dataframe& y, 
-    const std::vector<std::pair<std::vector<double>, bool>>& range_grid, int k, const std::string& metric, 
+    const std::vector<std::pair<std::vector<ParamValue>, bool>>& range_grid, int k, const std::string& metric, 
     int nb_iter, bool shuffle, bool stratified) {
 
     // Tests
@@ -558,40 +575,57 @@ GSres RSearchCV(Class::ClassificationBase* model, const Dataframe& x,  const Dat
     std::mt19937 gen(rd());
 
     // Let's create a dist for each param
+    std::vector<bool> vect_is_string(n);
     std::vector<std::uniform_real_distribution<>> vect_r_dist(n);
     std::vector<std::uniform_int_distribution<>> vect_z_dist(n);
     for (size_t i = 0; i < n; i++){
 
+        // To test if std::string or not 
+        bool is_string = std::holds_alternative<std::string>(range_grid[i].first[0]);
+        vect_is_string[i] = is_string;
+
         // If log distribution, then create one with min and max
-        if (range_grid[i].second && range_grid[i].first.size() > 1) {
-            double min_val = std::log10(range_grid[i].first[0]);
-            double max_val = std::log10(range_grid[i].first[1]);
+        if (range_grid[i].second && range_grid[i].first.size() > 1 && !is_string) {
+            double min_val = std::log10(std::get<double>(range_grid[i].first[0]));
+            double max_val = std::log10(std::get<double>(range_grid[i].first[1]));
             
             vect_r_dist[i].param(
                 std::uniform_real_distribution<>::param_type(min_val, max_val)
             );
         }
-        else if (range_grid[i].first.size() > 1) {
-            int min_val = range_grid[i].first[0];
-            int max_val = range_grid[i].first[1];
+        // Integer dist
+        else if (range_grid[i].first.size() > 1 && !is_string) {
+            int min_val = std::get<double>(range_grid[i].first[0]);
+            int max_val = std::get<double>(range_grid[i].first[1]);
 
             vect_z_dist[i].param(
                 std::uniform_int_distribution<>::param_type(min_val, max_val)
             );
         }
+        // Integer dist for std::string
+        else if (range_grid[i].first.size() > 1 && is_string) {
+            vect_z_dist[i].param(
+                std::uniform_int_distribution<>::param_type(0, range_grid[i].first.size() - 1)
+            );
+        }
     }
 
     // Calculating result on each one
-    std::vector<double> grid_to_test(n);
+    std::vector<ParamValue> grid_to_test(n);
     for (size_t i = 0; i < nb_iter; i++) {
 
         // Let's create our grid_to_test
         for (size_t j = 0; j < n; j++) {
 
-            if (range_grid[j].first.size() > 1) {
+            // If double and not fixed param
+            if (range_grid[j].first.size() > 1 && !vect_is_string[j]) {
                 grid_to_test[j] = range_grid[j].second ? 
                     std::pow(10, vect_r_dist[j](gen)) : 
                     static_cast<double>(vect_z_dist[j](gen));
+            }
+            // If string not fixed
+            else if (range_grid[j].first.size() > 1 && vect_is_string[j]) {
+                grid_to_test[j] = range_grid[j].first[vect_z_dist[j](gen)];
             }
             // If fixed parameter
             else {
@@ -622,11 +656,53 @@ GSres RSearchCV(Class::ClassificationBase* model, const Dataframe& x,  const Dat
     std::cout << std::endl;
     return res;
 }
+
+GSres GSearchCV(Reg::RegressionBase* model, const Dataframe& x, const Dataframe& y, 
+    const std::vector<std::vector<double>>& param_grid, int k, const std::string& metric, bool shuffle) {
+    
+    std::vector<std::vector<ParamValue>> converted;
+    for (const auto& v : param_grid)
+        converted.push_back({v.begin(), v.end()});
+    
+    return GSearchCV(model, x, y, converted, k, metric, shuffle);
+}
+
+GSres RSearchCV(Reg::RegressionBase* model, const Dataframe& x,  const Dataframe& y, 
+    const std::vector<std::pair<std::vector<double>, bool>>& range_grid, int k, const std::string& metric, int nb_iter, bool shuffle) {
+
+    std::vector<std::pair<std::vector<ParamValue>, bool>> converted;
+    for (const auto& [v, b] : range_grid) {
+        std::vector<ParamValue> converted_v(v.begin(), v.end());
+        converted.push_back(std::make_pair(converted_v, b));
+    }
+    return RSearchCV(model, x,  y, converted, k, metric, nb_iter, shuffle);
+}
+
+GSres GSearchCV(Class::ClassificationBase* model, const Dataframe& x, const Dataframe& y, 
+    const std::vector<std::vector<double>>& param_grid, int k, const std::string& metric, bool shuffle, bool stratified) {
+    
+    std::vector<std::vector<ParamValue>> converted;
+    for (const auto& v : param_grid)
+        converted.push_back({v.begin(), v.end()});
+    
+    return GSearchCV(model, x, y, converted, k, metric, shuffle, stratified);
+}
+
+GSres RSearchCV(Class::ClassificationBase* model, const Dataframe& x,  const Dataframe& y, 
+    const std::vector<std::pair<std::vector<double>, bool>>& range_grid, int k, const std::string& metric, int nb_iter, bool shuffle, bool stratified) {
+
+    std::vector<std::pair<std::vector<ParamValue>, bool>> converted;
+    for (const auto& [v, b] : range_grid) {
+        std::vector<ParamValue> converted_v(v.begin(), v.end());
+        converted.push_back(std::make_pair(converted_v, b));
+    }
+    return RSearchCV(model, x,  y, converted, k, metric, nb_iter, shuffle, stratified);
+}
 }
 
 namespace Validation::detail {
-    void generate_recurCombi(std::vector<std::vector<double>>& result, std::vector<double>& current,
-        const std::vector<std::vector<double>>& param_grid, size_t param_index) {
+    void generate_recurCombi(std::vector<std::vector<ParamValue>>& result, std::vector<ParamValue>& current,
+        const std::vector<std::vector<ParamValue>>& param_grid, size_t param_index) {
 
         if (param_index == param_grid.size()) {
             result.push_back(current);
@@ -634,7 +710,7 @@ namespace Validation::detail {
         }
         
         // Recursivity, try every parameters
-        for (double value : param_grid[param_index]) {
+        for (auto value : param_grid[param_index]) {
             current.push_back(value);              // Add value
             generate_recurCombi(result, current, param_grid, param_index + 1);
             current.pop_back();                    // Try another one

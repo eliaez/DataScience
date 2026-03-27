@@ -30,8 +30,12 @@ Once cross-validation is set up, the next step is finding the best hyperparamete
 Grid search will evaluate every possible combination of hyperparameters via cross-validation. `param_grid` must list all constructor parameters **in order**, with a single-element sub-vector for fixed parameters.
 
 ```cpp
-// Example: fixed param=0, search over {1,2,3,4,5}, fixed param=2
-std::vector<std::vector<double>> grid = {{0}, {1, 2, 3, 4, 5}, {2}};
+// Example: fixed param="l1", search over {1,2,3,4,5}, fixed param=2
+std::vector<std::vector<std::variant<double, std::string>>> grid = {
+    {"l1"}, 
+    {1, 2, 3, 4, 5}, 
+    {2}
+};
 
 Validation::GSres gs = Validation::GSearchCV(
     &model, X, y, grid,
@@ -52,11 +56,12 @@ Samples hyperparameter combinations randomly over defined ranges, more efficient
 Each parameter range is defined as `{[min, max], log_scale}`: use a single-element vector for fixed parameters, `log=true` for log-uniform sampling (suitable for learning rates, regularization), `log=false` for uniform sampling.
 
 ```cpp
-// Example: fixed param=0, log-uniform in [1,100], uniform in [2,5]  
+// Example: fixed param=0, log-uniform in [1,100], uniform in [2,5], uniform in ["l1", "l2", "elasticnet"] (bool haven't any influence on string params)
 std::vector<std::pair<std::vector<double>, bool>> ranges = {
     {{0},     false},
     {{1, 100}, true},
-    {{2, 5},  false}
+    {{2, 5},  false},
+    {{"l1", "l2", "elasticnet"}, true}
 };
 
 Validation::GSres rs = Validation::RSearchCV(

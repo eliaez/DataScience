@@ -350,11 +350,8 @@ namespace OneHot {
         size_t N = y.get_rows();
         size_t K = y.get_cols();
         size_t n = N * K;
-        if (K < 2) throw std::invalid_argument("Invalid K:" + std::to_string(K));
+        if (K < 2) throw std::invalid_argument("Invalid K, y should be one-hot encoded:" + std::to_string(K));
         if (N != prob.get_rows()) throw std::invalid_argument("Incompatible sizes");
-
-        double max_y = *std::max_element(y.get_data().begin(), y.get_data().end());
-        if (max_y > 1) throw std::invalid_argument("y should be one-hot encoded");
 
         // Log loss
         double sum = 0.0;

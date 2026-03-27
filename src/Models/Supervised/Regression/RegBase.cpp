@@ -31,7 +31,7 @@ void RegressionBase::fit(const Dataframe& x, const Dataframe& y) {
     compute_stats(x, x_const, XtXInv, y);
 }
 
-std::unique_ptr<RegressionBase> RegressionBase::create(const std::vector<double>& /*params*/) {
+std::unique_ptr<RegressionBase> RegressionBase::create(const std::vector<std::variant<double, std::string>>& /*params*/) {
     throw std::logic_error("GridSearch not supported for this model");
 }
 
