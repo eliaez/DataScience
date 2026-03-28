@@ -139,6 +139,7 @@ set(LIB_SOURCES
     # Classifications
     src/Models/Supervised/Classification/ClassBase.cpp
     src/Models/Supervised/Classification/LogisticReg.cpp
+    src/Models/Supervised/Classification/SVM.cpp
 
     # Unsupervised
     src/Models/Unsupervised/Kmeans.cpp

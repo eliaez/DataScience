@@ -106,7 +106,7 @@ std::vector<double> ClassificationBase::predict_proba(const Dataframe& x) const 
     // Copy our data 
     std::vector<double> x_v = x.get_data();
     
-    // Insert an unit col to get intercept value
+    // Insert an unit col for intercept value
     x_v.insert(x_v.begin(), n, 1.0);
     
     Dataframe X = {n, p+1, false, std::move(x_v)};

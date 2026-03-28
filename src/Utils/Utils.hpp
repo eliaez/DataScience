@@ -45,6 +45,10 @@ namespace Utils {
     template<typename T>
     std::vector<T> sub(const std::vector<T>& v, const std::vector<T>& v1);
 
+    // Vector elements **d independantly
+    template<typename T>
+    std::vector<T> pow_vect(const std::vector<T>& v, int d);
+
     // Norm L**p
     template<typename T>
     double Lnorm(const std::vector<T>& v, int p, int pow = 1);
@@ -174,6 +178,15 @@ std::vector<T> sub(const std::vector<T>& v, const std::vector<T>& v1) {
         result[i] = v[i] - v1[i];
     }
     return result;
+}
+
+template<typename T>
+std::vector<T> pow_vect(const std::vector<T>& v, int d) {
+    std::vector<T> result(v.size());
+    for(size_t i = 0; i < v.size(); ++i) {
+        result[i] = std::pow(v[i], d);
+    }
+    return result;  
 }
 
 template<typename T>

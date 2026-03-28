@@ -16,7 +16,6 @@ namespace Class {
             double C_;         // 1 / lambda
             double l1_ratio_;  // Used only if elastic net
             std::string penality_;  // "" (None), "l1", "l2", "elasticnet"
-            
 
         protected:
             // Calculate Stats after fit function
@@ -25,7 +24,7 @@ namespace Class {
         public:
             // C = 1/lambda, penality = "" (None), "l1", "l2", "elasticnet"
             // l1_ratio used only if elastic net
-            LogisticRegression(double C = 1.0, std::string penality = "l2", double l1_ratio = 0.5) 
+            LogisticRegression(double C = 1.0, const std::string& penality = "l2", double l1_ratio = 0.5) 
                 : C_(C), penality_(penality), l1_ratio_(l1_ratio) {};
 
             // Training Logistic Regression with x col-major
@@ -50,6 +49,6 @@ namespace Class {
             // Setter
             void set_c(double C) { C_ = C; }
             void set_l1_ratio(double l1_ratio) { l1_ratio_ = l1_ratio; }
-            std::string set_penality(std::string penality) { penality_ = penality; }
+            std::string set_penality(const std::string& penality) { penality_ = penality; }
     };
 }

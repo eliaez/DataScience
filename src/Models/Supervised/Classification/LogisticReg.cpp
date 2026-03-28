@@ -191,7 +191,6 @@ void LogisticRegression::compute_stats(const Dataframe& x, Dataframe& x_const, c
     }
 
     // Covariance matrix
-
     Dataframe cov_mat;
     try {
         cov_mat = Stats_class::cov_mat(fisher);
