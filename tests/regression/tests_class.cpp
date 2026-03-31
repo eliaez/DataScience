@@ -30,6 +30,21 @@ void LogReg(const Dataframe& x, const Dataframe& y, const std::string& penality,
     ASSERT_VEC_EPS(to_test1, clean_res1, 1e-2)
 }
 
+// Testing SVM with corresponding stats
+void SVM(const Dataframe& x, const Dataframe& y, const std::string& kernel, 
+    const vector<double> clean_res0, const vector<double>& clean_res1) {
+
+    // Through implemented code
+    Class::SVM_Algo New_class(1.0, kernel);
+    New_class.fit(x, y);
+    vector<double> to_test0 = New_class.get_stats();
+    vector<double> to_test1(1, New_class.get_coeffs()[0]);
+
+    ASSERT_VEC_EPS(to_test0, clean_res0, 1e-2)
+
+    ASSERT_VEC_EPS(to_test1, clean_res1, 1e-2)
+}
+
 void tests_Class() {
     
 
@@ -37,6 +52,17 @@ void tests_Class() {
     Dataframe iris = CsvHandler::loadCsv("../tests/datasets/classification/iris.csv", ',', true);
     Dataframe y = iris.transfer_col("target");
     iris.pop(0);
+
+    Dataframe breast_cancer = CsvHandler::loadCsv("../tests/datasets/classification/breast_cancer.csv", ',', true);    
+    Dataframe y2 = breast_cancer.transfer_col("target");
+    breast_cancer.pop(0);
+
+    //Dataframe air = CsvHandler::loadCsv("C:/Users/romai/Documents/Code/c_plus_plus/tests/datasets/airline_passengers.csv", ',', true);  
+    //std::vector<int> res = Stats_TS::detect_SARIMA(air.popup(1));
+    
+    for (size_t i = 0; i < breast_cancer.get_cols(); i++) {
+        Scaling::scaling(breast_cancer, i);
+    }
     
     for (size_t i = 0; i < iris.get_cols(); i++) {
         Scaling::scaling(iris, i);
@@ -101,6 +127,23 @@ void tests_Class() {
         0.4924,    // Beta4 p-value
     };
 
+    vector<double> clean_res4 = {
+        0.257409,  // Margin
+        119,       // Nb of SV
+        20.9139,   // % of SV
+        0.97385,   // MCC
+        0.987698,  // Accuracy
+        0.980769,  // Precision
+        1,         // Recall
+        0.966984,  // Specificity
+        0.990291,  // F1
+        0.9834     // ROC AUC
+    };
+
+    vector<double> clean_res5 = {
+        -0.23536    // Beta0
+    };
+
     // Add tests
     TestSuite::Tests tests_Class;
 
@@ -112,6 +155,11 @@ void tests_Class() {
     tests_Class.add_test(
         bind(LogReg, iris, y, "elasticnet", clean_res2, clean_res3), 
         "Logistic Regression with Elastic Net penality"
+    );
+
+    tests_Class.add_test(
+        bind(SVM, breast_cancer, y2, "rbf", clean_res4, clean_res5), 
+        "Support Vector Classification with rbf kernel"
     );
 
     cout << "Testing Classifications methods:" << endl;

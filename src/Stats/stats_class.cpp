@@ -79,10 +79,12 @@ double roc_auc(const std::vector<double>& y, const std::vector<double>& prob) {
 
     double tp = 0, fp = 0, auc = 0;
     double prevFpr = 0, prevTpr = 0;
-    double prevScore = -1;
+    double prevScore = -std::numeric_limits<double>::infinity();
 
     for (size_t i = 0; i < n; ++i) {
-        if (prob[idx[i]] != prevScore && i > 0) {
+        double score = prob[idx[i]];
+
+        if (std::abs(score - prevScore) > std::numeric_limits<double>::epsilon() * std::abs(prevScore + score + 1.0)) {
             double fpr = fp / totalNeg;
             double tpr = tp / totalPos;
             auc += (fpr - prevFpr) * (tpr + prevTpr) / 2.0;
@@ -90,7 +92,7 @@ double roc_auc(const std::vector<double>& y, const std::vector<double>& prob) {
             prevTpr = tpr;
         }
 
-        prevScore = prob[idx[i]];
+        prevScore = score;
         if (y[idx[i]] == 1.0) tp++; else fp++;
     }
 

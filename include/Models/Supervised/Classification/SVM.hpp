@@ -16,18 +16,22 @@ namespace Class {
             double C_;             // 1 / lambda
             double degree_;        // if poly kernel
             std::string gamma_;    // Point influence "scale" or "auto"
-            std::string kernel_;   // "linear", "poly", "rbf" or "sigmoid"
+            std::string kernel_;   // "linear", "poly" or "rbf"
 
             double gamma_val;
+            std::vector<double> sv_x;
+            std::vector<bool> sv_bool;
             std::vector<double> alpha_;
-            std::vector<bool> support_vector;
+            std::vector<double> sv_alpha_y;
+
+            Dataframe kernel_meth(const Dataframe& X1, const Dataframe& X2) const;
 
         protected:
             // Calculate Stats after fit function
             void compute_stats(const Dataframe& x, Dataframe& x_const, const Dataframe& y) override;
         
         public:
-            // C = 1/lambda, kernel = "linear", "poly", "rbf" or "sigmoid", gamma = "scale" or "auto"
+            // C = 1/lambda, kernel = "linear", "poly" or "rbf", gamma = "scale" or "auto"
             SVM_Algo(double C = 1.0, const std::string& kernel = "linear", const std::string& gamma = "scale", double degree = 2) 
                 : C_(C), kernel_(kernel), gamma_(gamma), degree_(degree) {};
 
@@ -49,7 +53,7 @@ namespace Class {
             std::string get_gamma() const { return gamma_; }
             std::string get_kernel() const { return kernel_; }
             const std::vector<double>& get_alpha_vect() const { return alpha_; }
-            const std::vector<bool>& get_supp_vect() const { return support_vector; }
+            const std::vector<bool>& get_which_is_SV() const { return sv_bool; }
 
             // Setter
             void set_c(double C) { C_ = C; }

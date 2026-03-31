@@ -10,6 +10,46 @@ using namespace Utils;
 
 namespace Class {
 
+Dataframe SVM_Algo::kernel_meth(const Dataframe& X1, const Dataframe& X2) const {
+    
+    Dataframe K;
+    if (kernel_ == "linear") {
+        K = X1 * X2;
+        return K;
+    }
+
+    size_t n1 = X1.get_rows();
+    size_t p = X1.get_cols();
+    size_t n2 = X2.get_cols();
+    std::vector<double> inter = (X1 * X2).get_data();
+
+    if (kernel_ == "poly") {
+        std::vector<double> c(n1 * n2, 1.0);
+        inter = mult(inter, gamma_val);
+        inter = add(inter, c);
+        inter = pow_vect(inter, degree_);
+    }
+    else if (kernel_ == "rbf") {
+        std::vector<double> d_sv(n1, 0.0), d_pred(n2, 0.0);
+        for (size_t i = 0; i < n1; i++)
+            for (size_t d = 0; d < p; d++)
+                d_sv[i] += X1.at(i*p+d) * X1.at(i*p+d); // Row major
+        
+        for (size_t j = 0; j < n2; j++)
+            for (size_t d = 0; d < p; d++)
+                d_pred[j] += X2.at(j*p+d) * X2.at(j*p+d); // Col major
+
+        // Create our matrix D col major
+        for (size_t j = 0; j < n2; j++)
+            for (size_t i = 0; i < n1; i++)
+                inter[j*n1+i] = std::exp(-gamma_val * (d_sv[i] + d_pred[j] - 2*inter[j*n1+i]));
+    }
+    else throw std::invalid_argument("Unknown kernel: " + kernel_);
+
+    K = {n1, n2, false, std::move(inter)};
+    return K;
+}
+
 Dataframe SVM_Algo::fit_without_stats(const Dataframe& x, const Dataframe& y) {
     
     // Tests
@@ -34,194 +74,193 @@ Dataframe SVM_Algo::fit_without_stats(const Dataframe& x, const Dataframe& y) {
     Dataframe X_T_row = X_T.change_layout();
     X.change_layout_inplace();
 
+    // Convert labels 0 to -1
+    std::vector<double> y_v = y.get_data();
+    for (size_t i = 0; i < n; i++) if (y_v[i] == 0) y_v[i] = -1;
+
+    // Compute gamma_val 
+    if (gamma_ == "scale") gamma_val = 1 / (p * Stats::var(X.get_data()) * (n * p - 1) / (n * p));
+    else if (gamma_ == "auto") gamma_val = 1 / p;
+    else throw std::invalid_argument("Unknown gamma: " + gamma_);
+
     // Construct our Kernel matrix
-    Dataframe K;
-    if (kernel_ == "linear") {
-        K = X * X_T;
-    }
-    else if (kernel_ == "poly") {
-        std::vector<double> inter = (X * X_T).get_data();
-        std::vector<double> c(n * n, 1.0);
-        inter = add(inter, c);
-        inter = pow_vect(inter, degree_);
-        K = {n, n, false, std::move(inter)};
-    }
-    else if (kernel_ == "rbf") {
-        std::vector<double> inter = (X * X_T).get_data();
-        
-        std::vector<double> diag;
-        diag.reserve(n);
-        for (size_t i = 0; i < n; i++) diag.push_back(inter[i * n + i]); 
-
-        if (gamma_ == "scale") gamma_val = 1 / (p * Stats::var(X.get_data()));
-        else if (gamma_ == "auto") gamma_val = 1 / p;
-        else throw std::invalid_argument("Unknown gamma: " + gamma_);
-
-        // TODO AVX2
-        // Create our matrix D
-        for (size_t i = 0; i < n; i++) {
-            for (size_t j = 0; j < n; j++)
-                inter[i * n + j] = std::exp(- gamma_val * (diag[i] + diag[j] - 2 * inter[i * n + j]));
-        }
-        K = {n, n, false, std::move(inter)};
-    }
-    else if (kernel_ == "sigmoid") {
-        std::vector<double> inter = (X * X_T).get_data();
-        std::vector<double> c(n * n, 1.0);
-
-        if (gamma_ == "scale") gamma_val = 1 / (p * Stats::var(X.get_data()));
-        else if (gamma_ == "auto") gamma_val = 1 / p;
-        else throw std::invalid_argument("Unknown gamma: " + gamma_);
-
-        inter = mult(inter, gamma_val);
-        inter = add(inter, c);
-        for (auto& val : inter) val = std::tanh(val);
-        K = {n, n, false, std::move(inter)};
-    }
-    else throw std::invalid_argument("Unknown kernel: " + kernel_);
+    Dataframe K = kernel_meth(X, X_T);
 
     // SMO (Sequential Minimal Optimization)
     int idx = 0;
     double b = 0;
     K.is_symmetric();
-    bool keep_cond = true;
-    std::vector<double> errors;
+    int numChanged = 0;
+    bool examineAll = true;
     std::vector<double> alpha(n, 0.0);
-    while (keep_cond && idx < max_iter_) {
 
-        // TODO AVX2
-        // Calculate errors and choose m with KKT conditions
-        size_t m = 0;
-        errors.clear();
-        errors.reserve(n);
-        double cond_value = 0.0;
+    // Init errors
+    std::vector<double> errors(n, 0.0);
+    for (size_t i = 0; i < n; i++) errors[i] = -y_v[i];
+
+    // Get error (recompute if bounded)
+    auto get_error = [&](size_t i) -> double {
+        double a = alpha[i];
+        if (a > 1e-8 && a < C_ - 1e-8) return errors[i];
+        double val = b;
+        for (size_t j = 0; j < n; j++)
+            val += alpha[j] * y_v[j] * K.at(i * n + j);
+        return val - y_v[i];
+    };
+    
+    while ((numChanged > 0 || examineAll) && idx < max_iter_) {
+        numChanged = 0;
+        
         for (size_t i = 0; i < n; i++) {
 
-            // Errors part
-            double error = b - y.at(i);
-            for (size_t j = 0; j < n; j++) {
-                error += alpha[j] * y.at(j) * K.at(i * n + j);
-            }
-            errors.push_back(error);
-
-            // KKT condition 
-            double val = 0.0;
-            if (alpha[i] == 0) val = std::max(0.0, - y.at(i) * errors[i]);
-            else if (alpha[i] == C_) val = std::max(0.0, y.at(i) * errors[i]);
-            else val = std::abs( y.at(i) * errors[i]);
-
-            if (val > cond_value) {
-                cond_value = val;
-                m = i;
-            }
-        }
-
-        // Choose o with KKT
-        size_t o = 0;
-        cond_value = 0.0;
-        double error_m = errors[m];
-        for (size_t i = 0; i < n; i++) {
+            size_t m = i;
+            double alpha_m = alpha[m];
+            if (!examineAll && (alpha_m <= 1e-8 || alpha_m >= C_ - 1e-8)) continue;
             
-            double val = std::abs(error_m - errors[i]);
-            if ( val > cond_value && i != m) {
-                cond_value = val;
-                o = i;
-            } 
-        }
+            double error_m = get_error(m);
 
-        // Calculate bounds L, H and eta 
-        double L = 0.0;
-        double H = 0.0;
-        if (y.at(m) == y.at(o)) {
-            L = std::max(0.0, alpha[o] + alpha[m] - C_);
-            H = std::min(C_, alpha[o] + alpha[m]);
-        }
-        else {
-            L = std::max(0.0, alpha[o] - alpha[m]);
-            H = std::min(C_, C_ + alpha[o] - alpha[m]);
-        }
+            // KKT conditions
+            double val = 0.0;
+            if (alpha_m <= 1e-8) val = std::max(0.0, - y_v[m] * error_m);
+            else if (alpha_m >= C_ - 1e-8) val = std::max(0.0, y_v[m] * error_m);
+            else val = std::abs( y_v[m] * error_m);
 
-        // Calculate eta
-        double eta = K.at(m * n + m) + K.at(o * n + o) - 2 * K.at(m * n + o);
-        if (eta <= 0) { 
-            idx++; 
-            continue; 
-        }
+            if (val < tol_) continue;
 
-        // Calculate and clip alpha_o
-        double alpha_o_new = alpha[o] + y.at(o) * (errors[m] - errors[o]) / eta;
-        if (alpha_o_new < L) alpha_o_new = L;
-        else if (alpha_o_new > H) alpha_o_new = H;
+            // Choose o with argmin/argmax
+            size_t o = n;
+            
+            if (error_m > 0.0) {
+                double best = std::numeric_limits<double>::max();
+                for (size_t j = 0; j < n; j++) {
+                    if (alpha[j] <= 1e-8 || alpha[j] >= C_ - 1e-8) continue;
+                    if (errors[j] < best || o == n) { 
+                        best = std::abs(error_m - errors[j]);
+                        o = j; 
+                    }
+                }
+            } else {
+                double best = std::numeric_limits<double>::lowest();
+                for (size_t j = 0; j < n; j++) {
+                    if (alpha[j] <= 1e-8 || alpha[j] >= C_ - 1e-8) continue;
+                    if (errors[j] > best || o == n) { 
+                        best = std::abs(error_m - errors[j]);
+                        o = j; 
+                    }
+                }
+            }
 
-        // Calculate alpha_m
-        double alpha_m_new = alpha[m] + y.at(m) * y.at(o) * (alpha[o] - alpha_o_new);
+            // Fallback for o
+            if (o == n) {
 
-        double delta_m = alpha_m_new - alpha[m];
-        double delta_o = alpha_o_new - alpha[o];
+                size_t start = std::rand() % n;
+                for (size_t k = 0; k < n; k++) {
 
-        // Update b 
-        if (alpha_m_new < C_ && alpha_m_new > 0) {
-            double bm = b - errors[m] - y.at(m) * delta_m * K.at(m * n + m) - y.at(o) * delta_o * K.at(m * n + o);
-            b = bm;
-        }
-        else {
-            if (alpha_o_new < C_ && alpha_o_new > 0) {
-                double bo = b - errors[o] - y.at(m) * delta_m * K.at(m * n + o) - y.at(o) * delta_o * K.at(o * n + o);
-                b = bo;
+                    size_t j = (start + k) % n;
+                    if (j != m) { 
+                        o = j; 
+                        break; 
+                    }
+                }
+            }
+            if (o == n || o == m) continue;
+
+            // Calculate bounds L, H
+            double L = 0.0;
+            double H = 0.0;
+            double alpha_o = alpha[o];
+            if (y_v[m] == y_v[o]) {
+                L = std::max(0.0, alpha_o + alpha_m - C_);
+                H = std::min(C_, alpha_o + alpha_m);
             }
             else {
-                double bm = b - errors[m] - y.at(m) * delta_m * K.at(m * n + m) - y.at(o) * delta_o * K.at(m * n + o);
-                double bo = b - errors[o] - y.at(m) * delta_m * K.at(m * n + o) - y.at(o) * delta_o * K.at(o * n + o);
-                b = (bm + bo) / 2;
+                L = std::max(0.0, alpha_m - alpha_o);
+                H = std::min(C_, C_ + alpha_m - alpha_o);
             }
+            if (H - L < 1e-12) continue;
+
+            // Calculate eta
+            double eta = K.at(m * n + m) + K.at(o * n + o) - 2 * K.at(m * n + o);
+            if (eta <= 0) continue;
+
+            double error_o = get_error(o);
+
+            // Calculate and clip alpha_o
+            double alpha_m_new = alpha_m + y_v[m] * (error_o - error_m) / eta;
+            if (alpha_m_new < L) alpha_m_new = L;
+            else if (alpha_m_new > H) alpha_m_new = H;
+            if (std::abs(alpha_m_new - alpha_m) < 1e-8 * (alpha_m_new + alpha_m + 1e-8)) continue;
+
+            // Calculate alpha_m and clip it
+            double alpha_o_new = alpha_o + y_v[m] * y_v[o] * (alpha_m - alpha_m_new);
+            if (alpha_o_new < 1e-8) alpha_o_new = 0.0;
+            else if (alpha_o_new > C_ - 1e-8) alpha_o_new = C_;
+
+            double delta_m = alpha_m_new - alpha_m;
+            double delta_o = alpha_o_new - alpha_o;
+
+            // Update b 
+            double bm = b - error_m - y_v[m] * delta_m * K.at(m*n+m) - y_v[o] * delta_o * K.at(m*n+o);
+            double bo = b - error_o - y_v[m] * delta_m * K.at(m*n+o)  - y_v[o] * delta_o * K.at(o*n+o);
+
+            double old_b = b;
+            if (alpha_m_new > 0 && alpha_m_new < C_) b = bm;
+            else if (alpha_o_new > 0 && alpha_o_new < C_) b = bo;
+            else b = (bm + bo) / 2.0;
+
+            // Update our alpha with alpha_m and alpha_o
+            alpha[m] = alpha_m_new;
+            alpha[o] = alpha_o_new;
+
+            // Update our errors (only for non bounds ones)
+            errors[m] = 0.0;
+            errors[o] = 0.0;
+            double db = b - old_b;
+            for (size_t j = 0; j < n; j++) {
+
+                if (j == o || j == m) continue;
+                if (alpha[j] > 0.0 && alpha[j] < C_) {
+                    double delta = y_v[m] * delta_m * K.at(j * n + m) + y_v[o] * delta_o * K.at(j * n + o);
+                    errors[j] += delta + db;
+                }
+            }
+            numChanged++;
         }
 
-        // Update our alpha with alpha_m and alpha_o
-        alpha[m] = alpha_m_new;
-        alpha[o] = alpha_o_new;
-
-        // TODO AVX2
-        // Update our errors
-        for (size_t i = 0; i < n; i++) {
-            double delta = y.at(m) * delta_m * K.at(i * n + m) + y.at(o) * delta_o * K.at(i * n + o);
-            errors[i] += delta;
-        }
-        
-        // Convergence
-        keep_cond = false;
-        for (size_t i = 0; i < n; i++) {
-
-            double yE = y.at(i) * errors[i];
-            if (alpha[i] < C_ && yE < -tol_) {
-                keep_cond = true;
-                break;
-            }
-            if (alpha[i] > 0 && yE > tol_) {
-                keep_cond = true;
-                break;
-            }
-        }
+        if (examineAll) examineAll = false;
+        else if (numChanged == 0) examineAll = true;
         idx++;
     }
     if (max_iter_ == idx) 
-        std::cout << "Max_iter reached, you might need to change learning_rate or scale your data\n" << std::endl;
+        std::cout << "Max_iter reached, you might need to change max_iter or scale your data\n" << std::endl;
 
-    // Calculate final W
-    std::vector<double> inter;
-    inter.reserve(n);
-    for (size_t i = 0; i < n; i++) inter.push_back(alpha[i] * y.at(i));
-    Dataframe alpha_y = {1, n, false, std::move(inter)};
-    Dataframe W = X_T_row * alpha_y;
+    // Calculate final W or getting alpha 
+    if (kernel_ == "linear") {
+        std::vector<double> inter(n, 0.0);
+        for (size_t i = 0; i < n; i++) inter[i] = alpha[i] * y_v[i];
+        Dataframe alpha_y = {n, 1, false, std::move(inter)};
+        Dataframe W = X_T_row * alpha_y;
 
-    // Results
-    coeffs = W.get_data();
-    coeffs.insert(coeffs.begin(), b);
-    alpha_ = std::move(alpha);
-    support_vector.assign(n, false);
-    for (size_t i = 0; i < n; i++) {
-        if (alpha_[i] > 0 && alpha_[i] < C_)
-            support_vector[i] = true;
+        // Results
+        coeffs = W.get_data();
+        coeffs.insert(coeffs.begin(), b);
     }
+    else {
+        sv_x.clear();
+        sv_alpha_y.clear();
+
+        for (size_t i = 0; i < n; i++) {
+            if (alpha[i] > 1e-8) {
+                for (size_t j = 0; j < p; j++) sv_x.push_back(x.at(j * n + i));
+                sv_alpha_y.push_back(alpha[i] * y_v[i]);
+            }
+        }
+        coeffs = {b};
+    }
+
+    alpha_ = std::move(alpha);
+    sv_bool.assign(n, false);
+    for (size_t i = 0; i < n; i++) if (alpha_[i] > 1e-8) sv_bool[i] = true;
     is_fitted = true;
 
     return {};
@@ -240,17 +279,40 @@ std::vector<double> SVM_Algo::predict(const Dataframe& x) const {
 
     // Copy our data 
     std::vector<double> x_v = x.get_data();
-    
-    // Insert an unit col for intercept value
-    x_v.insert(x_v.begin(), n, 1.0);
-    Dataframe X = {n, p+1, false, std::move(x_v)};
-    X.change_layout_inplace();
 
-    // Calculate y_pred
+    Dataframe Y;
+    if (kernel_ == "linear") {
+
+        // Insert an unit col for intercept value
+        x_v.insert(x_v.begin(), n, 1.0);
+        Dataframe X = {n, p+1, false, std::move(x_v)};
+        X.change_layout_inplace();
+
+        // Calculate y_pred
+        Dataframe W = {p+1, 1, false, coeffs};
+        Y = X * W;
+    }
+    else {
+        size_t n_sv = sv_alpha_y.size();
+        
+        Dataframe X_sv = {n_sv, p, true, sv_x};
+        Dataframe X = {n, p, false, std::move(x_v)};
+        Dataframe X_T = ~X;
+        Dataframe K = kernel_meth(X_sv, X_T);
+
+        K = ~K;
+        K.change_layout_inplace();
+        Dataframe SV_alpha_y = {n_sv, 1, false, sv_alpha_y};
+        
+        // b
+        std::vector<double> b_v(n, coeffs[0]);
+        Dataframe B = {n, 1, false, std::move(b_v)};
+
+        Y = (K * SV_alpha_y) + B;
+    }
+
     std::vector<double> y_pred;
     y_pred.reserve(n);
-    Dataframe W = {1, p+1, false, coeffs};
-    Dataframe Y = X * W;
     for (size_t i = 0; i < n; i++) y_pred.push_back(Y.at(i) > 0 ? 1.0 : 0.0);
 
     return y_pred;
@@ -283,13 +345,13 @@ void SVM_Algo::compute_stats(const Dataframe& x, Dataframe& /*x_const*/, const D
     
     // Predict 
     std::vector<double> y_pred = predict(x);
-    Dataframe Y_pred = {n, 2, false, std::move(y_pred)};
+    Dataframe Y_pred = {n, 1, false, std::move(y_pred)};
     
     // Confusion matrix
     std::vector<double> conf_matrix = Stats_class::conf_matrix(y.get_data(), Y_pred.get_data());
 
     // Roc Auc 
-    double roc_auc = Stats_class::roc_auc(y.get_data(), y_pred);
+    double roc_auc = Stats_class::roc_auc(y.get_data(), Y_pred.get_data());
 
     // If we have not the cols name
     std::vector<std::string> headers(p+1, "");
@@ -323,13 +385,28 @@ void SVM_Algo::compute_stats(const Dataframe& x, Dataframe& /*x_const*/, const D
     c.gen_stats = {prec, rec, spec, f1_, roc_auc};
     coeff_stats.push_back(c);
 
-    std::vector<double> w(coeffs.begin() + 1, coeffs.end());
-    double w_norm = Lnorm(w, 2); 
-    int n_sv = std::count(support_vector.begin(), support_vector.end(), true);
+    int n_sv = std::count(sv_bool.begin(), sv_bool.end(), true);
+    
+    if (kernel_ == "linear") {
+        std::vector<double> w(coeffs.begin() + 1, coeffs.end());
+        double w_norm = Lnorm(w, 2);
+        gen_stats.push_back(2.0 / w_norm);
+    } 
+    else {
+        Dataframe SV_alpha_y_T = {1, static_cast<size_t>(n_sv), true, sv_alpha_y};
+        Dataframe X_sv = {static_cast<size_t>(n_sv), p, true, sv_x};
+        Dataframe X_sv_T = ~X_sv;
+        X_sv.change_layout_inplace();
 
-    gen_stats.push_back(2.0 / w_norm);
+        Dataframe K = kernel_meth(X_sv, X_sv_T);
+        std::vector<double> W_norm = (SV_alpha_y_T * K).get_data();
+
+        double w_norm_sq = dot(W_norm, sv_alpha_y); 
+        gen_stats.push_back(2.0 / std::sqrt(w_norm_sq));
+    }
+
     gen_stats.push_back(n_sv);
-    gen_stats.push_back(n_sv / n);
+    gen_stats.push_back(static_cast<double>(n_sv) * 100.0 / n);
     gen_stats.push_back(Stats_class::mcc(conf_matrix));
     gen_stats.push_back((TP + TN) / n);
     gen_stats.push_back(prec);
@@ -346,7 +423,7 @@ void SVM_Algo::summary(bool detailled) const {
     // Global Stats
     std::cout << "Margin      = " << gen_stats[0] << "\n";
     std::cout << "Nb of SV    = " << gen_stats[1] << "\n";
-    std::cout << "% of SV     = " << gen_stats[2] << "\n";
+    std::cout << "% of SV     = " << gen_stats[2] << "%\n";
     std::cout << "MCC         = " << gen_stats[3] << "\n";
     std::cout << "Accuracy    = " << gen_stats[4] << "\n\n";
 
@@ -368,8 +445,12 @@ void SVM_Algo::summary(bool detailled) const {
     CoeffStats stat = coeff_stats[0];
     for (size_t i = 0; i < stat.name.size(); i++) {
         std::cout << std::left  << std::setw(25) << stat.name[i]
-                    << std::right << std::fixed << std::setprecision(4)
-                    << std::setw(12) << stat.beta[i] << "\n";
+                    << std::right << std::fixed << std::setprecision(4);
+        
+        if (kernel_ == "linear" || i == 0)
+            std::cout << std::setw(12) << stat.beta[i] << "\n";
+        else
+            std::cout << std::setw(12) << " _ \n";
     }
     std::cout << "\n" << std::endl;
 }
