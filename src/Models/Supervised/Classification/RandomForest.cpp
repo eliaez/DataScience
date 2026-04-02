@@ -14,6 +14,39 @@ using namespace Utils;
 
 namespace Class {
 
+size_t RandomForest::max_features(size_t p) {
+    if (max_features_ == "sqrt") return static_cast<size_t>(std::round(std::sqrt(p)));
+    else if (max_features_ == "log2") return static_cast<size_t>(std::round(std::log2(p)));
+    else if (max_features_ == "all") return p;
+    else {
+        // Trying to convert it to double
+        double val;
+        try { val = std::stod(max_features_); }
+        catch (std::invalid_argument&) {
+            throw std::invalid_argument("Max_features input not recognized: " + max_features_);
+        }
+
+        // Int or Float
+        if (val == static_cast<int>(val)) return static_cast<size_t>(std::round(val));
+        else return static_cast<size_t>(std::round(val * p));
+    }
+}
+
+double RandomForest::majority_vote(const std::vector<double>& y) const {
+    return detail::DecisionTree::leaf_value(y);
+}
+
+std::vector<size_t> RandomForest::bootstrap(int n) const {
+    
+    // Will select randomly n values
+    std::mt19937 rng;
+    std::vector<size_t> res_idx(n);
+    rng.seed(std::random_device{}());
+    auto dist = std::uniform_int_distribution<>(0 , n-1);
+    for (size_t i = 0; i < static_cast<size_t>(n); i++) res_idx[i] = static_cast<size_t>(dist(rng));
+    return res_idx;
+}
+
 Dataframe RandomForest::fit_without_stats(const Dataframe& x, const Dataframe& y) {
     
     // Tests
@@ -24,210 +57,64 @@ Dataframe RandomForest::fit_without_stats(const Dataframe& x, const Dataframe& y
     }
 
     nb_categories(y);
-    if (y.get_cols() > 2 || nb_cats > 2) {
-        throw std::invalid_argument("SVM support only binary classfication");
+    if (y.get_cols() > 1) {
+        throw std::invalid_argument("RandomForest doesn't support Y One-Hot");
     }
 
     size_t n = x.get_rows();
     size_t p = x.get_cols();
+    size_t max_p = max_features(p);
 
-    // Creating appropriate Dataframe
-    std::vector<double> x_v = x.get_data();
-    Dataframe X = {n, p, false, std::move(x_v)};
-    Dataframe X_T = ~X;
-    Dataframe X_T_row = X_T.change_layout();
-    X.change_layout_inplace();
+    // Getting ptrs to each row
+    std::vector<std::vector<const double*>> X_rows(n);
+    for (size_t i = 0; i < n; i++) {
+        X_rows[i] = x.getRowPtrs(i);
+    }
 
-    // Convert labels 0 to -1
-    std::vector<double> y_v = y.get_data();
-    for (size_t i = 0; i < n; i++) if (y_v[i] == 0) y_v[i] = -1;
+    // Create N trees
+    std::vector<double> features_importance(p, 0.0);
+    for (size_t i = 0; i < n_estimators_; i++) {
 
-    // Compute gamma_val 
-    if (gamma_ == "scale") gamma_val = 1 / (p * Stats::var(X.get_data()) * (n * p - 1) / (n * p));
-    else if (gamma_ == "auto") gamma_val = 1 / p;
-    else throw std::invalid_argument("Unknown gamma: " + gamma_);
+        // Getting idx for bootstrap
+        std::vector<size_t> idx = bootstrap(n);
 
-    // Construct our Kernel matrix
-    Dataframe K = kernel_meth(X, X_T);
+        // Creating our dataframe
+        std::vector<double> X_v;
+        std::vector<double> y_sample;
+        X_v.reserve(n * p);
+        y_sample.reserve(n);
+        for (size_t j = 0; j < n; j++) {
 
-    // SMO (Sequential Minimal Optimization)
-    int idx = 0;
-    double b = 0;
-    K.is_symmetric();
-    int numChanged = 0;
-    bool examineAll = true;
-    std::vector<double> alpha(n, 0.0);
-
-    // Init errors
-    std::vector<double> errors(n, 0.0);
-    for (size_t i = 0; i < n; i++) errors[i] = -y_v[i];
-
-    // Get error (recompute if bounded)
-    auto get_error = [&](size_t i) -> double {
-        double a = alpha[i];
-        if (a > 1e-8 && a < C_ - 1e-8) return errors[i];
-        double val = b;
-        for (size_t j = 0; j < n; j++)
-            val += alpha[j] * y_v[j] * K.at(i * n + j);
-        return val - y_v[i];
-    };
-    
-    while ((numChanged > 0 || examineAll) && idx < max_iter_) {
-        numChanged = 0;
-        
-        for (size_t i = 0; i < n; i++) {
-
-            size_t m = i;
-            double alpha_m = alpha[m];
-            if (!examineAll && (alpha_m <= 1e-8 || alpha_m >= C_ - 1e-8)) continue;
-            
-            double error_m = get_error(m);
-
-            // KKT conditions
-            double val = 0.0;
-            if (alpha_m <= 1e-8) val = std::max(0.0, - y_v[m] * error_m);
-            else if (alpha_m >= C_ - 1e-8) val = std::max(0.0, y_v[m] * error_m);
-            else val = std::abs( y_v[m] * error_m);
-
-            if (val < tol_) continue;
-
-            // Choose o with argmin/argmax
-            size_t o = n;
-            
-            if (error_m > 0.0) {
-                double best = std::numeric_limits<double>::max();
-                for (size_t j = 0; j < n; j++) {
-                    if (alpha[j] <= 1e-8 || alpha[j] >= C_ - 1e-8) continue;
-                    if (errors[j] < best || o == n) { 
-                        best = std::abs(error_m - errors[j]);
-                        o = j; 
-                    }
-                }
-            } else {
-                double best = std::numeric_limits<double>::lowest();
-                for (size_t j = 0; j < n; j++) {
-                    if (alpha[j] <= 1e-8 || alpha[j] >= C_ - 1e-8) continue;
-                    if (errors[j] > best || o == n) { 
-                        best = std::abs(error_m - errors[j]);
-                        o = j; 
-                    }
-                }
+            size_t row_idx = idx[j];
+            for (size_t k = 0; k < p; k++) {
+                X_v.push_back(*X_rows[row_idx][k]);
             }
+            y_sample.push_back(y.at(row_idx));
+        }
+        Dataframe X = {n, p, true, std::move(X_v)};
 
-            // Fallback for o
-            if (o == n) {
-
-                size_t start = std::rand() % n;
-                for (size_t k = 0; k < n; k++) {
-
-                    size_t j = (start + k) % n;
-                    if (j != m) { 
-                        o = j; 
-                        break; 
-                    }
-                }
-            }
-            if (o == n || o == m) continue;
-
-            // Calculate bounds L, H
-            double L = 0.0;
-            double H = 0.0;
-            double alpha_o = alpha[o];
-            if (y_v[m] == y_v[o]) {
-                L = std::max(0.0, alpha_o + alpha_m - C_);
-                H = std::min(C_, alpha_o + alpha_m);
-            }
-            else {
-                L = std::max(0.0, alpha_m - alpha_o);
-                H = std::min(C_, C_ + alpha_m - alpha_o);
-            }
-            if (H - L < 1e-12) continue;
-
-            // Calculate eta
-            double eta = K.at(m * n + m) + K.at(o * n + o) - 2 * K.at(m * n + o);
-            if (eta <= 0) continue;
-
-            double error_o = get_error(o);
-
-            // Calculate and clip alpha_o
-            double alpha_m_new = alpha_m + y_v[m] * (error_o - error_m) / eta;
-            if (alpha_m_new < L) alpha_m_new = L;
-            else if (alpha_m_new > H) alpha_m_new = H;
-            if (std::abs(alpha_m_new - alpha_m) < 1e-8 * (alpha_m_new + alpha_m + 1e-8)) continue;
-
-            // Calculate alpha_m and clip it
-            double alpha_o_new = alpha_o + y_v[m] * y_v[o] * (alpha_m - alpha_m_new);
-            if (alpha_o_new < 1e-8) alpha_o_new = 0.0;
-            else if (alpha_o_new > C_ - 1e-8) alpha_o_new = C_;
-
-            double delta_m = alpha_m_new - alpha_m;
-            double delta_o = alpha_o_new - alpha_o;
-
-            // Update b 
-            double bm = b - error_m - y_v[m] * delta_m * K.at(m*n+m) - y_v[o] * delta_o * K.at(m*n+o);
-            double bo = b - error_o - y_v[m] * delta_m * K.at(m*n+o)  - y_v[o] * delta_o * K.at(o*n+o);
-
-            double old_b = b;
-            if (alpha_m_new > 0 && alpha_m_new < C_) b = bm;
-            else if (alpha_o_new > 0 && alpha_o_new < C_) b = bo;
-            else b = (bm + bo) / 2.0;
-
-            // Update our alpha with alpha_m and alpha_o
-            alpha[m] = alpha_m_new;
-            alpha[o] = alpha_o_new;
-
-            // Update our errors (only for non bounds ones)
-            errors[m] = 0.0;
-            errors[o] = 0.0;
-            double db = b - old_b;
-            for (size_t j = 0; j < n; j++) {
-
-                if (j == o || j == m) continue;
-                if (alpha[j] > 0.0 && alpha[j] < C_) {
-                    double delta = y_v[m] * delta_m * K.at(j * n + m) + y_v[o] * delta_o * K.at(j * n + o);
-                    errors[j] += delta + db;
-                }
-            }
-            numChanged++;
+        // Getting ptrs to each col
+        std::vector<std::vector<const double*>> X_cols(p);
+        for (size_t j = 0; j < p; j++) {
+            X_cols[j] = X.getColumnPtrs(j);
         }
 
-        if (examineAll) examineAll = false;
-        else if (numChanged == 0) examineAll = true;
-        idx++;
-    }
-    if (max_iter_ == idx) 
-        std::cout << "Max_iter reached, you might need to change max_iter or scale your data\n" << std::endl;
+        // Create our tree
+        detail::DecisionTree tree(max_p, max_depth_, min_samples_split_, min_samples_leaf_, criterion_);
 
-    // Calculate final W or getting alpha 
-    if (kernel_ == "linear") {
-        std::vector<double> inter(n, 0.0);
-        for (size_t i = 0; i < n; i++) inter[i] = alpha[i] * y_v[i];
-        Dataframe alpha_y = {n, 1, false, std::move(inter)};
-        Dataframe W = X_T_row * alpha_y;
+        // Fit 
+        tree.fit(X_cols, y_sample);
+        std::vector<double> features_imp = tree.get_feature_imp();
+        for (size_t j = 0; j < p; j++) features_importance[j] += features_imp[j];
 
-        // Results
-        coeffs = W.get_data();
-        coeffs.insert(coeffs.begin(), b);
-    }
-    else {
-        sv_x.clear();
-        sv_alpha_y.clear();
-
-        for (size_t i = 0; i < n; i++) {
-            if (alpha[i] > 1e-8) {
-                for (size_t j = 0; j < p; j++) sv_x.push_back(x.at(j * n + i));
-                sv_alpha_y.push_back(alpha[i] * y_v[i]);
-            }
-        }
-        coeffs = {b};
+        // Add it to Forest
+        forest.push_back(std::move(tree));
     }
 
-    alpha_ = std::move(alpha);
-    sv_bool.assign(n, false);
-    for (size_t i = 0; i < n; i++) if (alpha_[i] > 1e-8) sv_bool[i] = true;
+    // Results
     is_fitted = true;
-
-    return {};
+    Dataframe features_imp = {1, p, false, std::move(features_importance)}; 
+    return features_imp;
 }
 
 std::vector<double> RandomForest::predict(const Dataframe& x) const {
@@ -238,71 +125,57 @@ std::vector<double> RandomForest::predict(const Dataframe& x) const {
     if (x.get_storage()) {
         throw std::invalid_argument("Need x col-major");
     }
+    
     size_t n = x.get_rows();
-    size_t p = x.get_cols();
 
-    // Copy our data 
-    std::vector<double> x_v = x.get_data();
-
-    Dataframe Y;
-    if (kernel_ == "linear") {
-
-        // Insert an unit col for intercept value
-        x_v.insert(x_v.begin(), n, 1.0);
-        Dataframe X = {n, p+1, false, std::move(x_v)};
-        X.change_layout_inplace();
-
-        // Calculate y_pred
-        Dataframe W = {p+1, 1, false, coeffs};
-        Y = X * W;
-    }
-    else {
-        size_t n_sv = sv_alpha_y.size();
-        
-        Dataframe X_sv = {n_sv, p, true, sv_x};
-        Dataframe X = {n, p, false, std::move(x_v)};
-        Dataframe X_T = ~X;
-        Dataframe K = kernel_meth(X_sv, X_T);
-
-        K = ~K;
-        K.change_layout_inplace();
-        Dataframe SV_alpha_y = {n_sv, 1, false, sv_alpha_y};
-        
-        // b
-        std::vector<double> b_v(n, coeffs[0]);
-        Dataframe B = {n, 1, false, std::move(b_v)};
-
-        Y = (K * SV_alpha_y) + B;
+    // Getting ptrs to each row
+    std::vector<std::vector<const double*>> X_rows(n);
+    for (size_t i = 0; i < n; i++) {
+        X_rows[i] = x.getRowPtrs(i);
     }
 
+    // Predict on each tree
+    size_t nb_tree = forest.size();
+    std::vector<std::vector<double>> forest_pred;
+    forest_pred.reserve(nb_tree);
+    for(size_t i = 0; i < nb_tree; i++) {
+        forest_pred.push_back(
+            forest[i].predict(X_rows) 
+        );
+    }
+
+    // Majority vote on each obs
     std::vector<double> y_pred;
     y_pred.reserve(n);
-    for (size_t i = 0; i < n; i++) y_pred.push_back(Y.at(i) > 0 ? 1.0 : 0.0);
+    for (size_t i = 0; i < n; i++) {
 
+        std::vector<double> pred_obs(nb_tree, 0.0);
+        for (size_t j = 0; j < nb_tree; j++) {
+            pred_obs[j] = forest_pred[j][i];
+        }
+        y_pred.push_back(
+            majority_vote(pred_obs)
+        );
+    }
     return y_pred;
 }
 
 std::unique_ptr<ClassificationBase> RandomForest::create(const std::vector<std::variant<double, std::string>>& params) {
 
-    if (params.size() > 3) {
+    if (params.size() == 6) {
         return std::make_unique<RandomForest>(
             std::get<double>(params[0]), 
-            std::get<std::string>(params[1]),
-            std::get<std::string>(params[2]),
-            std::get<double>(params[3])
+            std::get<double>(params[1]),
+            std::get<double>(params[2]), 
+            std::get<double>(params[3]),
+            std::get<std::string>(params[4]),
+            std::get<std::string>(params[5])
         );
     }
-    else if (params.size() > 2) {
-        return std::make_unique<RandomForest>(
-            std::get<double>(params[0]), 
-            std::get<std::string>(params[1]),
-            std::get<std::string>(params[2])
-        );
-    }
-    return std::make_unique<RandomForest>(std::get<double>(params[0]), std::get<std::string>(params[1]));
+    else throw std::invalid_argument("For RandomForest fill all inputs");
 }
 
-void RandomForest::compute_stats(const Dataframe& x, Dataframe& /*x_const*/, const Dataframe& y) {
+void RandomForest::compute_stats(const Dataframe& x, Dataframe& features_imp, const Dataframe& y) {
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();
@@ -318,22 +191,27 @@ void RandomForest::compute_stats(const Dataframe& x, Dataframe& /*x_const*/, con
     double roc_auc = Stats_class::roc_auc(y.get_data(), Y_pred.get_data());
 
     // If we have not the cols name
-    std::vector<std::string> headers(p+1, "");
-    headers[0] = "Intercept";
+    std::vector<std::string> headers(p, "");
     if (x.get_headers().empty()) {
-        for (size_t i = 1; i < p+1; i++) headers[i] = "c" + std::to_string(i);
+        for (size_t i = 0; i < p; i++) headers[i] = "c" + std::to_string(i);
     }
     else {
-        headers = {"Intercept"};
+        headers = {};
         headers.insert(headers.end(), x.get_headers().begin(), x.get_headers().end());
     }
+
+    // Calculating features importance
+    double sum = 0.0;
+    std::vector<double> data = features_imp.get_data();
+    for (size_t i = 0; i < data.size(); i++) sum += data[i];
+    for (size_t i = 0; i < data.size(); i++) data[i] /= sum;
 
     // Coeff stats
     CoeffStats c;
     c.category = "";
-    for (size_t i = 0; i < p+1; i++) {
+    for (size_t i = 0; i < p; i++) {
         c.name.push_back(headers[i]);
-        c.beta.push_back(coeffs[i]);
+        c.p_value.push_back(data[i]);
     }
 
     double TP = conf_matrix[0];
@@ -348,29 +226,6 @@ void RandomForest::compute_stats(const Dataframe& x, Dataframe& /*x_const*/, con
 
     c.gen_stats = {prec, rec, spec, f1_, roc_auc};
     coeff_stats.push_back(c);
-
-    int n_sv = std::count(sv_bool.begin(), sv_bool.end(), true);
-    
-    if (kernel_ == "linear") {
-        std::vector<double> w(coeffs.begin() + 1, coeffs.end());
-        double w_norm = Lnorm(w, 2);
-        gen_stats.push_back(2.0 / w_norm);
-    } 
-    else {
-        Dataframe SV_alpha_y_T = {1, static_cast<size_t>(n_sv), true, sv_alpha_y};
-        Dataframe X_sv = {static_cast<size_t>(n_sv), p, true, sv_x};
-        Dataframe X_sv_T = ~X_sv;
-        X_sv.change_layout_inplace();
-
-        Dataframe K = kernel_meth(X_sv, X_sv_T);
-        std::vector<double> W_norm = (SV_alpha_y_T * K).get_data();
-
-        double w_norm_sq = dot(W_norm, sv_alpha_y); 
-        gen_stats.push_back(2.0 / std::sqrt(w_norm_sq));
-    }
-
-    gen_stats.push_back(n_sv);
-    gen_stats.push_back(static_cast<double>(n_sv) * 100.0 / n);
     gen_stats.push_back(Stats_class::mcc(conf_matrix));
     gen_stats.push_back((TP + TN) / n);
     gen_stats.push_back(prec);
@@ -380,49 +235,46 @@ void RandomForest::compute_stats(const Dataframe& x, Dataframe& /*x_const*/, con
     gen_stats.push_back(roc_auc);
 }
 
-void RandomForest::summary(bool detailled) const {
+void RandomForest::summary(bool /*detailled*/) const {
 
     std::cout << "\n=== Classification SUMMARY ===\n\n";
 
     // Global Stats
-    std::cout << "Margin      = " << gen_stats[0] << "\n";
-    std::cout << "Nb of SV    = " << gen_stats[1] << "\n";
-    std::cout << "% of SV     = " << gen_stats[2] << "%\n";
-    std::cout << "MCC         = " << gen_stats[3] << "\n";
-    std::cout << "Accuracy    = " << gen_stats[4] << "\n\n";
+    std::cout << "MCC         = " << gen_stats[0] << "\n";
+    std::cout << "Accuracy    = " << gen_stats[1] << "\n";
+    std::cout << "Precision   = " << gen_stats[2] << "\n";
+    std::cout << "Recall      = " << gen_stats[3] << "\n";
+    std::cout << "Specificity = " << gen_stats[4] << "\n";
+    std::cout << "F1          = " << gen_stats[5] << "\n";
+    std::cout << "ROC AUC     = " << gen_stats[6] << "\n\n";
 
-    if (detailled) {
-        std::cout << "Precision   = " << gen_stats[5] << "\n";
-        std::cout << "Recall      = " << gen_stats[6] << "\n";
-        std::cout << "Specificity = " << gen_stats[7] << "\n";
-        std::cout << "F1          = " << gen_stats[8] << "\n";
-        std::cout << "ROC AUC     = " << gen_stats[9] << "\n\n";
-    }
-
-    std::cout << "---  Coefficient  ---\n";
+    std::cout << "-------  Feature Importance by IG  -------\n";
 
     // Coefficients table
     std::cout << std::left  << std::setw(25) << "Feature"
-                << std::right << std::setw(12) << "Weights" << "\n";
-    std::cout << std::string(40, '-') << "\n";
+                << std::right << std::setw(12) << "Importance Value" << "\n";
+    std::cout << std::string(42, '-') << "\n\n";
 
     CoeffStats stat = coeff_stats[0];
     for (size_t i = 0; i < stat.name.size(); i++) {
         std::cout << std::left  << std::setw(25) << stat.name[i]
                     << std::right << std::fixed << std::setprecision(4);
         
-        if (kernel_ == "linear" || i == 0)
-            std::cout << std::setw(12) << stat.beta[i] << "\n";
-        else
-            std::cout << std::setw(12) << " _ \n";
+        std::cout << std::setw(12) << stat.p_value[i] << "\n";
     }
     std::cout << "\n" << std::endl;
 }
 
 namespace detail {
 
-    std::unique_ptr<Node> DecisionTree::grow(std::vector<std::vector<const double*>>& X_rows,
-        std::vector<std::vector<const double*>>& X_cols, std::vector<double>& y, int depth) {
+    void DecisionTree::fit(const std::vector<std::vector<const double*>>& X_cols, const std::vector<double>& y) {
+        size_t p = X_cols.size();
+        features_importance.assign(p, 0.0);
+        root = grow(X_cols, y, 0);
+    }
+
+    std::unique_ptr<Node> DecisionTree::grow(const std::vector<std::vector<const double*>>& X_cols, 
+        const std::vector<double>& y, double depth) {
         
         // Test of purity of y sample
         size_t n = y.size();
@@ -436,17 +288,70 @@ namespace detail {
         }
 
         // Stop conditions
-        if (depth >= max_depth_ || X_rows.size() < min_samples_split_ || is_pure) {
+        if ((depth >= max_depth_ && max_depth_ != -1) || n < min_samples_split_ || is_pure) {
             Node node;
             node.value = leaf_value(y);
-            return std::make_unique<Node>(node);
+            return std::make_unique<Node>(std::move(node));
         }
         else {
+            auto [best_feature, best_threshold, best_IG] = best_split(X_cols, y);
+            if (isnan(best_IG)) {
+                Node node;
+                node.value = leaf_value(y);
+                return std::make_unique<Node>(std::move(node));   
+            }
 
+            std::vector<bool> left_idx = split(X_cols[best_feature], best_threshold);
+
+            // Create our left and right vectors
+            std::vector<double> left_y;
+            std::vector<double> right_y;
+            for (size_t i = 0; i < n; i++) {
+
+                if (left_idx[i]) left_y.push_back(y[i]);
+                else right_y.push_back(y[i]);
+            }
+
+            // Check if left or right aren't empty or < min_samples_split_
+            size_t n_left = left_y.size();
+            if (n_left == n || n_left < min_samples_leaf_ || (n - n_left) < min_samples_leaf_) {
+                Node node;
+                node.value = leaf_value(y);
+                return std::make_unique<Node>(std::move(node));
+            }
+
+            // Create our X_cols_left and right
+            size_t p = X_cols.size();
+            std::vector<std::vector<const double*>> left_X;
+            std::vector<std::vector<const double*>> right_X;
+            left_X.reserve(p);
+            right_X.reserve(p);
+            for (size_t i = 0; i < p; i++) {
+
+                std::vector<const double*> left_inter;
+                std::vector<const double*> right_inter;
+                left_inter.reserve(n_left);
+                right_inter.reserve(n - n_left);
+                for (size_t j = 0; j < n; j++) {
+
+                    if (left_idx[j]) left_inter.push_back(X_cols[i][j]);
+                    else right_inter.push_back(X_cols[i][j]);
+                }
+                left_X.push_back(left_inter);
+                right_X.push_back(right_inter);            
+            }
+            features_importance[best_feature] += best_IG;
+
+            Node node;
+            node.threshold = best_threshold;
+            node.feature_index = best_feature;
+            node.left = grow(left_X, left_y, depth + 1);
+            node.right = grow(right_X, right_y, depth + 1);
+            return std::make_unique<Node>(std::move(node));
         }
     }     
 
-    double DecisionTree::leaf_value(const std::vector<double>& y) const {
+    double DecisionTree::leaf_value(const std::vector<double>& y) {
         
         // Getting nb of val of each category
         std::unordered_map<int, int> counts;
@@ -497,7 +402,7 @@ namespace detail {
         return stat_p - left_y.size() * stat_l / y.size() - right_y.size() * stat_r / y.size();
     }
 
-    std::pair<size_t, double> DecisionTree::best_split(const std::vector<std::vector<const double*>>& X_cols, 
+    std::tuple<size_t, double, double> DecisionTree::best_split(const std::vector<std::vector<const double*>>& X_cols, 
         const std::vector<double>& y) const {
         
         // Will select randomly max_features features
@@ -528,8 +433,6 @@ namespace detail {
                 std::vector<bool> left_idx = split(X_cols[col_idx], threshold);
 
                 // Create our left and right vectors
-                size_t n_left = left_idx.size();
-
                 std::vector<double> left_y;
                 std::vector<double> right_y;
                 for (size_t j = 0; j < n; j++) {
@@ -556,8 +459,8 @@ namespace detail {
                 res_threshold = best_threshold;
             }
         }
-        if (res_IG == -1) return {SIZE_MAX, NAN};
-        return {res_feature, res_threshold};
+        if (res_IG == -1) return {SIZE_MAX, NAN, NAN};
+        return {res_feature, res_threshold, res_IG};
     }
 
     double DecisionTree::gini(const std::vector<double>& y) const {
@@ -629,10 +532,3 @@ namespace detail {
     }
 }
 }
-/*
-    // Getting ptrs to each row
-    std::vector<std::vector<const double*>> X_i(n);
-    for (size_t i = 0; i < n; i++) {
-        X_i[i] = x_copy.getRowPtrs(i);
-    }
-*/

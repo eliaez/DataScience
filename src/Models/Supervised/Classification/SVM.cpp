@@ -60,7 +60,7 @@ Dataframe SVM_Algo::fit_without_stats(const Dataframe& x, const Dataframe& y) {
     }
 
     nb_categories(y);
-    if (y.get_cols() > 2 || nb_cats > 2) {
+    if (y.get_cols() > 1 || nb_cats > 2) {
         throw std::invalid_argument("SVM support only binary classfication");
     }
 
