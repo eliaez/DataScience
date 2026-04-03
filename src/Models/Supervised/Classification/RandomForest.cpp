@@ -176,6 +176,8 @@ std::unique_ptr<ClassificationBase> RandomForest::create(const std::vector<std::
 }
 
 void RandomForest::compute_stats(const Dataframe& x, Dataframe& features_imp, const Dataframe& y) {
+    gen_stats.clear();
+    coeff_stats.clear();
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();
@@ -256,11 +258,20 @@ void RandomForest::summary(bool /*detailled*/) const {
     std::cout << std::string(42, '-') << "\n\n";
 
     CoeffStats stat = coeff_stats[0];
+    std::vector<std::pair<std::string, double>> named_Impval;
     for (size_t i = 0; i < stat.name.size(); i++) {
-        std::cout << std::left  << std::setw(25) << stat.name[i]
-                    << std::right << std::fixed << std::setprecision(4);
-        
-        std::cout << std::setw(12) << stat.p_value[i] << "\n";
+        named_Impval.push_back({stat.name[i], stat.p_value[i]});
+    }
+
+    std::sort(named_Impval.begin(), named_Impval.end(),
+        [](const auto& a, const auto& b) {
+            return a.second > b.second;
+        });
+
+    for (const auto& [name, imp] : named_Impval) {
+        std::cout << std::left  << std::setw(25) << name
+                << std::right << std::fixed << std::setprecision(4)
+                << std::setw(12) << imp << "\n";
     }
     std::cout << "\n" << std::endl;
 }
@@ -268,6 +279,7 @@ void RandomForest::summary(bool /*detailled*/) const {
 namespace detail {
 
     void DecisionTree::fit(const std::vector<std::vector<const double*>>& X_cols, const std::vector<double>& y) {
+        total_size = y.size();
         size_t p = X_cols.size();
         features_importance.assign(p, 0.0);
         root = grow(X_cols, y, 0);
@@ -340,7 +352,7 @@ namespace detail {
                 left_X.push_back(left_inter);
                 right_X.push_back(right_inter);            
             }
-            features_importance[best_feature] += best_IG;
+            features_importance[best_feature] +=  n * best_IG / total_size;
 
             Node node;
             node.threshold = best_threshold;
@@ -428,19 +440,21 @@ namespace detail {
             // And calculate IG to get best threshold
             double best_IG = -1;
             double best_threshold = -1;
-            for (double threshold : unique_val) {
-
+            std::vector<double> uv(unique_val.begin(), unique_val.end()); // Add mid-point
+            for (size_t j = 0; j + 1 < uv.size(); j++) {
+                
+                double threshold = (uv[j] + uv[j + 1]) / 2.0;
                 std::vector<bool> left_idx = split(X_cols[col_idx], threshold);
 
                 // Create our left and right vectors
                 std::vector<double> left_y;
                 std::vector<double> right_y;
-                for (size_t j = 0; j < n; j++) {
+                for (size_t k = 0; k < n; k++) {
 
-                    if (left_idx[j]) {
-                        left_y.push_back(y[j]);
+                    if (left_idx[k]) {
+                        left_y.push_back(y[k]);
                     }
-                    else right_y.push_back(y[j]);
+                    else right_y.push_back(y[k]);
                 }
 
                 // Check if left or right aren't empty

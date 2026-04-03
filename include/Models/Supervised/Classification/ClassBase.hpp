@@ -47,13 +47,6 @@ namespace Class {
             // Function to verify if x non-empty,...
             void basic_verif(const Dataframe& x) const;
 
-            // Calculate Stats after fit function
-            virtual void compute_stats(const Dataframe& x, Dataframe& x_const, const Dataframe& y) = 0;
-            
-            // Function to handle Softmax in case of multi classes
-            std::vector<double> softmax(const Dataframe& X) const;
-            std::vector<double> softmax(const Dataframe& X, const Dataframe& W) const;
-
             // Function to get number of categories
             void nb_categories(const Dataframe& Y);
 
@@ -66,8 +59,11 @@ namespace Class {
             virtual Dataframe fit_without_stats(const Dataframe& x, const Dataframe& y) = 0;
       
             // Prediction
-            virtual std::vector<double> predict(const Dataframe& x) const;
+            virtual std::vector<double> predict(const Dataframe& x) const = 0;
             virtual std::vector<double> predict_proba(const Dataframe& x) const;
+
+            // Calculate Stats after fit function
+            virtual void compute_stats(const Dataframe& x, Dataframe& x_const, const Dataframe& y) = 0;
 
             // Display stats after training
             virtual void summary(bool detailled = false) const = 0;

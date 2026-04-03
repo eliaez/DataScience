@@ -29,6 +29,7 @@ namespace Class {
                 double min_samples_split_;     // Nb min of samples to split node
                 std::string criterion_;     // "gini" or "entropy"
 
+                size_t total_size;
                 std::unique_ptr<Node> root;
                 std::vector<double> features_importance;
 
@@ -87,16 +88,11 @@ namespace Class {
             std::string criterion_;        // "gini" or "entropy"
             std::string max_features_;     // Nb of features to consider for each split "sqrt", "log2", "all", "0.5"%,...
 
-            std::vector<detail::DecisionTree> forest; 
-            std::vector<std::vector<size_t>> oob_indices;
+            std::vector<detail::DecisionTree> forest;
 
             size_t max_features(size_t p);
             std::vector<size_t> bootstrap(int n) const;
             double majority_vote(const std::vector<double>& y) const;
-
-        protected:
-            // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, Dataframe& features_imp, const Dataframe& y) override;
         
         public:
             
@@ -110,8 +106,11 @@ namespace Class {
             : n_estimators_(n_estimator), max_depth_(max_depth), min_samples_split_(min_samples_split), 
               min_samples_leaf_(min_samples_leaf), max_features_(max_features), criterion_(criterion) {};
 
-            // Training RandomForest with x col-major
+            // Training RandomForest with x col-major, returns features_imp
             Dataframe fit_without_stats(const Dataframe& x, const Dataframe& y) override;
+
+            // Calculate Stats after fit function
+            void compute_stats(const Dataframe& x, Dataframe& features_imp, const Dataframe& y) override;
 
             // Predict RandomForest
             std::vector<double> predict(const Dataframe& x) const override;

@@ -181,14 +181,16 @@ std::vector<double> RegressionBase::predict(const Dataframe& x) const {
 
 void RegressionBase::clean_params() {
     is_fitted = false;
-    coeffs = {};
-    gen_stats = {};
-    coeff_stats = {};
+    coeffs.clear();
+    gen_stats.clear();
+    coeff_stats.clear();
 }
 
 // --------------------------------------- Penalized Regressions ---------------------------------
 void RegressionBase::compute_stats_penalized(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y, 
     std::function<double(Dataframe&, Dataframe&)> effective_df) {
+    gen_stats.clear();
+    coeff_stats.clear();
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();

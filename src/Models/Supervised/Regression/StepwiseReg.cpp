@@ -699,6 +699,8 @@ double StepwiseRegression::effective_df() const {
 }
 
 void StepwiseRegression::compute_stats(const Dataframe& x, Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) {
+    gen_stats.clear();
+    coeff_stats.clear();
     
     size_t n = x.get_rows();
     size_t p = x_const.get_cols() - 1;

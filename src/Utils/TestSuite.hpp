@@ -59,7 +59,7 @@ namespace TestSuite {
         auto _actual = (actual); \
         auto _expected = (expected); \
         for (size_t i = 0; i < _actual.size(); i++) { \
-            if (std::abs(_actual[i] - _expected[i]) / std::max(std::abs(_actual[i]), std::abs(_expected[i])) > EPSILON) { \
+            if (std::abs(_actual[i] - _expected[i]) / (std::max)(std::abs(_actual[i]), std::abs(_expected[i])) > EPSILON) { \
                 throw std::runtime_error( \
                     std::string("Value ") + std::to_string(i) + " : " + std::to_string(_actual[i]) + " vs " + std::to_string(_expected[i]) \
                 ); \

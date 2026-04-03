@@ -339,6 +339,8 @@ std::unique_ptr<ClassificationBase> SVM_Algo::create(const std::vector<std::vari
 }
 
 void SVM_Algo::compute_stats(const Dataframe& x, Dataframe& /*x_const*/, const Dataframe& y) {
+    gen_stats.clear();
+    coeff_stats.clear();
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();

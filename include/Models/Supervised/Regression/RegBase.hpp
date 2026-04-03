@@ -35,9 +35,6 @@ namespace Reg {
         
             // Function to verify if x non-empty,...
             void basic_verif(const Dataframe& x) const;
-
-            // Calculate Stats after fit function
-            virtual void compute_stats(const Dataframe& x, Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) = 0;
             
             // ------------------------------------------ Penalized Regressions ------------------------------------------
             
@@ -59,6 +56,9 @@ namespace Reg {
       
             // Prediction
             virtual std::vector<double> predict(const Dataframe& x) const;
+
+            // Calculate Stats after fit function
+            virtual void compute_stats(const Dataframe& x, Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) = 0;
 
             // Display stats after training
             virtual void summary(bool detailled = false) const = 0;

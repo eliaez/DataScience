@@ -74,7 +74,9 @@ std::pair<Dataframe, Dataframe> LinearRegression::fit_without_stats(const Datafr
 }
 
 void LinearRegression::compute_stats(const Dataframe& x, Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) {
-    
+    gen_stats.clear();
+    coeff_stats.clear();
+
     size_t n = x.get_rows();
     size_t p = x.get_cols();
     size_t p_const = constant_ ? p+1 : p;

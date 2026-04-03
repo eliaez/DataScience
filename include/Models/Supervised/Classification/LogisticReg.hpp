@@ -17,9 +17,9 @@ namespace Class {
             double l1_ratio_;  // Used only if elastic net
             std::string penality_;  // "" (None), "l1", "l2", "elasticnet"
 
-        protected:
-            // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, Dataframe& x_const, const Dataframe& y) override;
+            // Function to handle Softmax in case of multi classes
+            std::vector<double> softmax(const Dataframe& X) const;
+            std::vector<double> softmax(const Dataframe& X, const Dataframe& W) const;
         
         public:
             // C = 1/lambda, penality = "" (None), "l1", "l2", "elasticnet"
@@ -29,6 +29,13 @@ namespace Class {
 
             // Training Logistic Regression with x col-major
             Dataframe fit_without_stats(const Dataframe& x, const Dataframe& y) override;
+
+            // Calculate Stats after fit function
+            void compute_stats(const Dataframe& x, Dataframe& x_const, const Dataframe& y) override;
+
+            // Prediction
+            std::vector<double> predict(const Dataframe& x) const override;
+            std::vector<double> predict_proba(const Dataframe& x) const override;
 
             // Display stats after training
             void summary(bool detailled = false) const override;

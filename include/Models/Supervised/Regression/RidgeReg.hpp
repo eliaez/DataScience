@@ -14,16 +14,15 @@ namespace Reg {
     class RidgeRegression : public RegressionBase {
         private:
             double lambda_; // L2 Penality
-
-        protected:
-            // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) override;
         
         public:
             RidgeRegression(double lambda = 1.0) : lambda_(lambda) {};
 
             // Training Ridge Regression with x col-major
             std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;
+
+            // Calculate Stats after fit function
+            void compute_stats(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) override;
 
             // Display stats after training
             void summary(bool detailled = false) const override;

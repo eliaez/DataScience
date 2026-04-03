@@ -25,10 +25,6 @@ namespace Class {
             std::vector<double> sv_alpha_y;
 
             Dataframe kernel_meth(const Dataframe& X1, const Dataframe& X2) const;
-
-        protected:
-            // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, Dataframe& x_const, const Dataframe& y) override;
         
         public:
             // C = 1/lambda, kernel = "linear", "poly" or "rbf", gamma = "scale" or "auto"
@@ -37,6 +33,9 @@ namespace Class {
 
             // Training SVM with x col-major
             Dataframe fit_without_stats(const Dataframe& x, const Dataframe& y) override;
+
+            // Calculate Stats after fit function
+            void compute_stats(const Dataframe& x, Dataframe& x_const, const Dataframe& y) override;
 
             // Predict SVM
             std::vector<double> predict(const Dataframe& x) const override;
