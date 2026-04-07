@@ -7,6 +7,7 @@
 #include "Data/Data.hpp"
 #include "Utils/Utils.hpp"
 #include "Stats/stats_reg.hpp"
+#include "Utils/ThreadPool.hpp"
 #include "Stats/stats_class.hpp"
 #include "Models/Supervised/Classification/RandomForest.hpp"
 
@@ -71,44 +72,74 @@ Dataframe RandomForest::fit_without_stats(const Dataframe& x, const Dataframe& y
         X_rows[i] = x.getRowPtrs(i);
     }
 
-    // Create N trees
+    // ThreadPool Variables
+    ThreadPool& pool = ThreadPool::instance();
+    size_t nb_threads = pool.nb_threads;
+    std::vector<std::future<void>> futures;
+    futures.reserve(nb_threads);
+
+    size_t chunk = std::floor(n_estimators_ / nb_threads);
+    size_t start = 0;
+
+    // Assign by default Forest
+    forest.clear();
+    for (int i = 0; i < n_estimators_; ++i) {
+        forest.push_back(detail::DecisionTree(max_p));
+    }
+
+    for (size_t nb = 0; nb < nb_threads; nb++) {
+        size_t end = (nb + 1 == nb_threads) ? n_estimators_ : start + chunk;
+        end = std::min(end, static_cast<size_t>(n_estimators_));
+
+        auto fut = pool.enqueue([start, end, n, p, max_p, &X_rows, &y, this] {
+            
+            // Create N trees
+            for (size_t i = start; i < end; i++) {
+
+                // Getting idx for bootstrap
+                std::vector<size_t> idx = bootstrap(n);
+
+                // Creating our dataframe
+                std::vector<double> X_v;
+                std::vector<double> y_sample;
+                X_v.reserve(n * p);
+                y_sample.reserve(n);
+                for (size_t j = 0; j < n; j++) {
+
+                    size_t row_idx = idx[j];
+                    for (size_t k = 0; k < p; k++) {
+                        X_v.push_back(*X_rows[row_idx][k]);
+                    }
+                    y_sample.push_back(y.at(row_idx));
+                }
+                Dataframe X = {n, p, true, std::move(X_v)};
+
+                // Getting ptrs to each col
+                std::vector<std::vector<const double*>> X_cols(p);
+                for (size_t j = 0; j < p; j++) {
+                    X_cols[j] = X.getColumnPtrs(j);
+                }
+
+                // Create our tree
+                detail::DecisionTree tree(max_p, max_depth_, min_samples_split_, min_samples_leaf_, criterion_);
+
+                // Fit 
+                tree.fit(X_cols, y_sample);
+
+                // Add it to Forest
+                forest[i] = std::move(tree);
+            }
+        });
+        futures.push_back(std::move(fut));
+        start += chunk;
+    }
+    for (auto& fut : futures) fut.wait();
+
+    // Calculating features Importance
     std::vector<double> features_importance(p, 0.0);
     for (size_t i = 0; i < n_estimators_; i++) {
-
-        // Getting idx for bootstrap
-        std::vector<size_t> idx = bootstrap(n);
-
-        // Creating our dataframe
-        std::vector<double> X_v;
-        std::vector<double> y_sample;
-        X_v.reserve(n * p);
-        y_sample.reserve(n);
-        for (size_t j = 0; j < n; j++) {
-
-            size_t row_idx = idx[j];
-            for (size_t k = 0; k < p; k++) {
-                X_v.push_back(*X_rows[row_idx][k]);
-            }
-            y_sample.push_back(y.at(row_idx));
-        }
-        Dataframe X = {n, p, true, std::move(X_v)};
-
-        // Getting ptrs to each col
-        std::vector<std::vector<const double*>> X_cols(p);
-        for (size_t j = 0; j < p; j++) {
-            X_cols[j] = X.getColumnPtrs(j);
-        }
-
-        // Create our tree
-        detail::DecisionTree tree(max_p, max_depth_, min_samples_split_, min_samples_leaf_, criterion_);
-
-        // Fit 
-        tree.fit(X_cols, y_sample);
-        std::vector<double> features_imp = tree.get_feature_imp();
+        std::vector<double> features_imp = forest[i].get_feature_imp();
         for (size_t j = 0; j < p; j++) features_importance[j] += features_imp[j];
-
-        // Add it to Forest
-        forest.push_back(std::move(tree));
     }
 
     // Results
