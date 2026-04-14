@@ -318,6 +318,10 @@ std::vector<double> SVM_Algo::predict(const Dataframe& x) const {
     return y_pred;
 }
 
+std::vector<double> SVM_Algo::predict_proba(const Dataframe& /*X*/) const {
+    throw std::logic_error("Predict proba not supported for this model");
+}
+
 std::unique_ptr<ClassificationBase> SVM_Algo::create(const std::vector<std::variant<double, std::string>>& params) {
 
     if (params.size() > 3) {

@@ -266,7 +266,7 @@ double chi2_pval(double loglikelihood_model, double loglikelihood_null, double d
 }
 
 namespace Mult {
-    std::vector<double> conf_matrix_mult(const std::vector<double>& y, const Dataframe& y_pred) {
+    std::vector<double> conf_matrix_mult(const std::vector<double>& y, const Dataframe& y_pred, size_t K) {
         if (y.empty()) throw std::invalid_argument("Cannot calculate Confusion matrix of empty vector");
         if (y_pred.get_storage()) throw std::invalid_argument("Y_proba need to be col major");
 
@@ -274,7 +274,6 @@ namespace Mult {
         if (n != y_pred.get_rows()) throw std::invalid_argument("Y and Y_pred need to have the same length");
 
         // Calc confusion matrix
-        size_t K = y_pred.get_cols();
         std::vector<double> cm(K * K, 0.0);
         for (size_t i = 0; i < n; i++) {
             int true_class = static_cast<int>(y[i]);

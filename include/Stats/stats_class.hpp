@@ -53,7 +53,7 @@ namespace Stats_class {
 
     namespace Mult {
         // Confusion matrix multi categories (row major), will vector K*K, row major with conf_mat[i*K + j] = "predict j, true i"
-        std::vector<double> conf_matrix_mult(const std::vector<double>& y, const Dataframe& y_pred);
+        std::vector<double> conf_matrix_mult(const std::vector<double>& y, const Dataframe& y_pred, size_t K);
     
         // Log loss for multiple categories with prob col major 
         double logloss_mult(const std::vector<double>& y, const Dataframe& prob);

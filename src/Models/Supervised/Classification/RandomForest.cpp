@@ -83,7 +83,7 @@ Dataframe RandomForest::fit_without_stats(const Dataframe& x, const Dataframe& y
 
     // Assign by default Forest
     forest.clear();
-    for (int i = 0; i < n_estimators_; ++i) {
+    for (int i = 0; i < n_estimators_; i++) {
         forest.push_back(detail::DecisionTree(max_p));
     }
 
@@ -189,6 +189,10 @@ std::vector<double> RandomForest::predict(const Dataframe& x) const {
         );
     }
     return y_pred;
+}
+
+std::vector<double> RandomForest::predict_proba(const Dataframe& /*X*/) const {
+    throw std::logic_error("Predict proba not supported for this model");
 }
 
 std::unique_ptr<ClassificationBase> RandomForest::create(const std::vector<std::variant<double, std::string>>& params) {

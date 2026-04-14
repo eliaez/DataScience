@@ -39,6 +39,7 @@ namespace Class {
 
             // Predict SVM
             std::vector<double> predict(const Dataframe& x) const override;
+            std::vector<double> predict_proba(const Dataframe& x) const override;
 
             // Display stats after training
             void summary(bool detailled = false) const override;

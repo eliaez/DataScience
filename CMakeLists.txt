@@ -140,6 +140,7 @@ set(LIB_SOURCES
     src/Models/Supervised/Classification/ClassBase.cpp
     src/Models/Supervised/Classification/LogisticReg.cpp
     src/Models/Supervised/Classification/SVM.cpp
+    src/Models/Supervised/Classification/XGBoost.cpp
     src/Models/Supervised/Classification/RandomForest.cpp
 
     # Unsupervised

@@ -50,10 +50,6 @@ namespace Class {
             // Function to get number of categories
             void nb_categories(const Dataframe& Y);
 
-            // Function to handle Softmax in case of multi classes
-            std::vector<double> softmax(const Dataframe& X) const;
-            std::vector<double> softmax(const Dataframe& X, const Dataframe& W) const;
-
         public:
             // Constructor 
             ClassificationBase() : is_fitted(false), nb_cats(-1.0), ref_class_(-1), tol_(1e-4), max_iter_(100000), learning_r_(0.1) {}; // Init to get col major or warn user 
@@ -61,10 +57,10 @@ namespace Class {
 
             virtual void fit(const Dataframe& x, const Dataframe& y);
             virtual Dataframe fit_without_stats(const Dataframe& x, const Dataframe& y) = 0;
-      
+
             // Prediction
-            virtual std::vector<double> predict(const Dataframe& x) const;
-            virtual std::vector<double> predict_proba(const Dataframe& x) const;
+            virtual std::vector<double> predict(const Dataframe& x) const = 0;
+            virtual std::vector<double> predict_proba(const Dataframe& x) const = 0;
 
             // Calculate Stats after fit function
             virtual void compute_stats(const Dataframe& x, Dataframe& x_const, const Dataframe& y) = 0;

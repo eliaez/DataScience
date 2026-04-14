@@ -403,12 +403,12 @@ CVres cross_validation(Class::ClassificationBase* model, const Dataframe& x, con
         if (metric == "f1" || metric == "accuracy") {
             
             std::vector<double> y_pred = model->predict(X_test_);
-            Dataframe Y_pred = {n_, K, false, std::move(y_pred)};
+            Dataframe Y_pred = {n_, 1, false, std::move(y_pred)};
 
             // Confusion matrix
             std::vector<double> conf_matrix;
             if (nb_cats == 2) conf_matrix = Stats_class::conf_matrix(y_test, Y_pred.get_data());
-            else conf_matrix = Stats_class::Mult::conf_matrix_mult(y_test, Y_pred);
+            else conf_matrix = Stats_class::Mult::conf_matrix_mult(y_test, Y_pred, K);
 
             // Getting accuracy or f1 if binary case
             if (nb_cats == 2) {
