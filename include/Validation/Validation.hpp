@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <random>
 #include <variant>
 #include <optional>
 #include "Models/Supervised/Regression/RegBase.hpp"
@@ -11,6 +12,8 @@ class Dataframe;
 
 namespace Validation {
     using ParamValue = std::variant<double, std::string>;
+    using RNG = std::mt19937;
+    inline RNG rng{std::random_device{}()};
 
     // CVres is composed of all scores for each folds, mean_score and std_score 
     struct CVres {

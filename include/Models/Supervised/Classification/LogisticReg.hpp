@@ -8,7 +8,7 @@
 
 class Dataframe;
 
-// ---------------------------------------Reg------------------------------------------
+// ---------------------------------------Class------------------------------------------
 
 namespace Class {
     class LogisticRegression : public ClassificationBase {

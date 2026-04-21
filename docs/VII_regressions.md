@@ -7,9 +7,19 @@ Every model exposes the same entry points: `fit()` to train and compute diagnost
 ```cpp
 // Common interface shared by all models
 model.fit(X, y);                                    // train + compute diagnostics
-std::vector<double> y_pred = model.predict(X_new);  // predict
 model.summary();                                    // display results
 model.summary(true);                                // detailed output
+std::vector<double> y_pred = model.predict(X_new);  // predict
+
+// Or 
+model.fit_without_stats(X_train, y_train);
+model.compute_stats(
+    X_test, 
+    X_test_const,               // X_test_const is X with col of 1.0 for intercept
+    XtXinv_test,                // XtXinv_test is (X.T * X).inv()
+    y_test
+);
+model.summary(true);  
 ```
 
 Each fitted model can also shows its results through a set of getters:

@@ -2,13 +2,14 @@
 
 #include <vector>
 #include <string>
+#include <random>
 #include "ClassBase.hpp"
 
 // ---------------Forward Declaration----------------
 
 class Dataframe;
 
-// ---------------------------------------Reg------------------------------------------
+// ---------------------------------------Class------------------------------------------
 
 namespace Class {
 
@@ -27,11 +28,12 @@ namespace Class {
                 double max_features_;          // Nb of features to consider for each split
                 double min_samples_leaf_;      // Nb min of samples in each leaf
                 double min_samples_split_;     // Nb min of samples to split node
-                std::string criterion_;     // "gini" or "entropy"
+                std::string criterion_;        // "gini" or "entropy"
 
                 size_t total_size;
                 std::unique_ptr<Node> root;
                 std::vector<double> features_importance;
+                mutable std::mt19937 rng{std::random_device{}()};
 
                 // Create our tree
                 std::unique_ptr<Node> grow(
@@ -89,6 +91,7 @@ namespace Class {
             std::string max_features_;     // Nb of features to consider for each split "sqrt", "log2", "all", "0.5"%,...
 
             std::vector<detail::DecisionTree> forest;
+            mutable std::mt19937 rng{std::random_device{}()};
 
             size_t max_features(size_t p);
             std::vector<size_t> bootstrap(int n) const;

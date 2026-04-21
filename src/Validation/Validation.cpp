@@ -39,8 +39,6 @@ CVres cross_validation(Reg::RegressionBase* model, const Dataframe& x, const Dat
 
     // Random shuffle
     if (shuffle) {
-        std::mt19937 rng;
-        rng.seed(std::random_device{}());
         std::shuffle(indices.begin(), indices.end(), rng);
     }
 
@@ -327,8 +325,6 @@ CVres cross_validation(Class::ClassificationBase* model, const Dataframe& x, con
 
     // Random shuffle
     if (shuffle) {
-        std::mt19937 rng;
-        rng.seed(std::random_device{}());
         if (stratified) {
             for (auto& [cls, idx] : class_indices)
                 std::shuffle(idx.begin(), idx.end(), rng);

@@ -40,9 +40,7 @@ double RandomForest::majority_vote(const std::vector<double>& y) const {
 std::vector<size_t> RandomForest::bootstrap(int n) const {
     
     // Will select randomly n values
-    std::mt19937 rng;
     std::vector<size_t> res_idx(n);
-    rng.seed(std::random_device{}());
     auto dist = std::uniform_int_distribution<>(0 , n-1);
     for (size_t i = 0; i < static_cast<size_t>(n); i++) res_idx[i] = static_cast<size_t>(dist(rng));
     return res_idx;
@@ -453,11 +451,9 @@ namespace detail {
         const std::vector<double>& y) const {
         
         // Will select randomly max_features features
-        std::mt19937 rng;
         size_t n = y.size();
         size_t p = X_cols.size();
         std::vector<size_t> indices(p);
-        rng.seed(std::random_device{}());
         std::iota(indices.begin(), indices.end(), 0);
         std::shuffle(indices.begin(), indices.end(), rng);
         
