@@ -1,6 +1,6 @@
 # VI - Statistical Functions
 
-Statistical toolkit for regression analysis, model validation, and inference. Provides both basic descriptive statistics (`mean`, `var`, `cov`, ...) and advanced diagnostic tests with optimized backends (`Naive` and `AVX2` by default). The module also extends to time series analysis through `Stats_TS` by enabling automatic `ARIMA` and `SARIMA` parameters identification. All the following functions are automatically called during the regression pipeline but can also be used as standalone utilities.
+Statistical toolkit for regression analysis, model validation, and inference. Provides both basic descriptive statistics (`mean`, `var`, `cov`, ...) and advanced diagnostic tests with optimized backends (`Naive` and `AVX2` by default). The module also extends to time series analysis through `Stats_TS` by enabling automatic `ARIMA` and `SARIMA` parameters identification, and to classification through `Stats_class` which covers everything from binary confusion metrics to multi-class inference.  All the following functions are automatically called during the regression pipeline but can also be used as standalone utilities.
 
 ## 1 - Regression Diagnostics
 Once the model is estimated, assessing its reliability and quality is essential. This section covers the functions implemented to evaluate both the statistical validity of the estimators and the overall goodness-of-fit of the model.
@@ -179,11 +179,112 @@ int p = Stats_TS::Pacf(y);
 **Note**: a grid search over (p, q) minimizing AIC/BIC would be more exhaustive at the cost of higher computational overhead.
 <br>
 
+## 4 - Classification Diagnostics (`Stats_class`)
+
+Once a classifier is trained, evaluating its performance goes well beyond simple accuracy. The `Stats_class` namespace provides a complete suite of binary and multi-class metrics to assess coefficient significance.
+
+### Confusion Matrix & Core Metrics
+
+The foundation of binary classification evaluation is the confusion matrix, computed via **`conf_matrix()`** which returns `{TP, FN, FP, TN}` for a binary outcome. From these four values, the full set of standard metrics follows naturally: **`accuracy()`**, **`precision()`**, **`recall()`**,  **`specificity()`** and **`f1()`**.
+
+```cpp
+// Compute confusion matrix
+std::vector<double> cm = Stats_class::conf_matrix(y, y_pred);
+// cm = {TP, FN, FP, TN}
+
+double acc  = Stats_class::accuracy(cm);
+double prec = Stats_class::precision(cm[0], cm[2]);   // TP, FP
+double rec  = Stats_class::recall(cm[0], cm[1]);      // TP, FN
+double spec = Stats_class::specificity(cm[3], cm[2]); // TN, FP
+double f1   = Stats_class::f1(prec, rec);
+```
+
+### Discrimination Metrics
+
+**`roc_auc()`** evaluates the classifier's ability to rank positive examples above negative ones, regardless of any fixed threshold. Complementing this, **`mcc()`** (the Matthews Correlation Coefficient) provides a single balanced score that accounts for all four cells of the confusion matrix simultaneously (making it particularly reliable when classes are heavily imbalanced):
+
+```cpp
+// Threshold-independent discrimination
+double auc = Stats_class::roc_auc(y, prob);
+
+// Matthews Correlation Coefficient
+double m = Stats_class::mcc(cm);
+// or directly from raw counts
+double m = Stats_class::mcc(TP, FN, FP, TN);
+```
+
+**Interpretation**: An AUC of 0.5 corresponds to a random classifier while 1.0 indicates perfect discrimination. MCC ranges from −1 (inverse predictions) to +1 (perfect predictions) with 0 indicating random chance.
+
+### Multi-class Extension (`Stats_class::Mult` & `Stats_class::OneHot`)
+
+When the number of classes exceeds two, the binary metrics generalize through the `Mult` namespace:
+
+```cpp
+// K×K confusion matrix (row-major), y_pred col-major Dataframe
+std::vector<double> cm_k = Stats_class::Mult::conf_matrix_mult(y, y_pred, K);
+
+// Log loss and multi-class AUC, prob col-major (one column per class)
+double loss = Stats_class::Mult::logloss_mult(y, prob);
+std::vector<double> aucs = Stats_class::Mult::roc_auc_mult(y, prob);
+
+// Generalized MCC over K classes
+double mcc_k = Stats_class::Mult::mcc_mult(cm_k, n, K);
+```
+
+When labels are one-hot encoded rather than integer-indexed, the `OneHot` namespace provides equivalent functions that operate directly on the encoded matrix:
+
+```cpp
+// y and prob are col-major Dataframes (N×K)
+double loss_oh = Stats_class::OneHot::logloss_mult_onehot(y_onehot, prob);
+double ll_oh   = Stats_class::OneHot::logLikelihood_onehot(y_onehot, prob);
+double ll_null = Stats_class::OneHot::logLikelihood_null_onehot(y_onehot);
+```
+
+### Goodness-of-Fit & Model Comparison
+
+Analogously to R² in linear regression, **`mc_fadden()`** quantifies the classification model's explanatory power relative to a null intercept-only model. Moreover, to formally test whether the improvement over the null is statistically significant, we use **`chi2_pval()`**:
+
+```cpp
+double ll_model = Stats_class::logLikelihood(y, prob);
+double ll_null  = Stats_class::logLikelihood_null(y, K);
+
+// McFadden R²
+double r2_mf = Stats_class::mc_fadden(ll_model, ll_null);
+
+// Likelihood-ratio test, df = (K-1) * p (p without intercept)
+double pval = Stats_class::chi2_pval(ll_model, ll_null, df);
+```
+
+**Interpretation**: McFadden R² values above 0.2 are generally considered good and above 0.4 excellent, though they are not directly comparable to OLS R². 
+
+### Coefficient Inference
+
+Standard errors are derived from the Fisher information matrix (`fisher_mat()`), inverted into a covariance matrix (`cov_mat()`), from which `stderr_coeff()` and `normal_pval()` can be calculated:
+
+```cpp
+// Fisher information matrix, then covariance
+Dataframe fisher = Stats_class::fisher_mat(x_const, y_proba, ref_class);
+Dataframe cov    = Stats_class::cov_mat(fisher);
+
+// Standard errors for class K (p features including intercept)
+std::vector<double> se = Stats_class::stderr_coeff(cov, K, p);
+
+// Or directly from design matrix and predicted probabilities
+std::vector<double> se = Stats_class::stderr_coeff(x_const, y_pred, K);
+
+// Two-tailed p-values from z-scores
+double z    = beta[j] / se[j];
+double pval = Stats_class::normal_pval(z);
+```
+<br>
+
 **To test it yourself**, you can also check the corresponding files:
 - [**stats.hpp**](/include/Stats/stats_reg.hpp)
 - [**stats.cpp**](/src/Stats/stats_reg.cpp)
 - [**Time_series.hpp**](/include/Stats/Time_series.hpp)
 - [**Time_series.cpp**](/src/Stats/Time_series.cpp)
+- [**stats_class.hpp**](/include/Stats/stats_class.hpp)
+- [**stats_class.cpp**](/src/Stats/stats_class.cpp)
 - [**Test folder**](/tests/)
 
 To read the next part: [**V - Preprocessing**](/docs/V_preprocessing.md).

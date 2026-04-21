@@ -65,4 +65,4 @@ std::vector<int> new_labels = model.predict(new_df);
 - [**Kmeans.hpp**](/include/Models/Unsupervised/Kmeans.hpp)
 - [**Kmeans.cpp**](/src/Models/Unsupervised/Kmeans.cpp)
 
-To read the next part: [**IX**].
+To read the next part: [**IX - Classifications**](/docs/IX_classifications.md).

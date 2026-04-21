@@ -2,7 +2,7 @@
 
 Regression analysis is at the core of this library. All models implemented here share a common interface through `Reg::RegressionBase`, which standardizes the training, prediction and diagnostic workflow regardless of the model chosen. This design makes it straightforward to swap models, plug them into the validation pipeline or compare their results under identical conditions.
 
-Every model exposes the same entry points: `fit()` to train and compute diagnostics, `predict()` to generate predictions on new data and `summary()` to display a structured report of the estimated coefficients and model statistics. Under the hood, each model handles its own estimation logic while delegating the statistical inference to the shared diagnostic toolkit described in [**IV - Statistical Functions**](/docs/IV_stats.md).
+Every model exposes the same entry points: `fit()` to train and compute diagnostics (use only `fit_without_stats()` to train then `compute_stats()`,...), `predict()` to generate predictions on new data and `summary()` to display a structured report of the estimated coefficients and model statistics. Under the hood, each model handles its own estimation logic while delegating the statistical inference to the shared diagnostic toolkit described in [**IV - Statistical Functions**](/docs/IV_stats.md).
 
 ```cpp
 // Common interface shared by all models
@@ -11,7 +11,7 @@ model.summary();                                    // display results
 model.summary(true);                                // detailed output
 std::vector<double> y_pred = model.predict(X_new);  // predict
 
-// Or 
+// Or, for split train/test workflows:
 model.fit_without_stats(X_train, y_train);
 model.compute_stats(
     X_test, 

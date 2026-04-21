@@ -361,7 +361,7 @@ void NeuralNetwork::summary(bool detailled) const {
     std::cout << "\n=== Classification SUMMARY ===\n\n";
 
     // Global Stats
-    std::cout << "Log-Likelyhood Predict = " << gen_stats[0] << "\n";
+    std::cout << "Log-Likelihood Predict = " << gen_stats[0] << "\n";
     std::cout << "Log-Loss Predict       = " << gen_stats[1] << "\n";
     std::cout << "Log-Loss Train         = " << gen_stats[2] << "\n";
     std::cout << "MCC                    = " << gen_stats[3] << "\n";
