@@ -14,16 +14,15 @@ namespace Reg {
     class LassoRegression : public RegressionBase {
         private:
             double lambda_; // L1 Penality
-
-        protected:
-            // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) override;
         
         public:
             LassoRegression(double lambda = 0.1) : lambda_(lambda) {};
 
             // Training Lasso Regression with x col-major
             std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;
+
+            // Calculate Stats after fit function
+            void compute_stats(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) override;
 
             // Display stats after training
             void summary(bool detailled = false) const override;
@@ -37,7 +36,7 @@ namespace Reg {
             double effective_df() const;
 
             // Function to create new model
-            std::unique_ptr<RegressionBase> create(const std::vector<double>& params) override;
+            std::unique_ptr<RegressionBase> create(const std::vector<std::variant<double, std::string>>& params) override;
 
             // Getter
             double get_lambda() const { return lambda_; }

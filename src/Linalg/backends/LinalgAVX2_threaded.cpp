@@ -62,10 +62,11 @@ std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const
             futures.reserve(nb_threads);
 
             size_t chunk = (int)((n - k - 1) / nb_threads);
-            size_t start = k+1, end = k + 1 + chunk;
+            size_t start = k+1;
 
             for (size_t nb = 0; nb < nb_threads; nb++) {
-                if (nb+1 == nb_threads) end = n;
+                size_t end = (nb + 1 == nb_threads) ? n : start + chunk;
+                end = std::min(end, n);
 
                 auto fut = pool.enqueue([start, end, k, n, p, vec_size, &LU] {
                     for (size_t i = start; i < end; i++) {
@@ -114,7 +115,6 @@ std::tuple<int, std::vector<double>, std::vector<double>> LU_decomposition(const
                 });
                 futures.push_back(std::move(fut));
                 start += chunk;
-                end += chunk;
             }
             for (auto& fut : futures) fut.wait();
         } else {
@@ -192,11 +192,12 @@ std::vector<double> solveLU_inplace(const std::vector<double>& perm, const std::
     futures.reserve(nb_threads);
     const size_t prefetch_dist1 = PREFETCH_DIST1;
 
-    size_t chunk = (int)(vec_size / nb_threads);
-    size_t start = 0, end = chunk;
+    size_t chunk = (vec_size / nb_threads / NB_DB) * NB_DB;
+    size_t start = 0;
 
     for (size_t nb = 0; nb < nb_threads; nb++) {
-        if (nb+1 == nb_threads) end = vec_size;
+        size_t end = (nb + 1 == nb_threads) ? vec_size : start + chunk;
+        end = std::min(end, vec_size);
 
         auto fut = pool.enqueue([start, end, n, prefetch_dist1, &perm, &y, &diag_U, &LU] {
             
@@ -290,12 +291,11 @@ std::vector<double> solveLU_inplace(const std::vector<double>& perm, const std::
         });
         futures.push_back(std::move(fut));
         start += chunk;
-        end += chunk;
     }
     for (auto& fut : futures) fut.wait();
 
     // Scalar Residual for k 
-    for (size_t k = end; k < n; k++) {
+    for (size_t k = vec_size; k < n; k++) {
 
         // Solving Ly = perm (No division because diag = 1)
         // Forward substitution
@@ -346,12 +346,13 @@ std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>
     std::vector<std::future<void>> futures;
     futures.reserve(nb_threads);
 
-    size_t chunk = (int)(vec_size / nb_threads);
-    size_t start = 0, end = chunk;
+    size_t chunk = (vec_size / nb_threads / NB_DB) * NB_DB;
+    size_t start = 0;
 
     if (op == '+') {
         for (size_t nb = 0; nb < nb_threads; nb++) {
-            if (nb+1 == nb_threads) end = vec_size;
+            size_t end = (nb + 1 == nb_threads) ? vec_size : start + chunk;
+            end = std::min(end, vec_size);
 
             auto fut = pool.enqueue([start, end, &v1, &v2, &new_data] {
                 for (size_t i = start; i < end; i += NB_DB) {
@@ -372,19 +373,19 @@ std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>
             });
             futures.push_back(std::move(fut));
             start += chunk;
-            end += chunk;
         }
 
         for (auto& fut : futures) fut.wait();
 
         // Scalar residual
-        for (size_t i = end; i < m*n; i++) {
+        for (size_t i = vec_size; i < m*n; i++) {
             new_data[i] = v1[i] + v2[i];
         }
     }
     else if (op == '-') {
         for (size_t nb = 0; nb < nb_threads; nb++) {
-            if (nb+1 == nb_threads) end = vec_size;
+            size_t end = (nb + 1 == nb_threads) ? vec_size : start + chunk;
+            end = std::min(end, vec_size);
 
             auto fut = pool.enqueue([start, end, &v1, &v2, &new_data] {
                 for (size_t i = start; i < end; i += NB_DB) {
@@ -405,13 +406,12 @@ std::vector<double> sum(const std::vector<double>& v1, const std::vector<double>
             });
             futures.push_back(std::move(fut));
             start += chunk;
-            end += chunk;
         }
 
         for (auto& fut : futures) fut.wait();
 
         // Scalar residual
-        for (size_t i = end; i < m*n; i++) {
+        for (size_t i = vec_size; i < m*n; i++) {
             new_data[i] = v1[i] - v2[i];
         }
     }
@@ -439,11 +439,12 @@ std::vector<double> multiply(const std::vector<double>& v1, const std::vector<do
     std::vector<std::future<void>> futures;
     futures.reserve(nb_threads);
 
-    size_t chunk = (int)(vec_sizei / nb_threads);
-    size_t start = 0, end = chunk;
+    size_t chunk = (vec_sizei / nb_threads / NB_DB) * NB_DB;
+    size_t start = 0;
 
     for (size_t nb = 0; nb < nb_threads; nb++) {
-        if (nb+1 == nb_threads) end = vec_sizei;
+        size_t end = (nb + 1 == nb_threads) ? vec_sizei : start + chunk;
+        end = std::min(end, vec_sizei);
 
         auto fut = pool.enqueue([start, end, m, n, o, p, &v1, &v2, &new_data] {
             for (size_t i = start; i < end; i += NB_DB) {
@@ -510,13 +511,12 @@ std::vector<double> multiply(const std::vector<double>& v1, const std::vector<do
         });
         futures.push_back(std::move(fut));
         start += chunk;
-        end += chunk;
     }
 
     for (auto& fut : futures) fut.wait();
 
     // Scalar residual for i
-    for (size_t i = end; i < m; i++) {
+    for (size_t i = vec_sizei; i < m; i++) {
         for (size_t j = 0; j < p; j++) {
 
             double sum = 0.0;

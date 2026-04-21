@@ -50,10 +50,11 @@ std::pair<Dataframe, Dataframe> ElasticRegression::fit_without_stats(const Dataf
     };
 
     // Coordinate descent 
+    int idx = 0;
     bool keep_cond = true; 
     std::vector<double> v_beta_est(p, 0.0);
     Dataframe beta_est = {p, 1, false, v_beta_est};
-    while (keep_cond) {
+    while (keep_cond && idx < 1000) {
 
         std::vector<double> beta_old = v_beta_est;
         for (size_t j = 0; j < p; j++) {
@@ -78,6 +79,7 @@ std::pair<Dataframe, Dataframe> ElasticRegression::fit_without_stats(const Dataf
                 break;
             } 
         }
+        idx++;
     }
 
     // Results
@@ -134,8 +136,11 @@ double ElasticRegression::effective_df(Dataframe& X_c) const {
     return df;
 }
 
-std::unique_ptr<RegressionBase> ElasticRegression::create(const std::vector<double>& params) {
-    return std::make_unique<ElasticRegression>(params[0], params[1]);
+std::unique_ptr<RegressionBase> ElasticRegression::create(const std::vector<std::variant<double, std::string>>& params) {
+    return std::make_unique<ElasticRegression>(
+        std::get<double>(params[0]),
+        std::get<double>(params[1])
+    );
 }
 
 void ElasticRegression::compute_stats(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) {

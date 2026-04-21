@@ -4,6 +4,7 @@
 
 void tests_OLS();
 void tests_Reg();
+void tests_Class();
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -18,6 +19,9 @@ int main(int argc, char* argv[]) {
     } 
     else if (test == "Reg") {
         tests_Reg();
+    }
+    else if (test == "Class") {
+        tests_Class();
     }
     else {
         std::cerr << "Test inconnu: " << test << "\n";

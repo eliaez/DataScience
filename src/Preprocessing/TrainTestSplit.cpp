@@ -60,10 +60,10 @@ TrainTestSplit train_test_split(const Dataframe& x, const Dataframe& y, int prop
     fill(x_test, y_test_v, n_train, n_test);
 
     TrainTestSplit res;
-    res.X_train = {n_train, p, false, std::move(x_train)};
-    res.X_test = {n_test, p, false, std::move(x_test)};
-    res.y_train = {n_train, 1, false, std::move(y_train_v)};
-    res.y_test = {n_test, 1, false, std::move(y_test_v)};
+    res.X_train = {n_train, p, false, std::move(x_train), x.get_headers()};
+    res.X_test = {n_test, p, false, std::move(x_test), x.get_headers()};
+    res.y_train = {n_train, 1, false, std::move(y_train_v), y.get_headers()};
+    res.y_test = {n_test, 1, false, std::move(y_test_v), y.get_headers()};
 
     return res;
 }
@@ -134,12 +134,12 @@ TrainTestValidSplit train_test_split(const Dataframe& x, const Dataframe& y, con
     fill(x_test, y_test_v, n_train + n_valid, n_test);
 
     TrainTestValidSplit res;
-    res.X_train = {n_train, p, false, std::move(x_train)};
-    res.X_valid = {n_valid, p, false, std::move(x_valid)};
-    res.X_test = {n_test, p, false, std::move(x_test)};
-    res.y_train = {n_train, 1, false, std::move(y_train_v)};
-    res.y_valid = {n_valid, 1, false, std::move(y_valid_v)};
-    res.y_test = {n_test, 1, false, std::move(y_test_v)};
+    res.X_train = {n_train, p, false, std::move(x_train), x.get_headers()};
+    res.X_valid = {n_valid, p, false, std::move(x_valid), x.get_headers()};
+    res.X_test = {n_test, p, false, std::move(x_test), x.get_headers()};
+    res.y_train = {n_train, 1, false, std::move(y_train_v), y.get_headers()};
+    res.y_valid = {n_valid, 1, false, std::move(y_valid_v), y.get_headers()};
+    res.y_test = {n_test, 1, false, std::move(y_test_v), y.get_headers()};
 
     return res;
 }
@@ -224,10 +224,10 @@ TrainTestSplit stratified_split(const Dataframe& x, const Dataframe& y, int prop
     }
 
     TrainTestSplit res;
-    res.X_train = {n_train, p, false, std::move(x_train)};
-    res.X_test = {n_test, p, false, std::move(x_test)};
-    res.y_train = {n_train, 1, false, std::move(y_train_v)};
-    res.y_test = {n_test, 1, false, std::move(y_test_v)};
+    res.X_train = {n_train, p, false, std::move(x_train), x.get_headers()};
+    res.X_test = {n_test, p, false, std::move(x_test), x.get_headers()};
+    res.y_train = {n_train, 1, false, std::move(y_train_v), y.get_headers()};
+    res.y_test = {n_test, 1, false, std::move(y_test_v), y.get_headers()};
 
     return res;
 }
@@ -344,12 +344,12 @@ TrainTestValidSplit stratified_split(const Dataframe& x, const Dataframe& y, con
     }
 
     TrainTestValidSplit res;
-    res.X_train = {n_train, p, false, std::move(x_train)};
-    res.X_valid = {n_valid, p, false, std::move(x_valid)};
-    res.X_test = {n_test, p, false, std::move(x_test)};
-    res.y_train = {n_train, 1, false, std::move(y_train_v)};
-    res.y_valid = {n_valid, 1, false, std::move(y_valid_v)};
-    res.y_test = {n_test, 1, false, std::move(y_test_v)};
+    res.X_train = {n_train, p, false, std::move(x_train), x.get_headers()};
+    res.X_valid = {n_valid, p, false, std::move(x_valid), x.get_headers()};
+    res.X_test = {n_test, p, false, std::move(x_test), x.get_headers()};
+    res.y_train = {n_train, 1, false, std::move(y_train_v), y.get_headers()};
+    res.y_valid = {n_valid, 1, false, std::move(y_valid_v), y.get_headers()};
+    res.y_test = {n_test, 1, false, std::move(y_test_v), y.get_headers()};
 
     return res;
 }

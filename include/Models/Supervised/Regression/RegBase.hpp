@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <utility>
+#include <variant>
 #include <functional>
 
 // ---------------Forward Declaration----------------
@@ -34,9 +35,6 @@ namespace Reg {
         
             // Function to verify if x non-empty,...
             void basic_verif(const Dataframe& x) const;
-
-            // Calculate Stats after fit function
-            virtual void compute_stats(const Dataframe& x, Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) = 0;
             
             // ------------------------------------------ Penalized Regressions ------------------------------------------
             
@@ -59,11 +57,14 @@ namespace Reg {
             // Prediction
             virtual std::vector<double> predict(const Dataframe& x) const;
 
+            // Calculate Stats after fit function
+            virtual void compute_stats(const Dataframe& x, Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) = 0;
+
             // Display stats after training
             virtual void summary(bool detailled = false) const = 0;
 
             // Function to create new model 
-            virtual std::unique_ptr<RegressionBase> create(const std::vector<double>& params);
+            virtual std::unique_ptr<RegressionBase> create(const std::vector<std::variant<double, std::string>>& params);
 
             // Function to clean params from RegressionBase
             void clean_params();

@@ -15,10 +15,6 @@ namespace Reg {
         private:
             double alpha_;
             double l1_ratio_;
-
-        protected:
-            // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) override;
         
         public:
             ElasticRegression(double alpha = 0.1, double l1_ratio = 0.5) : 
@@ -28,6 +24,9 @@ namespace Reg {
             // Training Elastic Net Regression with x col-major
             std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;
 
+            // Calculate Stats after fit function
+            void compute_stats(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) override;
+
             // Display stats after training
             void summary(bool detailled = false) const override;
 
@@ -35,7 +34,7 @@ namespace Reg {
             double effective_df(Dataframe& X_c) const;
 
             // Function to create new model
-            std::unique_ptr<RegressionBase> create(const std::vector<double>& params) override;
+            std::unique_ptr<RegressionBase> create(const std::vector<std::variant<double, std::string>>& params) override;
 
             // Getter
             double get_alpha() const { return alpha_; }

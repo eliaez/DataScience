@@ -10,7 +10,7 @@ if(MSVC)
     add_compile_options(
         /W4         # /W4 to get warnings
         /bigobj     # Eigen generates too many sections
-        #/O2         # /02 opti-max for balance size/speed
+        /O2         # /02 opti-max for balance size/speed
         /wd4127     # Constant conditionnal expression
         /wd4267     # size_t to int
         /wd4244     # double to int
@@ -104,7 +104,7 @@ FetchContent_MakeAvailable(Eigen)
 # ============================================
 option(BUILD_TEST "Build tests" ON)
 option(BUILD_BENCHMARK "Build benchmark" ON)
-option(BUILD_MAIN "Build main" ON)
+option(BUILD_MAIN "Build main" OFF)
 
 
 # SOURCES
@@ -128,12 +128,21 @@ set(LIB_SOURCES
 
     # Models
     # Supervised
+    # Regressions
     src/Models/Supervised/Regression/RegBase.cpp
     src/Models/Supervised/Regression/LinearReg.cpp
     src/Models/Supervised/Regression/RidgeReg.cpp
     src/Models/Supervised/Regression/LassoReg.cpp
     src/Models/Supervised/Regression/ElasticNetReg.cpp
     src/Models/Supervised/Regression/StepwiseReg.cpp
+
+    # Classifications
+    src/Models/Supervised/Classification/ClassBase.cpp
+    src/Models/Supervised/Classification/LogisticReg.cpp
+    src/Models/Supervised/Classification/SVM.cpp
+    src/Models/Supervised/Classification/XGBoost.cpp
+    src/Models/Supervised/Classification/RandomForest.cpp
+    src/Models/Supervised/Classification/NeuralNetwork.cpp
 
     # Unsupervised
     src/Models/Unsupervised/Kmeans.cpp
@@ -149,6 +158,7 @@ set(LIB_SOURCES
 
     # Stats
     src/Stats/stats_reg.cpp
+    src/Stats/stats_class.cpp
     src/Stats/Time_series.cpp
 
     # Utils
@@ -234,17 +244,19 @@ if(BUILD_TEST)
     endif()
 
     # ------------------- Tests on Regressions --------------------
-    add_executable(test_reg
+    add_executable(test_models
         tests/regression/tests_main.cpp
         tests/regression/tests_OLS.cpp
         tests/regression/tests_Reg.cpp
+        tests/regression/tests_Class.cpp
     )
-    target_link_libraries(test_reg PRIVATE 
+    target_link_libraries(test_models PRIVATE 
         linalg_full
         test_utils
     )
-    add_test(NAME TestOLS COMMAND test_reg OLS)
-    add_test(NAME TestReg COMMAND test_reg Reg)
+    add_test(NAME TestOLS COMMAND test_models OLS)
+    add_test(NAME TestReg COMMAND test_models Reg)
+    add_test(NAME TestClass COMMAND test_models Class)
 endif()
 
 

@@ -51,10 +51,11 @@ std::pair<Dataframe, Dataframe> LassoRegression::fit_without_stats(const Datafra
     };
 
     // Coordinate descent 
+    int idx = 0;
     bool keep_cond = true; 
     std::vector<double> v_beta_est(p, 0.0);
     Dataframe beta_est = {p, 1, false, v_beta_est};
-    while (keep_cond) {
+    while (keep_cond && idx < 1000) {
 
         std::vector<double> beta_old = v_beta_est;
         for (size_t j = 0; j < p; j++) {
@@ -79,6 +80,7 @@ std::pair<Dataframe, Dataframe> LassoRegression::fit_without_stats(const Datafra
                 break;
             } 
         }
+        idx++;
     }
 
     // Results
@@ -105,7 +107,7 @@ void LassoRegression::optimal_lambda(double start, double end, int nb, const Dat
     std::vector<std::vector<double>> param_grid = {path};
     Validation::GSres res = Validation::GSearchCV(this, x, y, param_grid);
 
-    lambda_ = res.best_params[0];
+    lambda_ = std::get<double>(res.best_params[0]);
 }
 
 double LassoRegression::effective_df() const {
@@ -116,8 +118,8 @@ double LassoRegression::effective_df() const {
     return df;
 }
 
-std::unique_ptr<RegressionBase> LassoRegression::create(const std::vector<double>& params) {
-    return std::make_unique<LassoRegression>(params[0]);
+std::unique_ptr<RegressionBase> LassoRegression::create(const std::vector<std::variant<double, std::string>>& params) {
+    return std::make_unique<LassoRegression>(std::get<double>(params[0]));
 }
 
 void LassoRegression::compute_stats(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y) {

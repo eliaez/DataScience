@@ -31,7 +31,7 @@ void RegressionBase::fit(const Dataframe& x, const Dataframe& y) {
     compute_stats(x, x_const, XtXInv, y);
 }
 
-std::unique_ptr<RegressionBase> RegressionBase::create(const std::vector<double>& /*params*/) {
+std::unique_ptr<RegressionBase> RegressionBase::create(const std::vector<std::variant<double, std::string>>& /*params*/) {
     throw std::logic_error("GridSearch not supported for this model");
 }
 
@@ -118,7 +118,6 @@ std::vector<double> RegressionBase::predict(const Dataframe& x) const {
         #endif
     }
     else {
-        /*
         #ifdef __AVX2__
 
             size_t i = 0;
@@ -160,7 +159,7 @@ std::vector<double> RegressionBase::predict(const Dataframe& x) const {
             for (; i < n; i++) {
                 y_pred[i] += coeffs[0];
             }
-        #else */
+        #else
             for (size_t j = 0; j < p; j++) {
                 
                 double coeff = coeffs[1 + j];
@@ -174,7 +173,7 @@ std::vector<double> RegressionBase::predict(const Dataframe& x) const {
             for (size_t i = 0; i < n; i++) {
                 y_pred[i] += intercept;
             }
-        //#endif
+        #endif
     }
 
     return y_pred;
@@ -182,14 +181,16 @@ std::vector<double> RegressionBase::predict(const Dataframe& x) const {
 
 void RegressionBase::clean_params() {
     is_fitted = false;
-    coeffs = {};
-    gen_stats = {};
-    coeff_stats = {};
+    coeffs.clear();
+    gen_stats.clear();
+    coeff_stats.clear();
 }
 
 // --------------------------------------- Penalized Regressions ---------------------------------
 void RegressionBase::compute_stats_penalized(const Dataframe& x, Dataframe& x_c, Dataframe& XtXinv, const Dataframe& y, 
     std::function<double(Dataframe&, Dataframe&)> effective_df) {
+    gen_stats.clear();
+    coeff_stats.clear();
     
     size_t n = x.get_rows();
     size_t p = x.get_cols();
@@ -202,7 +203,7 @@ void RegressionBase::compute_stats_penalized(const Dataframe& x, Dataframe& x_c,
     double mse = Stats::mse(y.get_data(), y_pred);
     std::vector<double> residuals = Stats::get_residuals(y.get_data(), y_pred);
     double df = effective_df(x_c, XtXinv);
-    double loglikehood = Stats::logLikehood(y.get_data(), y_pred);
+    double loglikehood = Stats::logLikelihood(y.get_data(), y_pred);
 
 
     // Add them to our vector of stats

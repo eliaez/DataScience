@@ -27,10 +27,6 @@ namespace Reg {
             // Function for Stepwise
             std::vector<double> stepwise_reg(const Dataframe& x, const Dataframe& y);
         
-        protected:
-            // Calculate Stats after fit function
-            void compute_stats(const Dataframe& x, Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) override;
-        
         public:
             // alpha pair represents alpha in, alpha out conditions to keep or erase feature accordingly to
             // the method Forward/Backward/Stepwise and is linked to the threshold variable alpha by default.
@@ -46,6 +42,9 @@ namespace Reg {
 
             // Training Stepwise Regression with x col-major
             std::pair<Dataframe, Dataframe> fit_without_stats(const Dataframe& x, const Dataframe& y) override;
+
+            // Calculate Stats after fit function
+            void compute_stats(const Dataframe& x, Dataframe& x_const, Dataframe& XtXinv, const Dataframe& y) override;
             
             // Function to know nb of selected features
             double effective_df() const;

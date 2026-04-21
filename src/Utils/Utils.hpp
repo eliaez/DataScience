@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <vector>
+#include <numeric>
 #include <stdexcept>
 #include <unordered_map>
 
@@ -44,6 +45,10 @@ namespace Utils {
     template<typename T>
     std::vector<T> sub(const std::vector<T>& v, const std::vector<T>& v1);
 
+    // Vector elements **d independantly
+    template<typename T>
+    std::vector<T> pow_vect(const std::vector<T>& v, int d);
+
     // Norm L**p
     template<typename T>
     double Lnorm(const std::vector<T>& v, int p, int pow = 1);
@@ -69,6 +74,9 @@ namespace Utils {
     // Utils
     template<typename T>
     std::vector<T> rangeExcept(T max, T exclude);
+
+    template<typename T>
+    T mean(const std::vector<T>& v);
 
     template<typename T>
     T mostFrequent(const std::vector<T>& v);
@@ -170,6 +178,15 @@ std::vector<T> sub(const std::vector<T>& v, const std::vector<T>& v1) {
         result[i] = v[i] - v1[i];
     }
     return result;
+}
+
+template<typename T>
+std::vector<T> pow_vect(const std::vector<T>& v, int d) {
+    std::vector<T> result(v.size());
+    for(size_t i = 0; i < v.size(); ++i) {
+        result[i] = std::pow(v[i], d);
+    }
+    return result;  
 }
 
 template<typename T>
@@ -281,6 +298,11 @@ std::vector<T> rangeExcept(T max, T exclude) {
         }
     }
     return result;
+}
+
+template<typename T>
+T mean(const std::vector<T>& v) {
+    return std::accumulate(v.begin(), v.end(), 0.0) / v.size();
 }
 
 template <typename T>
