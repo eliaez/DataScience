@@ -47,12 +47,13 @@ For further details, see [**III - Linear Algebra Benchmark**](/docs/III_benchmar
 
 ## IV - Statistical Functions
 
-Once the model is estimated, we need tools to assess its reliability and quality. This section provides a statistical toolkit covering both basic descriptive statistics (`mean`, `var`, `cov`, ...) and advanced diagnostic tests, all automatically called during the regression pipeline but also usable as standalone utilities:
+Once the model is estimated, we need tools to assess its reliability and quality. This section provides a statistical toolkit covering both basic descriptive statistics (`mean`, `var`, `cov`, ...) and advanced diagnostic tests, all automatically called during the regression and classification pipeline but also usable as standalone utilities:
 
 - **Covariance matrix** with multiple estimators (`classical`, `HC3`, `HAC`, `cluster`, `GLS`)
 - **Goodness-of-fit metrics** including R², MAE, MSE and RMSE
 - **Hypothesis testing** through Fisher, Student, Durbin-Watson and Breusch-Pagan tests
 - **Multicollinearity and model selection** via VIF and AIC/BIC
+- **Classification diagnostics** covering binary and multi-class metrics (`accuracy`, `precision`, `recall`, `F1`, `ROC-AUC`, `MCC`) and more (McFadden R², Fisher information matrix,...) 
 - **Time series analysis** through ARIMA/SARIMA automatic parameter detection via stationarity testing, seasonality detection and autocorrelation analysis
 
 For further details, see [**IV - Statistical Functions**](/docs/IV_stats.md).
@@ -102,6 +103,16 @@ Moreover, when the number of clusters is unknown, the algorithm can automaticall
 
 For further details, see [**VIII - Clustering**](/docs/VIII_clustering.md).
 
-## IX -
+## IX - Classifications
 
-**In progress...**
+Building on the validation and statistical tools introduced in the previous sections, this section provides a unified classification framework covering a wide range of algorithms from interpretable linear models to tree-based ensembles and deep learning.
+
+All models share a common interface through `Class::ClassificationBase` which standardizes training, prediction and diagnostic reporting regardless of the model chosen. The following models are currently available:
+
+- **Logistic Regression** with multiple regularization strategies (`none`, `l1`, `l2`, `elasticnet`) and automated `C` selection
+- **Support Vector Machine** with interchangeable kernels (`linear`, `rbf`, `poly`) and configurable margin control
+- **Random Forest** for bagged decision tree ensembles with feature importance reporting
+- **XGBoost** for sequential gradient-boosted trees with L1/L2 regularization and softmax output
+- **Neural Network** with user-defined layer architecture, Adam optimizer, dropout and mini-batch training
+
+**To test it yourself**, you can check **the following document** to have an idea of how to use the various functions, see [**VIII - Classifications**](/docs/IX_classifications.md).
