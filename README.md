@@ -115,4 +115,4 @@ All models share a common interface through `Class::ClassificationBase` which st
 - **XGBoost** for sequential gradient-boosted trees with L1/L2 regularization and softmax output
 - **Neural Network** with user-defined layer architecture, Adam optimizer, dropout and mini-batch training
 
-**To test it yourself**, you can check **the following document** to have an idea of how to use the various functions, see [**VIII - Classifications**](/docs/IX_classifications.md).
+**To test it yourself**, you can check **the following document** to have an idea of how to use the various functions, see [**IX - Classifications**](/docs/IX_classifications.md).
