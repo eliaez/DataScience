@@ -1,5 +1,5 @@
 # Machine Learning From Scratch
-Educational project implementing fundamental machine learning and regression algorithms in C++ **without relying on external ML libraries**.
+Educational project implementing fundamental machine learning and regression algorithms in C++ **without relying on external ML libraries and AI**.
 
 ## Prerequisites
 
@@ -97,9 +97,7 @@ All models share a common interface through `Reg::RegressionBase`, which standar
 
 For unsupervised learning, we introduce a **K-Means** clustering algorithm that partitions data into `k` groups by minimizing intra-cluster variance. 
 
-The implementation relies on **`K-Means++`** initialization for better convergence, runs multiple times to keep the best result and supports three algorithmic variants: `batch`, `mini-batch` and `online`. 
-
-Moreover, when the number of clusters is unknown, the algorithm can automatically select the optimal `k` using the **elbow method**.
+The implementation relies on **`K-Means++`** initialization for better convergence, runs multiple times to keep the best result and supports three algorithmic variants: `batch`, `mini-batch` and `online`. Moreover, when the number of clusters is unknown, the algorithm can automatically select the optimal `k` using the **elbow method**.
 
 For further details, see [**VIII - Clustering**](/docs/VIII_clustering.md).
 
